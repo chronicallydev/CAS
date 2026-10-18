@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://b6ug31vif04s7"]
+
+[ext_resource type="Script" uid="uid://c8mt54d0soebl" path="res://scenes/Enemies/enemy.gd" id="1_5alqo"]
+
+[sub_resource type="Gradient" id="Gradient_5jgtd"]
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_s1fef"]
+gradient = SubResource("Gradient_5jgtd")
+fill_from = Vector2(0.6267361, 1)
+fill_to = Vector2(0.6822917, 0)
+
+[node name="Enemy" type="Node3D" unique_id=876811622]
+script = ExtResource("1_5alqo")
+speed = null
+
+[node name="Sprite3D" type="Sprite3D" parent="." unique_id=2039394829 groups=["enemies"]]
+transform = Transform3D(3, 0, 0, 0, 5, 0, 0, 0, 3, 0, 0, 0)
+billboard = 2
+texture = SubResource("GradientTexture2D_s1fef")
