@@ -2,20 +2,14 @@
 
 [ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://scenes/healthbar3D/health_bar_3d.tscn" id="1_5q1ba"]
 [ext_resource type="Script" uid="uid://cfu0njowud6ba" path="res://scenes/home/home.gd" id="1_ng36q"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_s1fef"]
-size = Vector3(7, 4, 7)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ng36q"]
-albedo_color = Color(0.44947696, 0.5977458, 0.85368836, 1)
+[ext_resource type="Script" path="res://scenes/home/oil_rig.gd" id="2_rig"]
 
 [node name="home" type="Area3D" unique_id=357851406]
 script = ExtResource("1_ng36q")
 
 [node name="HealthBar3D" parent="." unique_id=242640874 instance=ExtResource("1_5q1ba")]
 unique_name_in_owner = true
-transform = Transform3D(1, 9.181531e-05, -8.876792e-05, -9.181531e-05, 1, -0.00014896457, 8.876792e-05, 0.00014896457, 1, 0, 8.349745, 0)
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 20.5, 0)
 
-[node name="CSGMesh3D" type="CSGMesh3D" parent="." unique_id=1757932799]
-mesh = SubResource("BoxMesh_s1fef")
-material = SubResource("StandardMaterial3D_ng36q")
+[node name="OilRig" type="Node3D" parent="."]
+script = ExtResource("2_rig")

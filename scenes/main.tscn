@@ -11,13 +11,37 @@
 [ext_resource type="AudioStream" uid="uid://321sn8sgrtnp" path="res://assets/reticle/shooting.wav" id="8_85g3d"]
 [ext_resource type="PackedScene" path="res://scenes/Enemies/car.tscn" id="9_car"]
 [ext_resource type="PackedScene" path="res://scenes/Enemies/tank.tscn" id="10_tank"]
+[ext_resource type="Script" path="res://scenes/environment/desert_environment.gd" id="11_desert"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
-size = Vector3(120, 1, 120)
+size = Vector3(4000, 1, 4000)
+
+[sub_resource type="FastNoiseLite" id="Noise_sand"]
+frequency = 0.008
+fractal_octaves = 4
+
+[sub_resource type="Gradient" id="Gradient_sand"]
+colors = PackedColorArray(0.78, 0.76, 0.74, 1, 1, 1, 1, 1)
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture_sand"]
+width = 512
+height = 512
+seamless = true
+color_ramp = SubResource("Gradient_sand")
+noise = SubResource("Noise_sand")
+
+[sub_resource type="StandardMaterial3D" id="Material_sand"]
+albedo_color = Color(0.8, 0.63, 0.42, 1)
+albedo_texture = SubResource("NoiseTexture_sand")
+roughness = 1.0
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
-sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
-ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+sky_top_color = Color(0.3, 0.5, 0.78, 1)
+sky_horizon_color = Color(0.86, 0.8, 0.7, 1)
+ground_bottom_color = Color(0.6, 0.5, 0.36, 1)
+ground_horizon_color = Color(0.86, 0.8, 0.7, 1)
 
 [sub_resource type="Sky" id="Sky_o5qli"]
 sky_material = SubResource("ProceduralSkyMaterial_sgp6g")
@@ -25,7 +49,13 @@ sky_material = SubResource("ProceduralSkyMaterial_sgp6g")
 [sub_resource type="Environment" id="Environment_0wfyh"]
 background_mode = 2
 sky = SubResource("Sky_o5qli")
+tonemap_mode = 2
+ssao_enabled = true
 glow_enabled = true
+fog_enabled = true
+fog_light_color = Color(0.86, 0.8, 0.7, 1)
+fog_density = 0.0025
+fog_sky_affect = 0.3
 
 [node name="Main" type="Node3D" unique_id=373985464]
 
@@ -35,6 +65,10 @@ glow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.9081261, 0)
 use_collision = true
 mesh = SubResource("BoxMesh_1pgxc")
+material = SubResource("Material_sand")
+
+[node name="DesertEnvironment" type="Node3D" parent="EnvironmentalMesh"]
+script = ExtResource("11_desert")
 
 [node name="CameraController" parent="." unique_id=1898930510 node_paths=PackedStringArray("target_marker") instance=ExtResource("1_0wfyh")]
 transform = Transform3D(1, 0, 0, 0, 0.8225304, 0.5687214, 0, -0.5687214, 0.8225304, 0, 20.603447, 16.818096)
@@ -48,7 +82,10 @@ height_offset = 37.915
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Atmosphere" unique_id=1144913077]
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+light_color = Color(1, 0.94, 0.84, 1)
+light_energy = 1.15
 shadow_enabled = true
+directional_shadow_max_distance = 160.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="Atmosphere" unique_id=1249058794]
 environment = SubResource("Environment_0wfyh")

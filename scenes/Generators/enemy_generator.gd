@@ -104,6 +104,9 @@ func _ready() -> void:
 		set_process(false)
 		return
 
+	if Global.use_menu_settings:
+		apply_menu_settings()
+
 	if difficulty != Difficulty.CUSTOM:
 		apply_preset(difficulty)
 
@@ -114,6 +117,21 @@ func _ready() -> void:
 
 	spawn_countdown = get_current_spawn_interval()
 	set_process(true)
+
+
+# Settings picked in the main menu override the Inspector values.
+func apply_menu_settings() -> void:
+	difficulty = Global.difficulty as Difficulty
+	starting_level = Global.starting_level
+	infantry_enabled = Global.infantry_enabled
+	car_enabled = Global.car_enabled
+	tank_enabled = Global.tank_enabled
+
+	# Without infantry, let vehicles appear from the start instead of
+	# leaving the map empty until they unlock.
+	if not infantry_enabled:
+		car_min_level = 0
+		tank_min_level = 0
 
 
 func apply_preset(preset: Difficulty) -> void:
