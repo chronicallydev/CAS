@@ -40,12 +40,17 @@ var health_bar: ProgressBar
 var warning_label: Label
 var hit_flash: ColorRect
 
+var rotor_sound: AudioStreamPlayer
+var lock_sound: AudioStreamPlayer
+var inbound_sound: AudioStreamPlayer
+
 
 func _ready() -> void:
 	add_to_group("player")
 	health = max_health
 	build_model()
 	build_hud()
+	build_sounds()
 	position.y = altitude
 
 
@@ -56,6 +61,7 @@ func take_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
 	health_bar.value = health
 	hit_flash.color.a = 0.45
+	Sfx.play_2d("heli_hit")
 
 	if health <= 0.0:
 		shot_down()
@@ -76,6 +82,9 @@ func shot_down() -> void:
 		explosion.scale = Vector3.ONE * 1.5
 
 	body.visible = false
+	rotor_sound.stop()
+	lock_sound.stop()
+	inbound_sound.stop()
 	set_physics_process(false)
 
 	await get_tree().create_timer(restart_delay).timeout
@@ -176,6 +185,32 @@ func update_hud(delta: float) -> void:
 		warning_label.visible = fmod(time, 0.6) < 0.4
 	else:
 		warning_label.visible = false
+
+	# Warning tones: fast beeps for an incoming missile, slower for a lock.
+	set_loop_playing(inbound_sound, incoming and not dead)
+	set_loop_playing(lock_sound, lock_warning_timer > 0.0 and not incoming and not dead)
+
+
+func set_loop_playing(player: AudioStreamPlayer, on: bool) -> void:
+	if on and not player.playing:
+		player.play()
+	elif not on and player.playing:
+		player.stop()
+
+
+func make_loop_player(sound: String) -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.stream = Sfx.get_stream(sound)
+	player.volume_db = Sfx.mix_db(sound)
+	add_child(player)
+	return player
+
+
+func build_sounds() -> void:
+	rotor_sound = make_loop_player("rotor_loop")
+	lock_sound = make_loop_player("lock_tone")
+	inbound_sound = make_loop_player("inbound_tone")
+	rotor_sound.play()
 
 
 func build_hud() -> void:

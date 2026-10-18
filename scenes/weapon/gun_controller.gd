@@ -213,11 +213,14 @@ func get_mouse_world_position() -> Variant:
 	return result["position"]
 
 
-func play_shot_sound(pitch_min: float, pitch_max: float) -> void:
+func play_shot_sound(mix: String, pitch_min: float, pitch_max: float) -> void:
 	if shoot_sound != null:
 		# Slightly randomize pitch and loudness for each shot.
 		shoot_sound.pitch_scale = randf_range(pitch_min, pitch_max)
-		shoot_sound.volume_db = randf_range(-2.0, 0.0)
+		shoot_sound.volume_db = Sfx.mix_db(mix) + randf_range(-1.5, 0.0)
+		# Play from the gun, so it follows the helicopter.
+		if shooter != null and shooter.has_method("get_muzzle_position"):
+			shoot_sound.global_position = shooter.get_muzzle_position()
 		shoot_sound.play()
 
 
@@ -246,7 +249,7 @@ func fire_round() -> void:
 	if shooter != null and shooter.has_method("get_muzzle_position"):
 		delay = shooter.get_muzzle_position().distance_to(target) / maxf(cannon_shell_speed, 1.0)
 
-	play_shot_sound(0.8, 1.0)
+	play_shot_sound("gun_cannon", 0.8, 1.0)
 	schedule_explosion(target, delay, explosion_radius, damage, 1.0)
 
 
@@ -257,7 +260,7 @@ func fire_minigun_round() -> void:
 	if hit == null:
 		return
 
-	play_shot_sound(1.4, 1.7)
+	play_shot_sound("gun_minigun", 1.4, 1.7)
 	schedule_explosion(hit + random_spread(minigun_spread), minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
 
 
@@ -288,7 +291,7 @@ func launch_javelin() -> void:
 	)
 
 	javelin_cooldown = javelin_reload
-	play_shot_sound(0.5, 0.6)
+	Sfx.play_3d("javelin_launch", launch_from, 0.0, 1.25)
 
 
 func javelin_impact(impact_position: Vector3) -> void:

@@ -29,6 +29,7 @@ func _physics_process(delta: float) -> void:
 
 
 func take_damage(amount: float) -> void:
+	play_hit_sound()
 	health = maxf(health - amount, 0.0)
 	health_bar_3d.update_health(health, max_health)
 
@@ -55,9 +56,14 @@ func check_enemies() -> void:
 			damage_taken += enemy.contact_damage if "contact_damage" in enemy else damage_per_enemy
 
 	if damage_taken > 0.0:
+		play_hit_sound()
 		health = maxf(
 			health - damage_taken,
 			0.0
 		)
 
 		health_bar_3d.update_health(health, max_health)
+
+
+func play_hit_sound() -> void:
+	Sfx.play_3d("base_hit", global_position + Vector3.UP * 3.0)

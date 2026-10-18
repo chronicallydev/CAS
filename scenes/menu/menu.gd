@@ -115,6 +115,7 @@ func build_layout() -> void:
 
 	play_button = make_button("PLAY", true)
 	play_button.pressed.connect(on_play_pressed)
+	play_button.pressed.connect(func() -> void: Sfx.play_2d("ui_click"))
 	column.add_child(play_button)
 
 	var quit_button := make_button("QUIT", false)

@@ -105,6 +105,7 @@ func fire_at(base: Node3D) -> void:
 	tracer.color = Color(1.0, 0.75, 0.2)
 	get_tree().current_scene.add_child(tracer)
 	tracer.setup(from, target, shot_flight_time, 0.3, shot_hit)
+	Sfx.play_3d("car_gun", from)
 
 
 func shot_hit(position: Vector3) -> void:

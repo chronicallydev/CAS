@@ -19,6 +19,9 @@ func _ready() -> void:
 	add_debris()
 	add_smoke(soft_texture)
 
+	# Louder and deeper than a normal explosion.
+	Sfx.play_3d("explosion", position, 4.0, 0.8)
+
 	await get_tree().create_timer(lifetime).timeout
 	queue_free()
 

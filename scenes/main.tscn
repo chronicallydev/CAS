@@ -126,6 +126,7 @@ explosion_radius = 6.0
 shake_strength = 2.835
 
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="GunController" unique_id=2054740362]
+unit_size = 45.0
 stream = ExtResource("8_85g3d")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=229169152]

@@ -97,3 +97,4 @@ func fire_at(heli: Node3D) -> void:
 
 	# Leaves the tube along the rails, angled up.
 	missile.launch(muzzle.global_position, -muzzle.global_transform.basis.z)
+	Sfx.play_3d("missile_launch", muzzle.global_position)

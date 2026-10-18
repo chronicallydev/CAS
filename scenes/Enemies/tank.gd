@@ -67,6 +67,7 @@ func fire_at(base: Node3D) -> void:
 	var shell := TankShell.new()
 	get_tree().current_scene.add_child(shell)
 	shell.setup(muzzle.global_position, target, shell_flight_time, 4.0, shell_hit)
+	Sfx.play_3d("tank_fire", muzzle.global_position)
 
 	spawn_explosion(muzzle.global_position, 0.25)
 
