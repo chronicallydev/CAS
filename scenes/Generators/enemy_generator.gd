@@ -34,6 +34,11 @@ const PRESETS := {
 @export_range(0.0, 10.0, 0.05) var tank_weight: float = 0.1
 @export_range(0, 100, 1) var tank_min_level: int = 2
 
+@export var aa_enabled: bool = true
+@export var aa_scene: PackedScene
+@export_range(0.0, 10.0, 0.05) var aa_weight: float = 0.08
+@export_range(0, 100, 1) var aa_min_level: int = 1
+
 
 @export_group("Spawn Settings")
 # Starting delay between spawn bursts.
@@ -126,12 +131,14 @@ func apply_menu_settings() -> void:
 	infantry_enabled = Global.infantry_enabled
 	car_enabled = Global.car_enabled
 	tank_enabled = Global.tank_enabled
+	aa_enabled = Global.aa_enabled
 
 	# Without infantry, let vehicles appear from the start instead of
 	# leaving the map empty until they unlock.
 	if not infantry_enabled:
 		car_min_level = 0
 		tank_min_level = 0
+		aa_min_level = 0
 
 
 func apply_preset(preset: Difficulty) -> void:
@@ -214,6 +221,7 @@ func pick_enemy_scene() -> PackedScene:
 		[infantry_enabled, node_scene, infantry_weight, infantry_min_level],
 		[car_enabled, car_scene, car_weight, car_min_level],
 		[tank_enabled, tank_scene, tank_weight, tank_min_level],
+		[aa_enabled, aa_scene, aa_weight, aa_min_level],
 	]:
 		if entry[0] and entry[1] != null and entry[2] > 0.0 and level >= entry[3]:
 			options.append(entry)
@@ -242,6 +250,8 @@ func apply_modifiers(enemy: Node) -> void:
 		enemy.contact_damage *= enemy_damage_multiplier
 	if "shot_damage" in enemy:
 		enemy.shot_damage *= enemy_damage_multiplier
+	if "missile_damage" in enemy:
+		enemy.missile_damage *= enemy_damage_multiplier
 	if "shell_damage" in enemy:
 		enemy.shell_damage *= enemy_damage_multiplier
 

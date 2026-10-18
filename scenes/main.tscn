@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://5b5k2yrr0egx"]
 
 [ext_resource type="PackedScene" uid="uid://dgj7a65h2gdid" path="res://scenes/Camera/camera_controller.tscn" id="1_0wfyh"]
-[ext_resource type="Script" uid="uid://bqd14ktw0wovx" path="res://scenes/Camera/camera_controller.gd" id="2_sugp2"]
 [ext_resource type="PackedScene" uid="uid://dm23n74ym2rkg" path="res://scenes/home/home.tscn" id="3_sugp2"]
 [ext_resource type="Script" uid="uid://dsyc1byw7lu6m" path="res://scenes/Generators/enemy_generator.gd" id="4_tbgi4"]
 [ext_resource type="PackedScene" uid="uid://b6ug31vif04s7" path="res://scenes/Enemies/enemy.tscn" id="5_tefeu"]
@@ -12,6 +11,9 @@
 [ext_resource type="PackedScene" path="res://scenes/Enemies/car.tscn" id="9_car"]
 [ext_resource type="PackedScene" path="res://scenes/Enemies/tank.tscn" id="10_tank"]
 [ext_resource type="Script" path="res://scenes/environment/desert_environment.gd" id="11_desert"]
+[ext_resource type="Script" path="res://scenes/Camera/top_down_camera.gd" id="12_cam"]
+[ext_resource type="Script" path="res://scenes/player/helicopter.gd" id="13_heli"]
+[ext_resource type="PackedScene" path="res://scenes/Enemies/aa_launcher.tscn" id="14_aa"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(4000, 1, 4000)
@@ -70,13 +72,10 @@ material = SubResource("Material_sand")
 [node name="DesertEnvironment" type="Node3D" parent="EnvironmentalMesh"]
 script = ExtResource("11_desert")
 
-[node name="CameraController" parent="." unique_id=1898930510 node_paths=PackedStringArray("target_marker") instance=ExtResource("1_0wfyh")]
+[node name="CameraController" parent="." unique_id=1898930510 node_paths=PackedStringArray("target") instance=ExtResource("1_0wfyh")]
 transform = Transform3D(1, 0, 0, 0, 0.8225304, 0.5687214, 0, -0.5687214, 0.8225304, 0, 20.603447, 16.818096)
-script = ExtResource("2_sugp2")
-target_marker = NodePath("../OrbitAroundPoint")
-orbit_radius = 44.7
-orbit_speed = 5.0
-height_offset = 37.915
+script = ExtResource("12_cam")
+target = NodePath("../Helicopter")
 
 [node name="Atmosphere" type="Node3D" parent="." unique_id=1077662930]
 
@@ -89,9 +88,6 @@ directional_shadow_max_distance = 160.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="Atmosphere" unique_id=1249058794]
 environment = SubResource("Environment_0wfyh")
-
-[node name="OrbitAroundPoint" type="Marker3D" parent="." unique_id=1092273501]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4088936, 0.7763953)
 
 [node name="Home" parent="." unique_id=357851406 groups=["Base"] instance=ExtResource("3_sugp2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1253567, 0)
@@ -106,16 +102,26 @@ infantry_enabled = false
 car_scene = ExtResource("9_car")
 tank_enabled = false
 tank_scene = ExtResource("10_tank")
+aa_scene = ExtResource("14_aa")
 spawn_interval = 5.2
 max_nodes = 10
 game_speed = 2.5
 difficulty_ramp_seconds = 5.0
 
-[node name="GunController" type="Node3D" parent="." unique_id=499024300 node_paths=PackedStringArray("camera", "cursor")]
+[node name="Helicopter" type="Node3D" parent="." node_paths=PackedStringArray("camera")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, 25)
+script = ExtResource("13_heli")
+camera = NodePath("../CameraController/Camera")
+explosion_scene = ExtResource("7_85g3d")
+
+[node name="GunController" type="Node3D" parent="." unique_id=499024300 node_paths=PackedStringArray("camera", "cursor", "shooter")]
 script = ExtResource("6_o6xl0")
 camera = NodePath("../CameraController/Camera")
 explosion_scene = ExtResource("7_85g3d")
+explosion_scene = ExtResource("7_85g3d")
 cursor = NodePath("../CanvasLayer/Cursor")
+shooter = NodePath("../Helicopter")
+impact_delay = 0.9
 impact_spread = 9.0
 explosion_radius = 10.4
 shake_strength = 2.835

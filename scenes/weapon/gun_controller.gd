@@ -5,9 +5,13 @@ const WEAPON_NAMES := ["CANNON", "MINIGUN", "JAVELIN"]
 
 const JavelinMissile := preload("res://scenes/weapon/javelin_missile.gd")
 const JavelinExplosion := preload("res://assets/vfx/javelin_explosion.gd")
+const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
 
 @export_group("References")
 @export var camera: Camera3D
+# Optional vehicle the weapons fire from (needs get_muzzle_position()).
+# When set, rounds fly from it as visible tracers.
+@export var shooter: Node3D
 @export var explosion_scene: PackedScene
 @export var cursor : TextureRect
 @onready var shoot_sound: AudioStreamPlayer3D = $ShootSound
@@ -142,7 +146,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				if is_firing or camera == null:
+				if is_firing or camera == null or (shooter != null and shooter.get("dead")):
 					return
 
 				match current_weapon:
@@ -269,8 +273,12 @@ func launch_javelin() -> void:
 	missile.impacted.connect(javelin_impact)
 
 	get_tree().current_scene.add_child(missile)
+	var launch_from := camera.global_position + Vector3.DOWN * javelin_launch_drop
+	if shooter != null and shooter.has_method("get_muzzle_position"):
+		launch_from = shooter.get_muzzle_position()
+
 	missile.launch(
-		camera.global_position + Vector3.DOWN * javelin_launch_drop,
+		launch_from,
 		hit,
 		find_nearest_enemy(hit, javelin_lock_radius)
 	)
@@ -309,12 +317,26 @@ func find_nearest_enemy(point: Vector3, max_distance: float) -> Node3D:
 
 
 func schedule_explosion(position: Vector3, delay: float, radius: float, hit_damage: float, vfx_scale: float, light_weapon: bool = false) -> void:
+	spawn_tracer(position, delay, vfx_scale)
+
 	await get_tree().create_timer(delay).timeout
 
 	if not is_inside_tree():
 		return
 
 	explode_at(position, radius, hit_damage, vfx_scale, light_weapon)
+
+
+# Visible round flying from the shooter to where it will land.
+func spawn_tracer(target: Vector3, flight_time: float, vfx_scale: float) -> void:
+	if shooter == null or not shooter.has_method("get_muzzle_position") or flight_time <= 0.0:
+		return
+
+	var tracer := Tracer.new()
+	tracer.radius = 0.12 + 0.13 * clampf(vfx_scale, 0.0, 1.0)
+	tracer.color = Color(1.0, 0.85, 0.45)
+	get_tree().current_scene.add_child(tracer)
+	tracer.setup(shooter.get_muzzle_position(), target, flight_time, 0.0, Callable())
 
 
 func explode_at(position: Vector3, radius: float, hit_damage: float, vfx_scale: float, light_weapon: bool = false) -> void:

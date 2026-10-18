@@ -11,6 +11,7 @@ var difficulty: int = 1 # EnemyGenerator.Difficulty, 1 = NORMAL
 var infantry_enabled: bool = true
 var car_enabled: bool = true
 var tank_enabled: bool = true
+var aa_enabled: bool = true
 var starting_level: int = 0
 
 
@@ -45,6 +46,7 @@ func save_settings() -> void:
 	config.set_value("game", "infantry_enabled", infantry_enabled)
 	config.set_value("game", "car_enabled", car_enabled)
 	config.set_value("game", "tank_enabled", tank_enabled)
+	config.set_value("game", "aa_enabled", aa_enabled)
 	config.set_value("game", "starting_level", starting_level)
 	config.save(SETTINGS_PATH)
 
@@ -59,4 +61,5 @@ func load_settings() -> void:
 	infantry_enabled = config.get_value("game", "infantry_enabled", infantry_enabled)
 	car_enabled = config.get_value("game", "car_enabled", car_enabled)
 	tank_enabled = config.get_value("game", "tank_enabled", tank_enabled)
+	aa_enabled = config.get_value("game", "aa_enabled", aa_enabled)
 	starting_level = config.get_value("game", "starting_level", starting_level)

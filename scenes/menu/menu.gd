@@ -15,6 +15,7 @@ var difficulty_option: OptionButton
 var infantry_check: CheckBox
 var car_check: CheckBox
 var tank_check: CheckBox
+var aa_check: CheckBox
 var level_spin: SpinBox
 var warning_label: Label
 
@@ -102,9 +103,11 @@ func build_layout() -> void:
 	infantry_check = make_check("Infantry")
 	car_check = make_check("Cars")
 	tank_check = make_check("Tanks")
+	aa_check = make_check("AA launchers")
 	enemies.add_child(infantry_check)
 	enemies.add_child(car_check)
 	enemies.add_child(tank_check)
+	enemies.add_child(aa_check)
 	grid.add_child(enemies)
 
 	warning_label = make_label("Enable at least one enemy type", 16, Color(1.0, 0.45, 0.4))
@@ -119,7 +122,7 @@ func build_layout() -> void:
 	column.add_child(quit_button)
 
 	column.add_child(make_spacer(2))
-	column.add_child(make_label("LMB fire   ·   Q switch weapon   ·   Esc back to menu", 16, MUTED))
+	column.add_child(make_label("WASD fly   ·   Mouse aim   ·   LMB fire   ·   Q switch weapon   ·   Esc menu", 16, MUTED))
 
 
 func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:
@@ -207,10 +210,11 @@ func load_from_global() -> void:
 	infantry_check.button_pressed = Global.infantry_enabled
 	car_check.button_pressed = Global.car_enabled
 	tank_check.button_pressed = Global.tank_enabled
+	aa_check.button_pressed = Global.aa_enabled
 
 
 func any_enemy_enabled() -> bool:
-	return infantry_check.button_pressed or car_check.button_pressed or tank_check.button_pressed
+	return infantry_check.button_pressed or car_check.button_pressed or tank_check.button_pressed or aa_check.button_pressed
 
 
 func update_play_button() -> void:
@@ -227,4 +231,5 @@ func on_play_pressed() -> void:
 	Global.infantry_enabled = infantry_check.button_pressed
 	Global.car_enabled = car_check.button_pressed
 	Global.tank_enabled = tank_check.button_pressed
+	Global.aa_enabled = aa_check.button_pressed
 	Global.start_game()
