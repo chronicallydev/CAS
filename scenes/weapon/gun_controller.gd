@@ -22,6 +22,7 @@ const JavelinExplosion := preload("res://assets/vfx/javelin_explosion.gd")
 
 @export_group("Damage")
 @export_range(0.1, 100.0, 0.1) var explosion_radius: float = 5.0
+@export_range(0.1, 100.0, 0.1) var damage: float = 4.0
 
 
 @export var shake_strength: float = 5.0
@@ -32,6 +33,7 @@ const JavelinExplosion := preload("res://assets/vfx/javelin_explosion.gd")
 @export_range(0.0, 10.0, 0.05) var minigun_impact_delay: float = 0.35
 @export_range(0.0, 50.0, 0.1) var minigun_spread: float = 1.5
 @export_range(0.1, 100.0, 0.1) var minigun_radius: float = 2.5
+@export_range(0.1, 100.0, 0.1) var minigun_damage: float = 1.0
 @export_range(0.05, 2.0, 0.05) var minigun_explosion_scale: float = 0.35
 @export var minigun_shake_strength: float = 1.5
 
@@ -42,6 +44,7 @@ const JavelinExplosion := preload("res://assets/vfx/javelin_explosion.gd")
 # Speed the missile accelerates to in its final dive.
 @export_range(1.0, 300.0, 1.0) var javelin_dive_speed: float = 60.0
 @export_range(0.1, 100.0, 0.1) var javelin_radius: float = 8.0
+@export_range(0.1, 100.0, 0.1) var javelin_damage: float = 15.0
 # Enemies this close to the clicked point get locked and tracked.
 @export_range(0.0, 50.0, 0.5) var javelin_lock_radius: float = 10.0
 # How far above the launch point the missile climbs before diving.
@@ -58,7 +61,7 @@ var current_weapon: Weapon = Weapon.CANNON
 var is_firing: bool = false
 var fire_timer: float = 0.0
 var locked_target: Vector3 = Vector3.ZERO
-var kills : float = 0
+var kills : int = 0
 var javelin_cooldown: float = 0.0
 var weapon_label: Label
 
@@ -236,7 +239,7 @@ func random_spread(spread: float) -> Vector3:
 # Each shot schedules an explosion at the locked target.
 func fire_round(target: Vector3) -> void:
 	play_shot_sound(0.8, 1.0)
-	schedule_explosion(target + random_spread(impact_spread), impact_delay, explosion_radius, 1.0)
+	schedule_explosion(target + random_spread(impact_spread), impact_delay, explosion_radius, damage, 1.0)
 
 
 # Minigun rounds land wherever the cursor currently points.
@@ -247,7 +250,7 @@ func fire_minigun_round() -> void:
 		return
 
 	play_shot_sound(1.4, 1.7)
-	schedule_explosion(hit + random_spread(minigun_spread), minigun_impact_delay, minigun_radius, minigun_explosion_scale)
+	schedule_explosion(hit + random_spread(minigun_spread), minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
 
 
 func launch_javelin() -> void:
@@ -283,7 +286,7 @@ func javelin_impact(impact_position: Vector3) -> void:
 	explosion.position = impact_position
 	get_tree().current_scene.add_child(explosion)
 
-	damage_enemies(impact_position, javelin_radius)
+	damage_enemies(impact_position, javelin_radius, javelin_damage)
 
 
 func find_nearest_enemy(point: Vector3, max_distance: float) -> Node3D:
@@ -305,16 +308,16 @@ func find_nearest_enemy(point: Vector3, max_distance: float) -> Node3D:
 	return nearest
 
 
-func schedule_explosion(position: Vector3, delay: float, radius: float, vfx_scale: float) -> void:
+func schedule_explosion(position: Vector3, delay: float, radius: float, hit_damage: float, vfx_scale: float, light_weapon: bool = false) -> void:
 	await get_tree().create_timer(delay).timeout
 
 	if not is_inside_tree():
 		return
 
-	explode_at(position, radius, vfx_scale)
+	explode_at(position, radius, hit_damage, vfx_scale, light_weapon)
 
 
-func explode_at(position: Vector3, radius: float, vfx_scale: float) -> void:
+func explode_at(position: Vector3, radius: float, hit_damage: float, vfx_scale: float, light_weapon: bool = false) -> void:
 	if explosion_scene != null:
 		var explosion := explosion_scene.instantiate() as Node3D
 
@@ -323,20 +326,27 @@ func explode_at(position: Vector3, radius: float, vfx_scale: float) -> void:
 			explosion.global_position = position
 			explosion.scale = Vector3.ONE * vfx_scale
 
-	damage_enemies(position, radius)
+	damage_enemies(position, radius, hit_damage, light_weapon)
 
 
-func damage_enemies(position: Vector3, radius: float) -> void:
-	# Find and delete enemies near the explosion.
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(enemy):
+func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_weapon: bool = false) -> void:
+	# Damage enemies near the explosion. Distance is measured on the ground
+	# plane so tall or floating enemies are hit the same as vehicles.
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+
+		if enemy == null or not is_instance_valid(enemy) or enemy.is_queued_for_deletion():
 			continue
 
-		if not enemy is Node3D:
+		var offset := enemy.global_position - position
+		var distance := Vector2(offset.x, offset.z).length()
+
+		if distance > radius:
 			continue
 
-		var distance = enemy.global_position.distance_to(position)
-
-		if distance <= radius:
+		if enemy.has_method("take_damage"):
+			if enemy.take_damage(hit_damage, light_weapon):
+				kills += 1
+		else:
 			enemy.queue_free()
-			kills += 0.5
+			kills += 1

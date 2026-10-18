@@ -11,9 +11,8 @@ fill_to = Vector2(0.6822917, 0)
 
 [node name="Enemy" type="Node3D" unique_id=876811622]
 script = ExtResource("1_5alqo")
-speed = null
 
-[node name="Sprite3D" type="Sprite3D" parent="." unique_id=2039394829 groups=["enemies"]]
+[node name="Sprite3D" type="Sprite3D" parent="." unique_id=2039394829]
 transform = Transform3D(3, 0, 0, 0, 5, 0, 0, 0, 3, 0, 0, 0)
 billboard = 2
 texture = SubResource("GradientTexture2D_s1fef")

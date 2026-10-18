@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://assets/vfx/explosion_scene.tscn" id="7_85g3d"]
 [ext_resource type="Texture2D" uid="uid://dcn4lsj5mnhfe" path="res://assets/reticle/reticle-export.png" id="7_tipki"]
 [ext_resource type="AudioStream" uid="uid://321sn8sgrtnp" path="res://assets/reticle/shooting.wav" id="8_85g3d"]
+[ext_resource type="PackedScene" path="res://scenes/Enemies/car.tscn" id="9_car"]
+[ext_resource type="PackedScene" path="res://scenes/Enemies/tank.tscn" id="10_tank"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(120, 1, 120)
@@ -63,8 +65,14 @@ script = ExtResource("4_tbgi4")
 square_size = 100.0
 vertical_offset = 5.6899999999999995
 node_scene = ExtResource("5_tefeu")
+infantry_enabled = false
+car_scene = ExtResource("9_car")
+tank_enabled = false
+tank_scene = ExtResource("10_tank")
 spawn_interval = 5.2
-game_speed = 3.0
+max_nodes = 10
+game_speed = 2.5
+difficulty_ramp_seconds = 5.0
 
 [node name="GunController" type="Node3D" parent="." unique_id=499024300 node_paths=PackedStringArray("camera", "cursor")]
 script = ExtResource("6_o6xl0")
