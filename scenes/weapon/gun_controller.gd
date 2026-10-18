@@ -23,6 +23,8 @@ const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
 @export_range(1.0, 3000.0, 1.0) var rpm: float = 600.0
 @export_range(0.0, 10.0, 0.1) var impact_delay: float = 1.8
 @export_range(0.0, 50.0, 0.1) var impact_spread: float = 2.5
+# Shell speed when firing from a vehicle (see shooter); sets the flight time.
+@export_range(5.0, 500.0, 1.0) var cannon_shell_speed: float = 55.0
 
 @export_group("Damage")
 @export_range(0.1, 100.0, 0.1) var explosion_radius: float = 5.0
@@ -64,7 +66,6 @@ const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
 var current_weapon: Weapon = Weapon.CANNON
 var is_firing: bool = false
 var fire_timer: float = 0.0
-var locked_target: Vector3 = Vector3.ZERO
 var kills : int = 0
 var javelin_cooldown: float = 0.0
 var weapon_label: Label
@@ -122,7 +123,7 @@ func _process(delta: float) -> void:
 			fire_timer -= delta
 
 			while fire_timer <= 0.0:
-				fire_round(locked_target)
+				fire_round()
 				fire_timer += interval
 
 		Weapon.MINIGUN:
@@ -150,17 +151,8 @@ func _input(event: InputEvent) -> void:
 					return
 
 				match current_weapon:
-					Weapon.CANNON:
-						var hit: Variant = get_mouse_world_position()
-
-						# Only fire when the mouse ray hits a collider.
-						if hit != null:
-							locked_target = hit
-							is_firing = true
-							fire_timer = 0.0
-
-					Weapon.MINIGUN:
-						# Minigun follows the cursor, no target lock.
+					Weapon.CANNON, Weapon.MINIGUN:
+						# Both guns follow the cursor while the button is held.
 						is_firing = true
 						fire_timer = 0.0
 
@@ -240,10 +232,22 @@ func random_spread(spread: float) -> Vector3:
 	)
 
 
-# Each shot schedules an explosion at the locked target.
-func fire_round(target: Vector3) -> void:
+# Heavy cannon round aimed at the cursor. Fired from a vehicle, the shell
+# takes time to fly there, so moving targets need to be led.
+func fire_round() -> void:
+	var hit: Variant = get_mouse_world_position()
+
+	if hit == null:
+		return
+
+	var target: Vector3 = hit + random_spread(impact_spread)
+	var delay := impact_delay
+
+	if shooter != null and shooter.has_method("get_muzzle_position"):
+		delay = shooter.get_muzzle_position().distance_to(target) / maxf(cannon_shell_speed, 1.0)
+
 	play_shot_sound(0.8, 1.0)
-	schedule_explosion(target + random_spread(impact_spread), impact_delay, explosion_radius, damage, 1.0)
+	schedule_explosion(target, delay, explosion_radius, damage, 1.0)
 
 
 # Minigun rounds land wherever the cursor currently points.

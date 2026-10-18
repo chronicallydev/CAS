@@ -118,12 +118,11 @@ explosion_scene = ExtResource("7_85g3d")
 script = ExtResource("6_o6xl0")
 camera = NodePath("../CameraController/Camera")
 explosion_scene = ExtResource("7_85g3d")
-explosion_scene = ExtResource("7_85g3d")
 cursor = NodePath("../CanvasLayer/Cursor")
 shooter = NodePath("../Helicopter")
-impact_delay = 0.9
-impact_spread = 9.0
-explosion_radius = 10.4
+rpm = 180.0
+impact_spread = 3.0
+explosion_radius = 6.0
 shake_strength = 2.835
 
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="GunController" unique_id=2054740362]
