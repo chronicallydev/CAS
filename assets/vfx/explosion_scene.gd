@@ -10,3 +10,7 @@ func _ready() -> void:
 	fire.emitting = true
 	smoke.emitting = true
 	debris.emitting = true
+
+	# Free the effect once the particles are done.
+	await get_tree().create_timer(3.0).timeout
+	queue_free()
