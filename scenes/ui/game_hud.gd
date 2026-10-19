@@ -81,6 +81,8 @@ func _process(delta: float) -> void:
 	if gun != null:
 		score_label.text += "     KILLS  %d" % gun.kills
 	wave_label.text = "WAVE %d" % maxi(Global.wave, 1) if Global.wave > 0 else "GET READY"
+	if is_assault() and Global.wave > generator.starting_level:
+		wave_label.text = "WAVE %d / %d" % [Global.wave - generator.starting_level, generator.target_waves]
 
 	if generator == null or not generator.wave_mode:
 		status_label.text = ""
@@ -180,8 +182,18 @@ func show_banner(title: String, subtitle: String, color: Color) -> void:
 	banner_tween.tween_property(box, "modulate:a", 0.0, 0.6)
 
 
+func is_assault() -> bool:
+	return generator != null and generator.target_waves > 0
+
+
 func on_wave_started(number: int, is_boss: bool) -> void:
-	if is_boss:
+	if is_assault():
+		var count: int = number - generator.starting_level
+		if generator.is_final_wave(number):
+			show_banner("FINAL WAVE", "The garrison's heavy armour is rolling out", DANGER)
+		else:
+			show_banner("WAVE %d / %d" % [count, generator.target_waves], "%d more after this to take the rig" % (generator.target_waves - count), ACCENT)
+	elif is_boss:
 		show_banner("WAVE %d" % number, "BOSS WAVE  -  heavy armour incoming", DANGER)
 	else:
 		show_banner("WAVE %d" % number, "", ACCENT)
@@ -189,7 +201,11 @@ func on_wave_started(number: int, is_boss: bool) -> void:
 
 func on_wave_cleared(number: int, bonus: int) -> void:
 	var subtitle := "+%s bonus" % format_number(bonus) if bonus > 0 else ""
-	show_banner("WAVE %d CLEARED" % number, subtitle, Color(0.5, 0.9, 0.55))
+	if is_assault() and generator.is_final_wave(number):
+		show_banner("RIG SECURED", subtitle, Color(0.5, 0.9, 0.55))
+		return
+	var title := "WAVE %d CLEARED" % (number - generator.starting_level if is_assault() else number)
+	show_banner(title, subtitle, Color(0.5, 0.9, 0.55))
 
 
 # --- Rig status ----------------------------------------------------------
@@ -323,8 +339,48 @@ func build_combo_label() -> void:
 # --- Game over -----------------------------------------------------------
 
 func show_game_over(reason: String, new_best_score: bool, new_best_wave: bool) -> void:
-	if game_over_root != null:
+	var column := open_end_screen("MISSION FAILED" if Global.is_assault() else "GAME OVER", DANGER)
+	if column == null:
 		return
+
+	column.add_child(make_label(reason, 22, TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	add_end_spacer(column, 12)
+
+	column.add_child(make_label("Wave reached:  %d" % Global.wave, 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	column.add_child(make_label("Score:  %s" % format_number(Global.score), 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	add_payout(column)
+
+	if new_best_score or new_best_wave:
+		column.add_child(make_label("NEW BEST!", 26, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
+	else:
+		column.add_child(make_label("Best:  wave %d  ·  %s pts" % [Global.best_wave, format_number(Global.best_score)], 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+
+	add_end_buttons(column, "RETRY", Global.retry)
+
+
+func show_victory(rig_name: String) -> void:
+	var column := open_end_screen("RIG CAPTURED", Color(0.5, 0.9, 0.55))
+	if column == null:
+		return
+
+	column.add_child(make_label("%s is now yours" % rig_name, 24, TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	add_end_spacer(column, 12)
+	column.add_child(make_label("Score:  %s" % format_number(Global.score), 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	add_payout(column)
+
+	add_end_buttons(column, "CONTINUE", Global.go_to_map)
+	Sfx.play_2d("combo")
+
+
+# Dimmed overlay with a centred column and a big title. Null if one is open.
+func open_end_screen(title: String, color: Color) -> VBoxContainer:
+	if game_over_root != null:
+		return null
+
+	# Don't let a wave banner show through.
+	if banner_tween != null:
+		banner_tween.kill()
+	(banner.get_parent() as Control).modulate.a = 0.0
 
 	game_over_root = Control.new()
 	game_over_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -340,48 +396,63 @@ func show_game_over(reason: String, new_best_score: bool, new_best_wave: bool) -
 	game_over_root.add_child(center)
 
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 6)
 	center.add_child(column)
 
-	column.add_child(make_label("GAME OVER", 72, DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	column.add_child(make_label(reason, 22, TEXT, HORIZONTAL_ALIGNMENT_CENTER))
-
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 12)
-	column.add_child(spacer)
-
-	column.add_child(make_label("Wave reached:  %d" % Global.wave, 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
-	column.add_child(make_label("Score:  %s" % format_number(Global.score), 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
-	column.add_child(make_label("+ $%s for the hangar" % format_number(Global.last_earned), 20, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
-
-	if new_best_score or new_best_wave:
-		column.add_child(make_label("NEW BEST!", 26, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
-	else:
-		column.add_child(make_label("Best:  wave %d  ·  %s pts" % [Global.best_wave, format_number(Global.best_score)], 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-
-	var spacer2 := Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 14)
-	column.add_child(spacer2)
-
-	var retry := make_button("RETRY", true)
-	retry.pressed.connect(Global.retry)
-	column.add_child(retry)
-
-	var hangar := make_button("HANGAR", false)
-	hangar.pressed.connect(func() -> void:
-		Global.is_game_over = false
-		Global.go_to_hangar())
-	column.add_child(hangar)
-
-	var menu := make_button("MAIN MENU", false)
-	menu.pressed.connect(Global.go_to_menu)
-	column.add_child(menu)
-
-	retry.grab_focus()
+	column.add_child(make_label(title, 60, color, HORIZONTAL_ALIGNMENT_CENTER))
 
 	game_over_root.modulate.a = 0.0
 	var tween := create_tween()
 	tween.tween_property(game_over_root, "modulate:a", 1.0, 0.4)
+	return column
+
+
+func add_end_spacer(column: VBoxContainer, height: float) -> void:
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, height)
+	column.add_child(spacer)
+
+
+# Where the money came from: kills, rig income and a capture bonus.
+func add_payout(column: VBoxContainer) -> void:
+	var payout := Global.last_payout
+	var green := Color(0.5, 0.9, 0.55)
+	if payout.get("income", 0) > 0 or payout.get("capture", 0) > 0:
+		column.add_child(make_label("Kills  $%s" % format_number(payout["kills"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		column.add_child(make_label("Rig income  $%s" % format_number(payout["income"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		if payout["capture"] > 0:
+			column.add_child(make_label("Capture bonus  $%s" % format_number(payout["capture"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	column.add_child(make_label("+ $%s earned" % format_number(Global.last_earned), 24, green, HORIZONTAL_ALIGNMENT_CENTER))
+
+
+# The main action, with the other destinations in a row underneath.
+func add_end_buttons(column: VBoxContainer, primary_text: String, primary_action: Callable) -> void:
+	add_end_spacer(column, 10)
+
+	var primary := make_button(primary_text, true)
+	primary.pressed.connect(primary_action)
+	column.add_child(primary)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	column.add_child(row)
+
+	var add_secondary := func(text: String, action: Callable) -> void:
+		var button := make_button(text, false)
+		button.custom_minimum_size = Vector2(0, 44)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 18)
+		button.pressed.connect(action)
+		row.add_child(button)
+
+	if not Global.mission.is_empty() and primary_text != "CONTINUE":
+		add_secondary.call("MAP", Global.go_to_map)
+	add_secondary.call("HANGAR", func() -> void:
+		Global.is_game_over = false
+		Global.go_to_hangar())
+	add_secondary.call("MENU", Global.go_to_menu)
+
+	primary.grab_focus()
 
 
 func make_button(text: String, primary: bool) -> Button:

@@ -1,6 +1,6 @@
 extends Control
 
-# Main menu: start the game, pick difficulty and enemy types, quit.
+# Main menu: open the campaign map, pick difficulty and graphics, quit.
 # The UI is built in code; settings are stored on the Global autoload.
 
 const ACCENT := Color(1.0, 0.72, 0.25)
@@ -12,14 +12,8 @@ const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard", "Brutal"]
 
 var play_button: Button
 var difficulty_option: OptionButton
-var infantry_check: CheckBox
-var car_check: CheckBox
-var tank_check: CheckBox
-var aa_check: CheckBox
 var pixel_check: CheckBox
 var blood_check: CheckBox
-var level_spin: SpinBox
-var warning_label: Label
 
 
 func _ready() -> void:
@@ -27,7 +21,6 @@ func _ready() -> void:
 	build_background()
 	build_layout()
 	load_from_global()
-	update_play_button()
 	play_button.grab_focus()
 
 
@@ -94,27 +87,6 @@ func build_layout() -> void:
 	difficulty_option.add_theme_font_size_override("font_size", 20)
 	grid.add_child(difficulty_option)
 
-	grid.add_child(make_label("Starting level", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
-	level_spin = SpinBox.new()
-	level_spin.min_value = 0
-	level_spin.max_value = 20
-	level_spin.custom_minimum_size = Vector2(200, 40)
-	level_spin.get_line_edit().add_theme_font_size_override("font_size", 20)
-	grid.add_child(level_spin)
-
-	grid.add_child(make_label("Enemies", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
-	var enemies := VBoxContainer.new()
-	enemies.add_theme_constant_override("separation", 0)
-	infantry_check = make_check("Infantry")
-	car_check = make_check("Cars")
-	tank_check = make_check("Tanks")
-	aa_check = make_check("AA launchers")
-	enemies.add_child(infantry_check)
-	enemies.add_child(car_check)
-	enemies.add_child(tank_check)
-	enemies.add_child(aa_check)
-	grid.add_child(enemies)
-
 	grid.add_child(make_label("Graphics", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
 	pixel_check = make_check("Pixel art")
 	blood_check = make_check("Blood")
@@ -124,8 +96,8 @@ func build_layout() -> void:
 	graphics.add_child(blood_check)
 	grid.add_child(graphics)
 
-	warning_label = make_label("Enable at least one enemy type", 16, Color(1.0, 0.45, 0.4))
-	column.add_child(warning_label)
+	if Global.owned_rigs.size() > 1:
+		column.add_child(make_label("%d / %d rigs held" % [Global.owned_rigs.size(), Global.Campaign.RIGS.size()], 16, MUTED))
 
 	play_button = make_button("PLAY", true)
 	play_button.pressed.connect(on_play_pressed)
@@ -180,7 +152,6 @@ func make_check(text: String) -> CheckBox:
 	# The default icons are too dark on this background.
 	check.add_theme_icon_override("unchecked", make_box_icon(false))
 	check.add_theme_icon_override("checked", make_box_icon(true))
-	check.toggled.connect(func(_on: bool) -> void: update_play_button())
 	return check
 
 
@@ -238,35 +209,13 @@ func make_button_style(color: Color) -> StyleBoxFlat:
 
 func load_from_global() -> void:
 	difficulty_option.select(clampi(Global.difficulty, 0, DIFFICULTY_NAMES.size() - 1))
-	level_spin.value = Global.starting_level
-	infantry_check.button_pressed = Global.infantry_enabled
-	car_check.button_pressed = Global.car_enabled
-	tank_check.button_pressed = Global.tank_enabled
-	aa_check.button_pressed = Global.aa_enabled
 	pixel_check.button_pressed = Global.pixel_art
 	blood_check.button_pressed = Global.blood
-
-
-func any_enemy_enabled() -> bool:
-	return infantry_check.button_pressed or car_check.button_pressed or tank_check.button_pressed or aa_check.button_pressed
-
-
-func update_play_button() -> void:
-	if play_button == null:
-		return
-	var ok := any_enemy_enabled()
-	play_button.disabled = not ok
-	warning_label.visible = not ok
 
 
 # Copy the menu choices to Global (used by Play and before opening the hangar).
 func save_to_global() -> void:
 	Global.difficulty = difficulty_option.get_selected_id()
-	Global.starting_level = int(level_spin.value)
-	Global.infantry_enabled = infantry_check.button_pressed
-	Global.car_enabled = car_check.button_pressed
-	Global.tank_enabled = tank_check.button_pressed
-	Global.aa_enabled = aa_check.button_pressed
 	Global.pixel_art = pixel_check.button_pressed
 	Global.blood = blood_check.button_pressed
 	Global.save_settings()
@@ -274,7 +223,7 @@ func save_to_global() -> void:
 
 func on_play_pressed() -> void:
 	save_to_global()
-	Global.start_game()
+	Global.go_to_map()
 
 
 func format_money(value: int) -> String:

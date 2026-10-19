@@ -4,6 +4,8 @@ const MENU_SCENE := "res://scenes/menu/menu.tscn"
 const GAME_SCENE := "res://scenes/main.tscn"
 const SETTINGS_PATH := "user://settings.cfg"
 const HANGAR_SCENE := "res://scenes/hangar/hangar.tscn"
+const MAP_SCENE := "res://scenes/map/map.tscn"
+const Campaign := preload("res://scenes/map/campaign.gd")
 # Money a new player starts with.
 const STARTING_MONEY := 1500
 
@@ -37,6 +39,15 @@ var selected_heli: String = "cobra"
 var upgrades: Dictionary = {}
 # Money earned by the last finished run (shown on the game-over screen).
 var last_earned: int = 0
+# Where it came from: {"kills", "income", "capture"}.
+var last_payout: Dictionary = {}
+
+# Campaign: rigs the player owns and their upgrade levels ({id: {key: level}}).
+var owned_rigs: Array = [Campaign.HOME]
+var rig_upgrades: Dictionary = {}
+# The mission being played: {"rig": id, "mode": "assault" | "defend"}.
+# Empty when main.tscn is run directly.
+var mission: Dictionary = {}
 
 
 func _ready() -> void:
@@ -62,6 +73,23 @@ func start_game() -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+# Fly a mission at a rig: assault an enemy rig or defend an owned one.
+func start_mission(rig: String) -> void:
+	mission = {"rig": rig, "mode": "defend" if Campaign.is_owned(rig) else "assault"}
+	start_game()
+
+
+func go_to_map() -> void:
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	is_game_over = false
+	get_tree().change_scene_to_file(MAP_SCENE)
+
+
+func is_assault() -> bool:
+	return mission.get("mode", "") == "assault"
 
 
 func go_to_hangar() -> void:
@@ -135,11 +163,7 @@ func game_over(reason: String) -> void:
 	var new_best_wave := wave > best_wave
 	best_score = maxi(best_score, score)
 	best_wave = maxi(best_wave, wave)
-
-	# The run's score is paid out as money for the hangar.
-	last_earned = score
-	money += score
-	save_settings()
+	pay_out(false)
 
 	var hud := get_tree().get_first_node_in_group("game_hud")
 
@@ -149,6 +173,41 @@ func game_over(reason: String) -> void:
 
 	get_tree().paused = true
 	hud.show_game_over(reason, new_best_score, new_best_wave)
+
+
+# The assault mission's last wave was cleared: capture the rig.
+func mission_won() -> void:
+	if is_game_over:
+		return
+	is_game_over = true
+	pay_out(true)
+
+	var hud := get_tree().get_first_node_in_group("game_hud")
+
+	if hud == null:
+		go_to_map()
+		return
+
+	get_tree().paused = true
+	hud.show_victory(Campaign.RIGS[mission["rig"]]["name"])
+
+
+# The run's score is paid out as money, plus income from every owned rig
+# (win or lose) and a bonus for a capture.
+func pay_out(captured: bool) -> void:
+	last_payout = {"kills": score, "income": 0, "capture": 0}
+
+	if not mission.is_empty():
+		if captured:
+			var rig: String = mission["rig"]
+			if not owned_rigs.has(rig):
+				owned_rigs.append(rig)
+			last_payout["capture"] = Campaign.capture_bonus(rig)
+		last_payout["income"] = Campaign.total_income()
+
+	last_earned = last_payout["kills"] + last_payout["income"] + last_payout["capture"]
+	money += last_earned
+	save_settings()
 
 
 func save_settings() -> void:
@@ -167,6 +226,8 @@ func save_settings() -> void:
 	config.set_value("hangar", "owned_helis", owned_helis)
 	config.set_value("hangar", "selected_heli", selected_heli)
 	config.set_value("hangar", "upgrades", upgrades)
+	config.set_value("campaign", "owned_rigs", owned_rigs)
+	config.set_value("campaign", "rig_upgrades", rig_upgrades)
 	config.save(SETTINGS_PATH)
 
 
@@ -190,3 +251,5 @@ func load_settings() -> void:
 	owned_helis = config.get_value("hangar", "owned_helis", owned_helis)
 	selected_heli = config.get_value("hangar", "selected_heli", selected_heli)
 	upgrades = config.get_value("hangar", "upgrades", upgrades)
+	owned_rigs = config.get_value("campaign", "owned_rigs", owned_rigs)
+	rig_upgrades = config.get_value("campaign", "rig_upgrades", rig_upgrades)

@@ -17,6 +17,10 @@ var check_timer: float = 0.0
 
 
 func _ready() -> void:
+	# Defending an owned rig: its hull upgrades add health.
+	if Global.mission.get("mode", "") == "defend":
+		max_health += Global.Campaign.hull_bonus(Global.mission["rig"])
+		health = max_health
 	health_bar_3d.update_health(health, max_health)
 
 

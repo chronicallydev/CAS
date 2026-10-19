@@ -563,7 +563,8 @@ func heli_action_button() -> Button:
 
 func deploy_button() -> Button:
 	var deploy := stencil_button("DEPLOY", 28)
-	deploy.pressed.connect(Global.start_game)
+	# Missions are picked on the campaign map.
+	deploy.pressed.connect(Global.go_to_map)
 	return deploy
 
 

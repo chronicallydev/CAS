@@ -104,6 +104,11 @@ const PRESETS := {
 # Bonus points for clearing a wave, multiplied by the wave number.
 @export_range(0, 10000, 10) var wave_clear_bonus: int = 100
 
+const Campaign := preload("res://scenes/map/campaign.gd")
+
+# Assault missions: waves to clear to win. 0 = endless.
+var target_waves: int = 0
+
 signal wave_started(wave: int, is_boss: bool)
 signal wave_cleared(wave: int, bonus: int)
 
@@ -140,6 +145,9 @@ func _ready() -> void:
 
 	if Global.use_menu_settings:
 		apply_menu_settings()
+
+	if not Global.mission.is_empty():
+		apply_mission()
 
 	if difficulty != Difficulty.CUSTOM:
 		apply_preset(difficulty)
@@ -178,6 +186,37 @@ func apply_menu_settings() -> void:
 		car_min_level = 0
 		tank_min_level = 0
 		aa_min_level = 0
+
+
+# A campaign mission sets the starting level and enemy mix from its rig.
+# Assaults end after the rig's waves are cleared; defends are endless.
+func apply_mission() -> void:
+	var rig: Dictionary = Campaign.RIGS[Global.mission["rig"]]
+	var weights: Dictionary = Campaign.profile(Global.mission["rig"])["weights"]
+	wave_mode = true
+	starting_level = rig["level"]
+	infantry_weight = weights["infantry"]
+	car_weight = weights["car"]
+	tank_weight = weights["tank"]
+	aa_weight = weights["aa"]
+	infantry_enabled = infantry_weight > 0.0
+	car_enabled = car_weight > 0.0
+	tank_enabled = tank_weight > 0.0
+	aa_enabled = aa_weight > 0.0
+	# The garrison is all there from the first wave.
+	car_min_level = 0
+	tank_min_level = 0
+	aa_min_level = 0
+	target_waves = rig["waves"] if Global.is_assault() else 0
+
+
+# Waves still to clear before an assault is won.
+func waves_left() -> int:
+	return maxi(target_waves - (wave - starting_level), 0)
+
+
+func is_final_wave(number: int) -> bool:
+	return target_waves > 0 and number - starting_level == target_waves
 
 
 func apply_preset(preset: Difficulty) -> void:
@@ -253,7 +292,10 @@ func begin_wave(number: int) -> void:
 		if scene != null:
 			wave_queue.append(scene)
 
+	# Assaults end with the garrison's boss; endless runs get one every few waves.
 	var is_boss := boss_every > 0 and number % boss_every == 0 and tank_scene != null
+	if target_waves > 0:
+		is_boss = is_final_wave(number) and tank_scene != null
 	if is_boss:
 		# The boss rolls in after the first few escorts.
 		wave_queue.insert(mini(2, wave_queue.size()), "boss")
@@ -268,6 +310,12 @@ func clear_wave() -> void:
 	wave_state = WaveState.BREAK
 	break_left = breather_time
 	wave_cleared.emit(wave, bonus)
+
+	if is_final_wave(wave):
+		set_process(false)
+		# A moment to enjoy the last explosion before the victory screen.
+		await get_tree().create_timer(2.0).timeout
+		Global.mission_won()
 
 
 func get_wave_spawn_interval() -> float:
