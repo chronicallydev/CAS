@@ -26,6 +26,10 @@ PixelArt="*res://scenes/pixelart/pixel_art.gd"
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[gui]
+
+theme/custom_font="res://assets/fonts/monogram.ttf"
+
 [global_group]
 
 Base=""

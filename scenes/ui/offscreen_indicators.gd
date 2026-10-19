@@ -4,6 +4,7 @@ extends Control
 # outside the view. Colour and size show the enemy type; an AA launcher
 # that is locking on pulses red, and the boss gets the biggest arrow.
 
+const UiStyle := preload("res://scenes/ui/ui_style.gd")
 const MARGIN := 34.0
 # Keeps bottom arrows above the hull bar and warning text.
 const BOTTOM_MARGIN := 140.0
@@ -131,7 +132,7 @@ func draw_arrow(target: Vector2, color: Color, size: float) -> Vector2:
 
 func draw_label(text: String, at: Vector2, color: Color) -> void:
 	var font := get_theme_default_font()
-	var size := 16
+	var size := UiStyle.px(16)
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var pos := at + Vector2(-width * 0.5, size * 0.35)
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(0, 0, 0, 0.7))

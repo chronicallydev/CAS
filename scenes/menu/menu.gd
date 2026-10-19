@@ -3,10 +3,10 @@ extends Control
 # Main menu: open the campaign map, pick difficulty and graphics, quit.
 # The UI is built in code; settings are stored on the Global autoload.
 
+const UiStyle := preload("res://scenes/ui/ui_style.gd")
 const ACCENT := Color(1.0, 0.72, 0.25)
 const TEXT := Color(0.9, 0.92, 0.88)
 const MUTED := Color(0.6, 0.64, 0.6)
-const PANEL := Color(0.1, 0.12, 0.11, 0.85)
 
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard", "Brutal"]
 
@@ -58,19 +58,13 @@ func build_layout() -> void:
 	column.add_child(subtitle)
 
 	if Global.best_wave > 0:
-		column.add_child(make_label("BEST   Wave %d   ·   %d pts" % [Global.best_wave, Global.best_score], 18, ACCENT))
+		column.add_child(make_label("BEST   Wave %d   |   %d pts" % [Global.best_wave, Global.best_score], 18, ACCENT))
 
 	column.add_child(make_spacer(6))
 
 	# Settings panel.
 	var panel := PanelContainer.new()
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = PANEL
-	panel_style.set_corner_radius_all(6)
-	panel_style.set_content_margin_all(18)
-	panel_style.border_color = Color(1, 1, 1, 0.08)
-	panel_style.set_border_width_all(1)
-	panel.add_theme_stylebox_override("panel", panel_style)
+	panel.add_theme_stylebox_override("panel", UiStyle.gradient_panel(UiStyle.PANEL_TOP, UiStyle.PANEL_BOTTOM, UiStyle.PANEL_BORDER, 18.0))
 	column.add_child(panel)
 
 	var grid := GridContainer.new()
@@ -84,7 +78,7 @@ func build_layout() -> void:
 	for i in DIFFICULTY_NAMES.size():
 		difficulty_option.add_item(DIFFICULTY_NAMES[i], i)
 	difficulty_option.custom_minimum_size = Vector2(200, 40)
-	difficulty_option.add_theme_font_size_override("font_size", 20)
+	difficulty_option.add_theme_font_size_override("font_size", UiStyle.px(20))
 	grid.add_child(difficulty_option)
 
 	grid.add_child(make_label("Graphics", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
@@ -126,7 +120,7 @@ func build_layout() -> void:
 	row.add_child(quit_button)
 
 	column.add_child(make_spacer(2))
-	column.add_child(make_label("WASD fly   ·   Mouse aim   ·   LMB fire   ·   Q / 1-5 weapons   ·   Esc menu", 16, MUTED))
+	column.add_child(make_label("WASD fly   |   Mouse aim   |   LMB fire   |   Q / 1-5 weapons   |   Esc menu", 16, MUTED))
 
 
 func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:
@@ -134,7 +128,7 @@ func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGN
 	label.text = text
 	label.horizontal_alignment = align
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", UiStyle.px(size))
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -148,7 +142,7 @@ func make_spacer(height: float) -> Control:
 func make_check(text: String) -> CheckBox:
 	var check := CheckBox.new()
 	check.text = text
-	check.add_theme_font_size_override("font_size", 18)
+	check.add_theme_font_size_override("font_size", UiStyle.px(18))
 	# The default icons are too dark on this background.
 	check.add_theme_icon_override("unchecked", make_box_icon(false))
 	check.add_theme_icon_override("checked", make_box_icon(true))
@@ -176,7 +170,7 @@ func make_button(text: String, primary: bool) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(320, 48)
-	button.add_theme_font_size_override("font_size", 24)
+	button.add_theme_font_size_override("font_size", UiStyle.px(24))
 
 	var fill := ACCENT if primary else Color(0.2, 0.23, 0.21)
 	var text_color := Color(0.08, 0.08, 0.06) if primary else TEXT

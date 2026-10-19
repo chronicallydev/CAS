@@ -4,6 +4,7 @@ extends Node3D
 # altitude, and it turns to face the mouse cursor. The airframe, its look
 # and its stats come from the hangar (see heli_model.gd and loadout.gd).
 
+const UiStyle := preload("res://scenes/ui/ui_style.gd")
 const HeliModel := preload("res://scenes/player/heli_model.gd")
 const Loadout := preload("res://scenes/hangar/loadout.gd")
 
@@ -254,7 +255,7 @@ func build_hud() -> void:
 	var caption := Label.new()
 	caption.text = "HULL"
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	caption.add_theme_font_size_override("font_size", 16)
+	caption.add_theme_font_size_override("font_size", UiStyle.px(16))
 	box.add_child(caption)
 
 	health_bar = ProgressBar.new()
@@ -278,7 +279,7 @@ func build_hud() -> void:
 	warning_label.offset_top = -120
 	warning_label.offset_bottom = -80
 	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	warning_label.add_theme_font_size_override("font_size", 30)
+	warning_label.add_theme_font_size_override("font_size", UiStyle.px(30))
 	warning_label.visible = false
 	layer.add_child(warning_label)
 

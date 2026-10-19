@@ -4,6 +4,7 @@ extends Node3D
 # and the weapons (WORKSHOP tab), then deploy. A 3D hangar with the chosen
 # helicopter on a turntable sits behind the UI. Everything is built in code.
 
+const UiStyle := preload("res://scenes/ui/ui_style.gd")
 const P := preload("res://scenes/environment/prop_builder.gd")
 const HeliModel := preload("res://scenes/player/heli_model.gd")
 const Loadout := preload("res://scenes/hangar/loadout.gd")
@@ -218,16 +219,13 @@ func show_heli(id: String) -> void:
 # --- UI ---------------------------------------------------------------------
 
 func make_title_font() -> Font:
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Impact", "Arial Black", "Arial"])
-	font.font_weight = 800
-	return font
+	return UiStyle.FONT
 
 
 func label(text: String, size: int, color: Color = TEXT, title: bool = false) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", UiStyle.px(size))
 	l.add_theme_color_override("font_color", color)
 	if title:
 		l.add_theme_font_override("font", title_font)
@@ -250,7 +248,7 @@ func stencil_button(text: String, size: int, enabled: bool = true) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_override("font", title_font)
-	b.add_theme_font_size_override("font_size", size)
+	b.add_theme_font_size_override("font_size", UiStyle.px(size))
 	var normal := flat(Color(0.95, 0.95, 0.93) if enabled else Color(0.4, 0.4, 0.4))
 	normal.set_content_margin_all(8)
 	normal.content_margin_left = 18
@@ -277,7 +275,7 @@ func text_button(text: String, size: int) -> Button:
 	b.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
 	b.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
 	b.add_theme_font_override("font", title_font)
-	b.add_theme_font_size_override("font_size", size)
+	b.add_theme_font_size_override("font_size", UiStyle.px(size))
 	b.add_theme_color_override("font_color", TEXT)
 	b.add_theme_color_override("font_hover_color", ORANGE)
 	b.add_theme_color_override("font_pressed_color", ORANGE)
@@ -345,7 +343,7 @@ func build_ui() -> void:
 	right_panel.offset_left = -420
 	right_panel.offset_right = -14
 	right_panel.offset_top = 96
-	right_panel.add_theme_stylebox_override("panel", flat(PANEL_BG))
+	right_panel.add_theme_stylebox_override("panel", UiStyle.gradient_panel())
 	root.add_child(right_panel)
 
 	bottom_area = VBoxContainer.new()
@@ -626,7 +624,7 @@ func build_bottom() -> void:
 
 		var status := "IN USE" if Global.selected_heli == id else ("OWNED" if owned else "$ %s" % format_money(heli["price"]))
 		var status_color := ORANGE if Global.selected_heli == id else (MUTED if owned else Color(0.95, 0.8, 0.3))
-		var status_label := label("%s   ·   %s" % [heli["class"], status], 13, status_color)
+		var status_label := label("%s   |   %s" % [heli["class"], status], 13, status_color)
 		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		info.add_child(status_label)
 

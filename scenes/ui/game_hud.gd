@@ -4,6 +4,7 @@ extends CanvasLayer
 # the game-over screen. Built in code; Global.game_over() opens the
 # game-over screen through the "game_hud" group.
 
+const UiStyle := preload("res://scenes/ui/ui_style.gd")
 const ACCENT := Color(1.0, 0.72, 0.25)
 const TEXT := Color(0.92, 0.93, 0.9)
 const MUTED := Color(0.7, 0.72, 0.68)
@@ -105,7 +106,7 @@ func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGN
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = align
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", UiStyle.px(size))
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	label.add_theme_constant_override("outline_size", 6)
@@ -353,7 +354,7 @@ func show_game_over(reason: String, new_best_score: bool, new_best_wave: bool) -
 	if new_best_score or new_best_wave:
 		column.add_child(make_label("NEW BEST!", 26, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
 	else:
-		column.add_child(make_label("Best:  wave %d  ·  %s pts" % [Global.best_wave, format_number(Global.best_score)], 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		column.add_child(make_label("Best:  wave %d  |  %s pts" % [Global.best_wave, format_number(Global.best_score)], 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 
 	add_end_buttons(column, "RETRY", Global.retry)
 
@@ -395,9 +396,14 @@ func open_end_screen(title: String, color: Color) -> VBoxContainer:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	game_over_root.add_child(center)
 
+	# Everything sits on a gradient panel.
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UiStyle.gradient_panel(UiStyle.PANEL_TOP, UiStyle.PANEL_BOTTOM, UiStyle.PANEL_BORDER, 24.0))
+	center.add_child(panel)
+
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
-	center.add_child(column)
+	panel.add_child(column)
 
 	column.add_child(make_label(title, 60, color, HORIZONTAL_ALIGNMENT_CENTER))
 
@@ -441,7 +447,7 @@ func add_end_buttons(column: VBoxContainer, primary_text: String, primary_action
 		var button := make_button(text, false)
 		button.custom_minimum_size = Vector2(0, 44)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_size_override("font_size", 18)
+		button.add_theme_font_size_override("font_size", UiStyle.px(18))
 		button.pressed.connect(action)
 		row.add_child(button)
 
@@ -459,7 +465,7 @@ func make_button(text: String, primary: bool) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(320, 50)
-	button.add_theme_font_size_override("font_size", 22)
+	button.add_theme_font_size_override("font_size", UiStyle.px(22))
 
 	var fill := ACCENT if primary else Color(0.2, 0.23, 0.21)
 	var text_color := Color(0.08, 0.08, 0.06) if primary else TEXT

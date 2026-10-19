@@ -1,6 +1,7 @@
 extends Node3D
 
 enum Weapon { CANNON, MINIGUN, JAVELIN, ROCKETS, FAB }
+const UiStyle := preload("res://scenes/ui/ui_style.gd")
 const WEAPON_NAMES := ["CANNON", "MINIGUN", "JAVELIN", "ROCKETS", "FAB-500"]
 
 const JavelinMissile := preload("res://scenes/weapon/javelin_missile.gd")
@@ -131,7 +132,7 @@ func _ready() -> void:
 
 	# Weapon name, bottom right.
 	weapon_label = Label.new()
-	weapon_label.add_theme_font_size_override("font_size", 28)
+	weapon_label.add_theme_font_size_override("font_size", UiStyle.px(28))
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	weapon_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	weapon_label.add_theme_constant_override("outline_size", 6)
