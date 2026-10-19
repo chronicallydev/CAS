@@ -13,8 +13,13 @@ const Loadout := preload("res://scenes/hangar/loadout.gd")
 # How quickly the helicopter reaches the requested speed.
 @export var acceleration: float = 5.0
 @export var altitude: float = 16.0
-# The helicopter stays inside this distance from the centre on X and Z.
-@export var bounds: float = 65.0
+# Radius of the area of operations around the rig. Past it a warning
+# shows and the helicopter is pushed back; it can't go more than
+# `bounds_overshoot` further. Campaign missions set their own radius.
+@export var bounds: float = 90.0
+@export var bounds_overshoot: float = 20.0
+# How far out an assault starts, flying in from friendly territory.
+@export var ingress_distance: float = 140.0
 @export var turn_speed: float = 6.0
 @export var max_tilt_degrees: float = 16.0
 # Height of the ground plane used for mouse aiming.
@@ -32,6 +37,10 @@ var health: float = 0.0
 var dead: bool = false
 # Kept above zero by AA launchers while they are locking on.
 var lock_warning_timer: float = 0.0
+# Past the edge of the area of operations.
+var out_of_bounds: bool = false
+# 0 -> 1 while lifting off the rig's pad at the start of a defence.
+var takeoff: float = 1.0
 
 var body: Node3D
 var main_rotor: Node3D
@@ -58,6 +67,7 @@ func _ready() -> void:
 	build_hud()
 	build_sounds()
 	position.y = altitude
+	place_for_mission()
 
 
 func take_damage(amount: float) -> void:
@@ -99,6 +109,27 @@ func shot_down() -> void:
 
 	await get_tree().create_timer(restart_delay).timeout
 	Global.game_over("Your helicopter was shot down")
+
+
+# Assaults start far out on the friendly side and fly in; defences lift
+# off from the rig's own pad.
+func place_for_mission() -> void:
+	if Global.mission.is_empty():
+		return
+	var rig: String = Global.mission["rig"]
+	if Global.is_assault():
+		var side: Vector2 = Global.Campaign.approach_side(rig)
+		position = Vector3(side.x, 0.0, side.y) * ingress_distance + Vector3(0, altitude, 0)
+		rotation.y = atan2(side.x, side.y)
+		bounds = ingress_distance + 35.0
+	else:
+		position = Vector3(0, 2.5, 9.0)
+		takeoff = 0.0
+		bounds = 120.0
+
+	var camera_rig := get_tree().get_first_node_in_group("game_camera")
+	if camera_rig != null and camera_rig.has_method("snap"):
+		camera_rig.snap()
 
 
 func get_muzzle_position() -> Vector3:
@@ -152,9 +183,11 @@ func _physics_process(delta: float) -> void:
 	velocity = velocity.lerp(desired, 1.0 - exp(-acceleration * delta))
 
 	position += velocity * delta
-	position.x = clampf(position.x, -bounds, bounds)
-	position.z = clampf(position.z, -bounds, bounds)
-	position.y = altitude + sin(time * 1.7) * 0.25
+	keep_in_bounds(delta)
+
+	# Lift off the pad, then hold altitude with a gentle bob.
+	takeoff = minf(takeoff + delta / 2.5, 1.0)
+	position.y = lerpf(2.5, altitude, smoothstep(0.0, 1.0, takeoff)) + sin(time * 1.7) * 0.25
 
 	# Turn the nose toward the cursor.
 	var aim: Variant = get_mouse_ground_point()
@@ -170,6 +203,22 @@ func _physics_process(delta: float) -> void:
 	var tilt := deg_to_rad(max_tilt_degrees)
 	body.rotation.x = lerpf(body.rotation.x, tilt * local_velocity.z / speed, 1.0 - exp(-5.0 * delta))
 	body.rotation.z = lerpf(body.rotation.z, -tilt * local_velocity.x / speed, 1.0 - exp(-5.0 * delta))
+
+
+# Soft edge of the area of operations: push back past it, harder the
+# further out, and never more than bounds_overshoot beyond.
+func keep_in_bounds(delta: float) -> void:
+	var flat := Vector2(position.x, position.z)
+	var over := flat.length() - bounds
+	out_of_bounds = over > 0.0
+	if not out_of_bounds:
+		return
+	var inward := -flat.normalized()
+	velocity += Vector3(inward.x, 0.0, inward.y) * minf(over * 1.5, speed) * 3.0 * delta
+	if over > bounds_overshoot:
+		flat = flat.normalized() * (bounds + bounds_overshoot)
+		position.x = flat.x
+		position.z = flat.y
 
 
 func _process(delta: float) -> void:
@@ -204,6 +253,10 @@ func update_hud(delta: float) -> void:
 		warning_label.text = "MISSILE LOCK"
 		warning_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.2))
 		warning_label.visible = fmod(time, 0.6) < 0.4
+	elif out_of_bounds:
+		warning_label.text = "LEAVING AREA OF OPERATIONS"
+		warning_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+		warning_label.visible = fmod(time, 0.8) < 0.55
 	else:
 		warning_label.visible = false
 

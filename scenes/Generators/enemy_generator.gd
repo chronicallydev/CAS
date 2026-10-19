@@ -113,13 +113,22 @@ var target_waves: int = 0
 # Assaults: the last wave has been cleared (forts may still stand).
 var waves_done: bool = false
 var assault_won: bool = false
-# Spawn-square edges enemies never come from (e.g. the sea side).
-var blocked_edges: Array = []
+# Directions (x = east, y = south) enemies come from, out of enemy
+# territory. Each wave picks one as its main heading.
+var enemy_sides: Array = [Vector2(0, -1), Vector2(1, 0), Vector2(0, 1), Vector2(-1, 0)]
+var wave_side: Vector2 = Vector2(0, -1)
+# Assaults: waves hold off until the helicopter flies within contact_range.
+var awaiting_contact: bool = false
+var contact_range: float = 70.0
+# Spawns stay west of this x (the terminal's sea is to the east).
+var sea_x: float = INF
 
 signal wave_started(wave: int, is_boss: bool)
 signal wave_cleared(wave: int, bonus: int)
 # A fort around an assaulted rig was destroyed; `left` are still standing.
 signal fort_destroyed(left: int)
+# The helicopter reached the assaulted rig; the fight starts.
+signal contact_made
 
 enum WaveState { BREAK, ACTIVE }
 
@@ -171,7 +180,11 @@ func _ready() -> void:
 		wave = starting_level
 		Global.wave = wave
 		wave_state = WaveState.BREAK
-		break_left = 3.0
+		wave_side = pick_wave_side()
+		# Assaults wait for the helicopter to arrive; a defence gives a
+		# moment to lift off before the first column turns up.
+		awaiting_contact = target_waves > 0
+		break_left = 8.0 if not Global.mission.is_empty() else 3.0
 		return
 
 	difficulty_time = float(starting_level) * maxf(difficulty_ramp_seconds, 1.0)
@@ -219,9 +232,10 @@ func apply_mission() -> void:
 	tank_min_level = 0
 	aa_min_level = 0
 	target_waves = rig["waves"] if Global.is_assault() else 0
+	enemy_sides = Campaign.enemy_sides(Global.mission["rig"])
 	if rig["biome"] == "terminal":
-		# The gulf is on the right-hand edge.
-		blocked_edges = [3]
+		# The gulf lies to the east.
+		sea_x = 30.0
 
 
 # Waves still to clear before an assault is won.
@@ -273,6 +287,14 @@ func process_waves(delta: float) -> void:
 	if waves_done:
 		return
 
+	if awaiting_contact:
+		var heli := get_tree().get_first_node_in_group("player") as Node3D
+		if heli != null and Vector2(heli.global_position.x, heli.global_position.z).length() <= contact_range:
+			awaiting_contact = false
+			break_left = 2.5
+			contact_made.emit()
+		return
+
 	if wave_state == WaveState.BREAK:
 		break_left -= delta
 		if break_left <= 0.0:
@@ -282,15 +304,8 @@ func process_waves(delta: float) -> void:
 	wave_spawn_timer -= delta
 
 	if wave_spawn_timer <= 0.0 and not wave_queue.is_empty():
-		for i in get_wave_burst_size():
-			if wave_queue.is_empty() or alive_count() >= wave_max_alive:
-				break
-			var entry = wave_queue.pop_front()
-			if entry is String and entry == "boss":
-				spawn_boss()
-			else:
-				spawn_enemy(entry)
-		wave_spawn_timer = get_wave_spawn_interval()
+		var spawned := spawn_group()
+		wave_spawn_timer = get_wave_spawn_interval() * maxi(spawned, 1)
 
 	if wave_queue.is_empty() and alive_count() == 0:
 		clear_wave()
@@ -326,6 +341,8 @@ func clear_wave() -> void:
 	Global.add_score(bonus)
 	wave_state = WaveState.BREAK
 	break_left = breather_time
+	# The next wave comes from a fresh direction, announced during the break.
+	wave_side = pick_wave_side()
 	wave_cleared.emit(wave, bonus)
 
 	if is_final_wave(wave):
@@ -388,10 +405,6 @@ func get_wave_spawn_interval() -> float:
 	return maxf(interval, maxf(min_spawn_interval, 0.1))
 
 
-func get_wave_burst_size() -> int:
-	return clampi(1 + (wave - 1) / 3, 1, maxi(max_burst_size, 1))
-
-
 func prune_spawned() -> void:
 	for i in range(spawned_nodes.size() - 1, -1, -1):
 		if not is_instance_valid(spawned_nodes[i]):
@@ -412,8 +425,8 @@ func enemies_left() -> int:
 
 
 # A super-sized tank: much tougher, hits harder, worth more points.
-func spawn_boss() -> void:
-	var boss = spawn_enemy(tank_scene)
+func spawn_boss(at: Variant = null) -> void:
+	var boss = spawn_enemy(tank_scene, at)
 	if boss == null:
 		return
 
@@ -542,29 +555,80 @@ func spawn_random_node() -> void:
 	spawn_enemy(scene)
 
 
-# Spawn one enemy of the given scene on a random edge of the spawn square.
-func spawn_enemy(scene: PackedScene) -> Node3D:
+# --- Where enemies come from ---------------------------------------------
+
+# A wave's main heading: one of the enemy sides, swung a little.
+func pick_wave_side() -> Vector2:
+	var side: Vector2 = enemy_sides[randi() % enemy_sides.size()]
+	return side.rotated(randf_range(-0.35, 0.35))
+
+
+# A group of enemies arriving together from just off-screen. Most groups
+# come along the wave's heading; some flank from another enemy side.
+# Returns how many were spawned.
+func spawn_group() -> int:
+	var number := wave - starting_level if target_waves > 0 else wave
+	var size := clampi(2 + number / 2, 3, 7)
+	var side := wave_side.rotated(randf_range(-0.4, 0.4))
+	if randf() < 0.3:
+		side = pick_wave_side()
+	var origin := offscreen_point(side)
+
+	var spawned := 0
+	for i in size:
+		if wave_queue.is_empty() or alive_count() >= wave_max_alive:
+			break
+		var entry = wave_queue.pop_front()
+		# Spread out a little, mostly across the line of advance.
+		var across := Vector3(-side.y, 0.0, side.x) * randf_range(-7.0, 7.0)
+		var back := Vector3(side.x, 0.0, side.y) * randf_range(0.0, 6.0)
+		var at := origin + across + back
+		if entry is String and entry == "boss":
+			spawn_boss(at)
+		else:
+			spawn_enemy(entry, at)
+		spawned += 1
+	return spawned
+
+
+# A point along `side` from the centre of the view, just past its edge so
+# nothing appears on screen.
+func offscreen_point(side: Vector2) -> Vector3:
+	var camera := get_viewport().get_camera_3d()
+	var rig := get_tree().get_first_node_in_group("game_camera")
+	var focus: Vector3 = rig.get_focus() if rig != null and rig.has_method("get_focus") else Vector3.ZERO
+	focus.y = 0.0
+	var direction := Vector3(side.x, 0.0, side.y).normalized()
+
+	var point := focus + direction * 60.0
+	var distance := 60.0
+	while distance < 220.0:
+		point = focus + direction * distance
+		point.x = minf(point.x, sea_x)
+		if camera == null or not on_screen(camera, point):
+			break
+		distance += 8.0
+	# A few metres more so a whole group clears the edge.
+	point += direction * 10.0
+	point.x = minf(point.x, sea_x)
+	point.y = vertical_offset
+	return point
+
+
+func on_screen(camera: Camera3D, point: Vector3) -> bool:
+	if camera.is_position_behind(point):
+		return false
+	var rect := get_viewport().get_visible_rect().grow(60.0)
+	return rect.has_point(camera.unproject_position(point))
+
+
+# Spawn one enemy of the given scene at `at`, or (without one) off-screen
+# on a random enemy side.
+func spawn_enemy(scene: PackedScene, at: Variant = null) -> Node3D:
 	if scene == null:
 		return null
 
-	# Choose a random position along one of the square's edges.
-	var half_size: float = square_size / 2.0
-	var coordinate: float = randf_range(-half_size, half_size)
-	var edge: int = randi_range(0, 3)
-	while blocked_edges.has(edge) and blocked_edges.size() < 4:
-		edge = randi_range(0, 3)
-
-	var spawn_position: Vector3
-
-	match edge:
-		0: # Top edge
-			spawn_position = Vector3(coordinate, vertical_offset, -half_size)
-		1: # Bottom edge
-			spawn_position = Vector3(coordinate, vertical_offset, half_size)
-		2: # Left edge
-			spawn_position = Vector3(-half_size, vertical_offset, coordinate)
-		3: # Right edge
-			spawn_position = Vector3(half_size, vertical_offset, coordinate)
+	var spawn_position: Vector3 = at if at is Vector3 else offscreen_point(pick_wave_side())
 
 	# Instantiate the enemy.
 	var instance = scene.instantiate()
@@ -579,6 +643,8 @@ func spawn_enemy(scene: PackedScene) -> Node3D:
 	apply_modifiers(new_node)
 	add_child(new_node)
 	new_node.position = spawn_position
+	# Face the way they're heading from the start.
+	new_node.rotation.y = atan2(spawn_position.x, spawn_position.z)
 
 	spawned_nodes.append(new_node)
 	return new_node

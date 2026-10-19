@@ -27,6 +27,9 @@ const DANGER := Color(1.0, 0.2, 0.15)
 var home: Node3D
 # Seconds of "under attack" flashing left for the rig arrow.
 var rig_alert: float = 0.0
+# In an assault the rig is the enemy's: a red TARGET arrow with the
+# distance to it.
+var home_is_target: bool = false
 
 var time: float = 0.0
 
@@ -89,14 +92,14 @@ func _draw() -> void:
 	if home != null and is_instance_valid(home):
 		var info := project(camera, home.global_position)
 		if not info["on_screen"]:
-			var color := RIG_COLOR
-			var size := 16.0
+			var color := DANGER if home_is_target else RIG_COLOR
+			var size := 18.0 if home_is_target else 16.0
 			if rig_alert > 0.0:
 				var pulse := 0.5 + 0.5 * sin(time * 14.0)
 				color = DANGER.lerp(Color.WHITE, pulse * 0.3)
 				size = 18.0 + 4.0 * pulse
 			var tip := draw_arrow(info["point"], color, size)
-			draw_label("RIG", tip, color)
+			draw_label(target_label() if home_is_target else "RIG", tip, color)
 
 
 # Draws an arrow on the screen edge pointing toward `target`; returns where
@@ -130,6 +133,15 @@ func draw_arrow(target: Vector2, color: Color, size: float) -> Vector2:
 	points.append(tip)
 	draw_polyline(points, Color(0, 0, 0, 0.6), 2.0, true)
 	return base - direction * 14.0
+
+
+# "TARGET 140 m", measured from the helicopter.
+func target_label() -> String:
+	var heli := get_tree().get_first_node_in_group("player") as Node3D
+	if heli == null:
+		return "TARGET"
+	var offset := heli.global_position - home.global_position
+	return "TARGET %d m" % roundi(Vector2(offset.x, offset.z).length())
 
 
 func draw_label(text: String, at: Vector2, color: Color) -> void:

@@ -42,6 +42,13 @@ func ground_point() -> Vector3:
 	return point
 
 
+# Jump straight to the target (e.g. when it's placed far from the start).
+func snap() -> void:
+	if target != null:
+		global_position = ground_point() + offset
+		look_at(global_position - offset)
+
+
 # Point the camera is looking at, on the ground.
 func get_focus() -> Vector3:
 	return global_position - offset

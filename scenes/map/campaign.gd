@@ -119,3 +119,47 @@ static func capture_bonus(id: String) -> int:
 
 static func profile(id: String) -> Dictionary:
 	return PROFILES[RIGS[id]["profile"]]
+
+
+# --- Mission geography ---------------------------------------------------
+# Directions on the battlefield (x = east, y = south, as on the map) worked
+# out from where rigs sit on the campaign map.
+
+# Map positions are 0-1 on each axis; the map is 1.5 times wider than tall.
+const MAP_ASPECT := Vector2(1.5, 1.0)
+
+
+static func heading(from_id: String, to_id: String) -> Vector2:
+	var delta: Vector2 = (RIGS[to_id]["pos"] - RIGS[from_id]["pos"]) * MAP_ASPECT
+	return delta.normalized() if delta.length() > 0.001 else Vector2.RIGHT
+
+
+# Where the helicopter flies in from: the direction of the owned rig the
+# attack is launched from (the first owned link), as seen from the target.
+static func approach_side(id: String) -> Vector2:
+	for link in RIGS[id]["links"]:
+		if is_owned(link):
+			return heading(id, link)
+	return Vector2(0, 1)
+
+
+# Directions enemy reinforcements come from: toward enemy-held neighbours.
+# An assaulted rig with none is reinforced from the far side.
+static func enemy_sides(id: String) -> Array:
+	var sides: Array = []
+	for link in RIGS[id]["links"]:
+		if not is_owned(link) and link != id:
+			sides.append(heading(id, link))
+	if sides.is_empty():
+		sides.append(-approach_side(id) if not is_owned(id) else Vector2.from_angle(randf() * TAU))
+	if not is_owned(id):
+		# The garrison also fights back from behind the rig.
+		sides.append(-approach_side(id))
+	return sides
+
+
+# "north", "south-east"... for a direction (x = east, y = south).
+static func compass(direction: Vector2) -> String:
+	const NAMES := ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
+	var degrees := fposmod(rad_to_deg(atan2(direction.x, -direction.y)), 360.0)
+	return NAMES[int(round(degrees / 45.0)) % 8]

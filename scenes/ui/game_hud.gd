@@ -67,11 +67,16 @@ func _ready() -> void:
 		generator.wave_started.connect(on_wave_started)
 		generator.wave_cleared.connect(on_wave_cleared)
 		generator.fort_destroyed.connect(on_fort_destroyed)
+		generator.contact_made.connect(on_contact)
 
-	# Assaulting an enemy rig: there's no friendly rig to watch.
+	# Assaulting an enemy rig: there's no friendly rig to watch, and the
+	# rig arrow marks the target instead.
 	if Global.is_assault():
 		rig_bar.get_parent().visible = false
-		indicators.home = null
+		indicators.home_is_target = true
+
+	if not Global.mission.is_empty():
+		show_mission_start.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -87,7 +92,8 @@ func _process(delta: float) -> void:
 	score_label.text = "SCORE  %s" % format_number(int(shown_score))
 	if gun != null:
 		score_label.text += "     KILLS  %d" % gun.kills
-	wave_label.text = "WAVE %d" % maxi(Global.wave, 1) if Global.wave > 0 else "GET READY"
+	var started: bool = generator == null or Global.wave > generator.starting_level
+	wave_label.text = "WAVE %d" % maxi(Global.wave, 1) if Global.wave > 0 and started else "GET READY"
 	if is_assault():
 		var count: int = Global.wave - generator.starting_level
 		wave_label.text = "WAVE %d / %d" % [count, generator.target_waves] if count > 0 else "GET READY"
@@ -95,9 +101,16 @@ func _process(delta: float) -> void:
 	if generator == null or not generator.wave_mode:
 		status_label.text = ""
 	elif generator.wave_state == generator.WaveState.BREAK:
-		status_label.text = "Next wave in %d" % ceili(maxf(generator.break_left, 0.0))
+		status_label.text = "Next wave in %d  |  from the %s" % [ceili(maxf(generator.break_left, 0.0)), Global.Campaign.compass(generator.wave_side)]
 	else:
 		status_label.text = "Enemies left: %d" % generator.enemies_left()
+
+	if generator != null and generator.awaiting_contact:
+		wave_label.text = "INGRESS"
+		var heli := get_tree().get_first_node_in_group("player") as Node3D
+		var distance := Vector2(heli.global_position.x, heli.global_position.z).length() if heli != null else 0.0
+		status_label.text = "Fly to the target: %d m" % roundi(distance)
+		return
 
 	if is_assault():
 		var forts: int = generator.forts_left()
@@ -202,16 +215,30 @@ func is_assault() -> bool:
 
 
 func on_wave_started(number: int, is_boss: bool) -> void:
+	var from := "Inbound from the %s" % Global.Campaign.compass(generator.wave_side)
 	if is_assault():
 		var count: int = number - generator.starting_level
 		if generator.is_final_wave(number):
-			show_banner("FINAL WAVE", "The garrison's heavy armour is rolling out", DANGER)
+			show_banner("FINAL WAVE", "Heavy armour inbound from the %s" % Global.Campaign.compass(generator.wave_side), DANGER)
 		else:
-			show_banner("WAVE %d / %d" % [count, generator.target_waves], "%d more after this to take the rig" % (generator.target_waves - count), ACCENT)
+			show_banner("WAVE %d / %d" % [count, generator.target_waves], "%s  |  %d more to take the rig" % [from, generator.target_waves - count], ACCENT)
 	elif is_boss:
-		show_banner("WAVE %d" % number, "BOSS WAVE  -  heavy armour incoming", DANGER)
+		show_banner("WAVE %d" % number, "BOSS WAVE  |  heavy armour inbound from the %s" % Global.Campaign.compass(generator.wave_side), DANGER)
 	else:
-		show_banner("WAVE %d" % number, "", ACCENT)
+		show_banner("WAVE %d" % number, from, ACCENT)
+
+
+# Opening banner: fly in to an assault, or lift off for a defence.
+func show_mission_start() -> void:
+	var rig: Dictionary = Global.Campaign.RIGS[Global.mission["rig"]]
+	if Global.is_assault():
+		show_banner("INGRESS", "Fly to %s. The defences open fire as you close in." % rig["name"], ACCENT)
+	else:
+		show_banner("LIFT OFF", "Enemy column inbound from the %s" % Global.Campaign.compass(generator.wave_side), ACCENT)
+
+
+func on_contact() -> void:
+	show_banner("CONTACT", "Enemy forces moving in from the %s" % Global.Campaign.compass(generator.wave_side), DANGER)
 
 
 func on_wave_cleared(number: int, bonus: int) -> void:
