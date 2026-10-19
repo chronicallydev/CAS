@@ -704,6 +704,13 @@ func explode_at(position: Vector3, radius: float, hit_damage: float, vfx_scale: 
 
 
 func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_weapon: bool = false) -> void:
+	# How hard the blast throws bodies around (0 for light weapons):
+	# cannon ~1, rockets ~1.2, Javelin ~3, FAB ~16.
+	var force := 0.0 if light_weapon else hit_damage * radius / 40.0
+	# Light rounds come from the gun; blasts push away from their centre.
+	var from := get_shot_origin() if light_weapon else position
+	var killed := 0
+
 	# Damage enemies near the explosion. Distance is measured on the ground
 	# plane so tall or floating enemies are hit the same as vehicles.
 	for node in get_tree().get_nodes_in_group("enemies"):
@@ -718,9 +725,13 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 		if distance > radius:
 			continue
 
+		if enemy.has_method("set_last_hit"):
+			enemy.set_last_hit(from, force, light_weapon)
+
 		if enemy.has_method("take_damage"):
 			if enemy.take_damage(hit_damage, light_weapon):
 				register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
+				killed += 1
 			else:
 				register_hit()
 				if enemy.has_method("register_hit"):
@@ -728,6 +739,11 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 		else:
 			enemy.queue_free()
 			register_kill(enemy, 10)
+			killed += 1
+
+	# A tiny freeze on big multi-kills makes them land harder.
+	if killed >= 3:
+		Global.hit_stop(0.05 + minf(killed, 8) * 0.01)
 
 
 # Where shots come from, for placing hit marks on the side that was hit.

@@ -29,6 +29,12 @@ var health_bar: Node
 # Holes, sparks, smoke and fire for vehicles (see vehicle_damage.gd).
 var damage_fx: Node
 
+# The last hit, for death effects: where it came from, how strong the blast
+# was (0 for light weapons) and whether it was a light weapon.
+var last_hit_from: Vector3 = Vector3.ZERO
+var last_hit_force: float = 0.0
+var last_hit_light: bool = false
+
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -102,3 +108,9 @@ func launch_parts() -> void:
 		if detach_parts.size() > 1 and randf() > 0.6:
 			continue
 		Debris.launch_part(part, global_position, detach_parts.size() == 1)
+
+
+func set_last_hit(from: Vector3, force: float, light_weapon: bool) -> void:
+	last_hit_from = from
+	last_hit_force = force
+	last_hit_light = light_weapon

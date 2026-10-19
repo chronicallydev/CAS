@@ -46,6 +46,10 @@ const MIX := {
 	"rocket_fire": -9.0,
 	"bomb_release": -6.0,
 	"bomb_whistle": -9.0,
+	# Infantry deaths.
+	"body_thud": -12.0,
+	"gear_clank": -17.0,
+	"scream": -11.0,
 }
 
 # Per sound: [max voices at once, min milliseconds between starts].
@@ -59,6 +63,9 @@ const LIMITS := {
 	"hit_tick": [2, 70],
 	"kill_tick": [3, 40],
 	"rocket_fire": [6, 40],
+	"body_thud": [4, 40],
+	"gear_clank": [3, 50],
+	"scream": [1, 1200],
 }
 
 var streams: Dictionary = {}
@@ -90,6 +97,9 @@ func _ready() -> void:
 	streams["rocket_fire"] = streams["missile_launch"]
 	streams["bomb_release"] = make_stream(synth_clang(0.4, [140.0, 390.0, 820.0], 9.0))
 	streams["bomb_whistle"] = make_stream(synth_whistle())
+	streams["body_thud"] = make_stream(synth_thud())
+	streams["gear_clank"] = make_stream(synth_clang(0.3, [930.0, 2150.0, 3400.0], 16.0))
+	streams["scream"] = make_stream(synth_scream())
 
 
 func get_stream(sound: String) -> AudioStream:
@@ -438,4 +448,57 @@ func synth_whistle() -> PackedFloat32Array:
 		phase += freq / RATE
 		var env := minf(t / 0.4, 1.0) * minf((duration - t) / 0.05, 1.0)
 		out[i] = (sin(TAU * phase) + noise() * 0.08) * env
+	return out
+
+
+# Body hitting the ground: a dull low thump with a little grit.
+func synth_thud() -> PackedFloat32Array:
+	var duration := 0.3
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	var lp := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		phase += 85.0 * exp(-t * 6.0) / RATE
+		lp += 0.12 * (noise() - lp)
+		out[i] = sin(TAU * phase) * exp(-t * 16.0) * minf(t / 0.003, 1.0) + lp * exp(-t * 25.0) * 1.5
+	return out
+
+
+# A few distant shouting voices: vowel-like buzz with vibrato, falling in
+# pitch, softened so it sounds far away.
+func synth_scream() -> PackedFloat32Array:
+	var duration := 1.0
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var voices := [[520.0, 0.0], [430.0, 0.08], [610.0, 0.15]]
+	for voice in voices:
+		var base: float = voice[0]
+		var start: float = voice[1]
+		var phase := 0.0
+		for i in n:
+			var t := float(i) / RATE - start
+			if t < 0.0:
+				continue
+			var life := 0.8
+			if t > life:
+				break
+			var f := base * (1.0 - 0.3 * t / life) * (1.0 + 0.02 * sin(t * TAU * 6.0))
+			phase += f / RATE
+			# Harmonics shaped by "ah" formants (~800 and ~1200 Hz).
+			var s := 0.0
+			for k in range(1, 9):
+				var hz := f * k
+				var gain := exp(-pow((hz - 800.0) / 220.0, 2.0)) + 0.7 * exp(-pow((hz - 1200.0) / 260.0, 2.0)) + 0.05
+				s += sin(TAU * phase * k) * gain
+			var env := minf(t / 0.05, 1.0) * clampf((life - t) / 0.3, 0.0, 1.0)
+			out[i] += (s + noise() * 0.15) * env
+	# Distance: smooth off the highs.
+	var lp := 0.0
+	for i in n:
+		lp += 0.35 * (out[i] - lp)
+		out[i] = lp
 	return out

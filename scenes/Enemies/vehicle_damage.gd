@@ -279,3 +279,12 @@ func spawn_chips(at: Vector3, normal: Vector3) -> void:
 	var scene := vehicle.get_tree().current_scene
 	for i in randi_range(2, 4):
 		Debris.spawn_chip(scene, at, normal, paints.pick_random())
+
+
+# The scorch texture, for ground marks too (creates it if no vehicle has yet).
+static func scorch_texture_for_ground() -> Texture2D:
+	if scorch_texture == null:
+		hole_texture = make_mark_texture(false)
+		scorch_texture = make_mark_texture(true)
+		spark_mesh = make_spark_mesh()
+	return scorch_texture

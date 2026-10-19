@@ -201,17 +201,18 @@ func add_sparks() -> void:
 
 
 func add_debris() -> void:
-	var debris := make_burst(40, 2.5)
+	var debris := make_burst(int(30 * minf(size, 1.5)), 1.6)
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.9, 0.6, 0.7) * size
+	# Chunks stay small even in huge blasts (big glowing cubes read as boxes).
+	mesh.size = Vector3(0.6, 0.4, 0.5) * minf(size, 1.0)
 	var material := StandardMaterial3D.new()
 	# Hot embers that cool from bright orange to warm brown.
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.vertex_color_use_as_albedo = true
 	mesh.material = material
 	debris.color_ramp = make_ramp(
-		[0.0, 0.4, 1.0],
-		[Color(1.0, 0.75, 0.3), Color(0.95, 0.45, 0.15), Color(0.6, 0.35, 0.2)]
+		[0.0, 0.2, 1.0],
+		[Color(1.0, 0.75, 0.3), Color(0.85, 0.35, 0.1), Color(0.25, 0.18, 0.14)]
 	)
 	debris.mesh = mesh
 	debris.direction = Vector3.UP
@@ -222,7 +223,7 @@ func add_debris() -> void:
 	debris.angular_velocity_min = -540.0
 	debris.angular_velocity_max = 540.0
 	debris.scale_amount_min = 0.6
-	debris.scale_amount_max = 1.6
+	debris.scale_amount_max = 1.3
 	debris.emitting = true
 
 

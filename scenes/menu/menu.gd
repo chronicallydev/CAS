@@ -17,6 +17,7 @@ var car_check: CheckBox
 var tank_check: CheckBox
 var aa_check: CheckBox
 var pixel_check: CheckBox
+var blood_check: CheckBox
 var level_spin: SpinBox
 var warning_label: Label
 
@@ -116,7 +117,12 @@ func build_layout() -> void:
 
 	grid.add_child(make_label("Graphics", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
 	pixel_check = make_check("Pixel art")
-	grid.add_child(pixel_check)
+	blood_check = make_check("Blood")
+	var graphics := HBoxContainer.new()
+	graphics.add_theme_constant_override("separation", 24)
+	graphics.add_child(pixel_check)
+	graphics.add_child(blood_check)
+	grid.add_child(graphics)
 
 	warning_label = make_label("Enable at least one enemy type", 16, Color(1.0, 0.45, 0.4))
 	column.add_child(warning_label)
@@ -238,6 +244,7 @@ func load_from_global() -> void:
 	tank_check.button_pressed = Global.tank_enabled
 	aa_check.button_pressed = Global.aa_enabled
 	pixel_check.button_pressed = Global.pixel_art
+	blood_check.button_pressed = Global.blood
 
 
 func any_enemy_enabled() -> bool:
@@ -261,6 +268,7 @@ func save_to_global() -> void:
 	Global.tank_enabled = tank_check.button_pressed
 	Global.aa_enabled = aa_check.button_pressed
 	Global.pixel_art = pixel_check.button_pressed
+	Global.blood = blood_check.button_pressed
 	Global.save_settings()
 
 

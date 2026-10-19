@@ -2,9 +2,11 @@ extends "res://scenes/Enemies/enemy_base.gd"
 
 # Infantry: a soldier with a rifle who walks straight at the base.
 # The model is built from primitives and animated in code: legs stride,
-# arms sway with the rifle and the body bobs with each step.
+# arms sway with the rifle and the body bobs with each step. Blasts nearby
+# make soldiers run from them and dive flat; death is in soldier_death.gd.
 
 const P := preload("res://scenes/environment/prop_builder.gd")
+const SoldierDeath := preload("res://scenes/Enemies/soldier_death.gd")
 
 @export var speed: float = 5.0
 # Height of the ground surface (the soldier's feet).
@@ -18,8 +20,15 @@ var leg_left: Node3D
 var leg_right: Node3D
 var arm_left: Node3D
 var arm_right: Node3D
+var helmet: MeshInstance3D
+var rifle: Node3D
 
 var walk_phase: float = 0.0
+
+# Reaction to a nearby blast: run away from it, then dive flat for a moment.
+var panic_time: float = 0.0
+var prone_time: float = 0.0
+var panic_dir: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
@@ -30,15 +39,35 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	global_position.y = ground_y
+
+	if prone_time > 0.0:
+		prone_time -= delta
+		return
+
+	if panic_time > 0.0:
+		panic_time -= delta
+		global_position += panic_dir * speed * 1.8 * delta
+		face_direction(panic_dir)
+		if panic_time <= 0.0:
+			prone_time = randf_range(0.6, 0.9)
+		return
+
 	var direction := flat_direction_to_center()
 	global_position += direction * speed * delta
-	global_position.y = ground_y
 	face_direction(direction)
 
 
 func _process(delta: float) -> void:
+	# Dive forward while prone, get back up afterwards.
+	var lean := -1.35 if prone_time > 0.0 else 0.0
+	model.rotation.x = move_toward(model.rotation.x, lean, delta * 7.0)
+	if prone_time > 0.0:
+		return
+
 	# One full stride (two steps) covers about 2.8 m at model_scale 1.
-	walk_phase += delta * speed * TAU / (2.8 * model_scale)
+	var pace := 1.8 if panic_time > 0.0 else 1.0
+	walk_phase += delta * speed * pace * TAU / (2.8 * model_scale)
 	var swing := sin(walk_phase)
 
 	leg_left.rotation.x = swing * 0.6
@@ -53,10 +82,25 @@ func _process(delta: float) -> void:
 	body.rotation.z = swing * 0.04
 
 
+func die() -> void:
+	SoldierDeath.kill(self, last_hit_from, last_hit_force, last_hit_light)
+	queue_free()
+
+
+# A blast went off nearby: run from it, then hit the dirt.
+func react_to_blast(from: Vector3) -> void:
+	if panic_time > 0.0 or prone_time > 0.0 or is_queued_for_deletion():
+		return
+	panic_dir = global_position - from
+	panic_dir.y = 0.0
+	panic_dir = panic_dir.normalized() if panic_dir.length() > 0.05 else -flat_direction_to_center()
+	panic_time = randf_range(0.4, 0.8)
+
+
 func build_model() -> void:
 	var uniform := P.material(Color(0.36, 0.39, 0.26), 0.9)
 	var gear := P.material(Color(0.3, 0.29, 0.22), 0.9)
-	var helmet := P.material(Color(0.28, 0.31, 0.2), 0.7)
+	var helmet_paint := P.material(Color(0.28, 0.31, 0.2), 0.7)
 	var skin := P.material(Color(0.76, 0.56, 0.42), 0.8)
 	var boots := P.material(Color(0.26, 0.21, 0.16), 0.9)
 	var metal := P.material(Color(0.18, 0.18, 0.19), 0.5, 0.6)
@@ -76,7 +120,7 @@ func build_model() -> void:
 
 	# Head and helmet.
 	P.sphere(body, 0.13, Vector3(0, 1.7, 0), skin)
-	P.sphere(body, 0.17, Vector3(0, 1.76, 0.01), helmet, Vector3(1.0, 0.65, 1.05))
+	helmet = P.sphere(body, 0.17, Vector3(0, 1.76, 0.01), helmet_paint, Vector3(1.0, 0.65, 1.05))
 
 	# Legs pivot at the hips; each has a boot at the end.
 	leg_left = make_limb(Vector3(-0.12, 0.92, 0), Vector3(0.17, 0.82, 0.19), uniform)
@@ -91,7 +135,7 @@ func build_model() -> void:
 		P.sphere(arm, 0.07, Vector3(0, -0.6, 0), skin)
 
 	# Rifle carried across the chest, muzzle forward.
-	var rifle := Node3D.new()
+	rifle = Node3D.new()
 	rifle.position = Vector3(0.05, 1.18, -0.36)
 	rifle.rotation_degrees = Vector3(8, 18, 0)
 	body.add_child(rifle)
