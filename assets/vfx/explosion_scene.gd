@@ -30,3 +30,4 @@ func play_sound() -> void:
 		Sfx.play_3d("explosion_small", global_position)
 	else:
 		Sfx.play_3d("explosion", global_position)
+		Global.shake(0.22, global_position)

@@ -14,8 +14,19 @@ var tank_enabled: bool = true
 var aa_enabled: bool = true
 var starting_level: int = 0
 
+# Current run.
+var score: int = 0
+var wave: int = 0
+var is_game_over: bool = false
+
+# Saved records.
+var best_score: int = 0
+var best_wave: int = 0
+
 
 func _ready() -> void:
+	# Keep handling Esc and game over while the tree is paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	load_settings()
 
 
@@ -33,11 +44,69 @@ func is_in_game() -> bool:
 func start_game() -> void:
 	use_menu_settings = true
 	save_settings()
+	get_tree().paused = false
 	get_tree().change_scene_to_file(GAME_SCENE)
 
 
 func go_to_menu() -> void:
+	get_tree().paused = false
+	is_game_over = false
 	get_tree().change_scene_to_file(MENU_SCENE)
+
+
+func retry() -> void:
+	get_tree().paused = false
+	is_game_over = false
+	get_tree().reload_current_scene()
+
+
+# Shake the game camera. With a position, the shake fades out for things
+# far from the centre of the view.
+func shake(amount: float, at: Variant = null) -> void:
+	var camera := get_tree().get_first_node_in_group("game_camera")
+
+	if camera == null:
+		return
+
+	if at is Vector3:
+		var distance: float = Vector2(at.x, at.z).distance_to(Vector2(camera.get_focus().x, camera.get_focus().z))
+		amount *= clampf(1.0 - distance / 70.0, 0.2, 1.0)
+
+	camera.add_trauma(amount)
+
+
+func reset_run() -> void:
+	score = 0
+	wave = 0
+	is_game_over = false
+
+
+func add_score(points: int) -> void:
+	if not is_game_over:
+		score += points
+
+
+# Ends the run: records bests, pauses the game and shows the game-over
+# screen. Safe to call more than once.
+func game_over(reason: String) -> void:
+	if is_game_over:
+		return
+	is_game_over = true
+
+	var new_best_score := score > best_score
+	var new_best_wave := wave > best_wave
+	best_score = maxi(best_score, score)
+	best_wave = maxi(best_wave, wave)
+	save_settings()
+
+	var hud := get_tree().get_first_node_in_group("game_hud")
+
+	if hud == null:
+		retry()
+		return
+
+	get_tree().paused = true
+	hud.show_game_over(reason, new_best_score, new_best_wave)
 
 
 func save_settings() -> void:
@@ -48,6 +117,8 @@ func save_settings() -> void:
 	config.set_value("game", "tank_enabled", tank_enabled)
 	config.set_value("game", "aa_enabled", aa_enabled)
 	config.set_value("game", "starting_level", starting_level)
+	config.set_value("records", "best_score", best_score)
+	config.set_value("records", "best_wave", best_wave)
 	config.save(SETTINGS_PATH)
 
 
@@ -63,3 +134,5 @@ func load_settings() -> void:
 	tank_enabled = config.get_value("game", "tank_enabled", tank_enabled)
 	aa_enabled = config.get_value("game", "aa_enabled", aa_enabled)
 	starting_level = config.get_value("game", "starting_level", starting_level)
+	best_score = config.get_value("records", "best_score", best_score)
+	best_wave = config.get_value("records", "best_wave", best_wave)

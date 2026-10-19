@@ -1,0 +1,409 @@
+extends CanvasLayer
+
+# In-game HUD for the wave mode: wave and score readout, wave banners and
+# the game-over screen. Built in code; Global.game_over() opens the
+# game-over screen through the "game_hud" group.
+
+const ACCENT := Color(1.0, 0.72, 0.25)
+const TEXT := Color(0.92, 0.93, 0.9)
+const MUTED := Color(0.7, 0.72, 0.68)
+const DANGER := Color(1.0, 0.35, 0.3)
+
+@export var generator: Node
+# Optional: the gun controller, for the kill count.
+@export var gun: Node
+# The rig, for its health bar and attack warnings.
+@export var home: Node3D
+
+const Indicators := preload("res://scenes/ui/offscreen_indicators.gd")
+
+var wave_label: Label
+var score_label: Label
+var status_label: Label
+var banner: Label
+var banner_sub: Label
+var banner_tween: Tween
+var game_over_root: Control
+
+var shown_score: float = 0.0
+
+# Kills within this many seconds of each other count as one multi-kill.
+const COMBO_WINDOW := 0.6
+var combo_count: int = 0
+var combo_timer: float = 0.0
+var combo_label: Label
+var combo_tween: Tween
+
+var indicators: Control
+var rig_bar: ProgressBar
+var rig_fill: StyleBoxFlat
+var rig_warning: Label
+# Seconds left of the red flash on the rig bar / the off-screen warning.
+var rig_flash: float = 0.0
+var rig_alert: float = 0.0
+
+
+func _ready() -> void:
+	add_to_group("game_hud")
+	layer = 10
+	# The game-over screen has to work while the game is paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Edge arrows go underneath the rest of the HUD.
+	indicators = Indicators.new()
+	indicators.home = home
+	add_child(indicators)
+
+	build_readout()
+	build_rig_warning()
+	build_banner()
+	build_combo_label()
+
+	if home != null and home.has_signal("damaged"):
+		home.damaged.connect(on_rig_damaged)
+
+	if generator != null:
+		generator.wave_started.connect(on_wave_started)
+		generator.wave_cleared.connect(on_wave_cleared)
+
+
+func _process(delta: float) -> void:
+	update_rig(delta)
+
+	if combo_timer > 0.0:
+		combo_timer -= delta
+		if combo_timer <= 0.0:
+			finish_combo()
+
+	# Count the score up smoothly.
+	shown_score = move_toward(shown_score, Global.score, maxf(200.0, absf(Global.score - shown_score) * 6.0) * delta)
+	score_label.text = "SCORE  %s" % format_number(int(shown_score))
+	if gun != null:
+		score_label.text += "     KILLS  %d" % gun.kills
+	wave_label.text = "WAVE %d" % maxi(Global.wave, 1) if Global.wave > 0 else "GET READY"
+
+	if generator == null or not generator.wave_mode:
+		status_label.text = ""
+	elif generator.wave_state == generator.WaveState.BREAK:
+		status_label.text = "Next wave in %d" % ceili(maxf(generator.break_left, 0.0))
+	else:
+		status_label.text = "Enemies left: %d" % generator.enemies_left()
+
+
+func format_number(value: int) -> String:
+	var text := str(absi(value))
+	var out := ""
+	while text.length() > 3:
+		out = "," + text.right(3) + out
+		text = text.left(text.length() - 3)
+	return ("-" if value < 0 else "") + text + out
+
+
+func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = align
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	label.add_theme_constant_override("outline_size", 6)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
+
+
+func build_readout() -> void:
+	var box := VBoxContainer.new()
+	box.position = Vector2(24, 18)
+	box.add_theme_constant_override("separation", 0)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(box)
+
+	wave_label = make_label("WAVE 1", 34, ACCENT)
+	score_label = make_label("SCORE  0", 22, TEXT)
+	status_label = make_label("", 17, MUTED)
+	box.add_child(wave_label)
+	box.add_child(score_label)
+	box.add_child(status_label)
+
+	# Rig health.
+	var rig_row := HBoxContainer.new()
+	rig_row.add_theme_constant_override("separation", 8)
+	rig_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(rig_row)
+	rig_row.add_child(make_label("RIG", 17, TEXT))
+	rig_bar = ProgressBar.new()
+	rig_bar.custom_minimum_size = Vector2(200, 12)
+	rig_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rig_bar.max_value = 1.0
+	rig_bar.value = 1.0
+	rig_bar.show_percentage = false
+	rig_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rig_bg := StyleBoxFlat.new()
+	rig_bg.bg_color = Color(0.08, 0.08, 0.08, 0.7)
+	rig_fill = StyleBoxFlat.new()
+	rig_fill.bg_color = Color(0.3, 0.85, 0.45)
+	rig_bar.add_theme_stylebox_override("background", rig_bg)
+	rig_bar.add_theme_stylebox_override("fill", rig_fill)
+	rig_row.add_child(rig_bar)
+
+
+func build_banner() -> void:
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	box.offset_left = -400
+	box.offset_right = 400
+	box.offset_top = 150
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(box)
+
+	banner = make_label("", 64, ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_sub = make_label("", 24, TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(banner)
+	box.add_child(banner_sub)
+	box.modulate.a = 0.0
+
+
+func show_banner(title: String, subtitle: String, color: Color) -> void:
+	banner.text = title
+	banner.add_theme_color_override("font_color", color)
+	banner_sub.text = subtitle
+
+	var box := banner.get_parent() as Control
+	if banner_tween != null:
+		banner_tween.kill()
+	box.modulate.a = 0.0
+	box.scale = Vector2.ONE
+	banner_tween = create_tween()
+	banner_tween.tween_property(box, "modulate:a", 1.0, 0.25)
+	banner_tween.tween_interval(2.0)
+	banner_tween.tween_property(box, "modulate:a", 0.0, 0.6)
+
+
+func on_wave_started(number: int, is_boss: bool) -> void:
+	if is_boss:
+		show_banner("WAVE %d" % number, "BOSS WAVE  -  heavy armour incoming", DANGER)
+	else:
+		show_banner("WAVE %d" % number, "", ACCENT)
+
+
+func on_wave_cleared(number: int, bonus: int) -> void:
+	var subtitle := "+%s bonus" % format_number(bonus) if bonus > 0 else ""
+	show_banner("WAVE %d CLEARED" % number, subtitle, Color(0.5, 0.9, 0.55))
+
+
+# --- Rig status ----------------------------------------------------------
+
+func build_rig_warning() -> void:
+	rig_warning = make_label("RIG UNDER ATTACK", 30, DANGER, HORIZONTAL_ALIGNMENT_CENTER)
+	rig_warning.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	rig_warning.offset_left = -300
+	rig_warning.offset_right = 300
+	rig_warning.offset_top = 70
+	rig_warning.offset_bottom = 110
+	rig_warning.visible = false
+	add_child(rig_warning)
+
+
+func update_rig(delta: float) -> void:
+	rig_flash = maxf(rig_flash - delta, 0.0)
+	rig_alert = maxf(rig_alert - delta, 0.0)
+
+	if home == null or not is_instance_valid(home):
+		return
+
+	var fraction: float = clampf(home.health / maxf(home.max_health, 1.0), 0.0, 1.0)
+	rig_bar.value = fraction
+
+	var color := Color(0.3, 0.85, 0.45)
+	if fraction < 0.25:
+		color = DANGER
+	elif fraction < 0.5:
+		color = ACCENT
+	# Flash toward white for a moment on each hit.
+	rig_fill.bg_color = color.lerp(Color.WHITE, rig_flash / 0.4 * 0.7)
+
+	# Only warn while the rig is out of view; on screen you can see it.
+	var off_screen: bool = not indicators.is_on_screen(home.global_position)
+	rig_warning.visible = rig_alert > 0.0 and off_screen and fmod(Time.get_ticks_msec() / 1000.0, 0.5) < 0.32
+
+
+func on_rig_damaged() -> void:
+	rig_flash = 0.4
+	rig_alert = 2.5
+	indicators.rig_alert = 2.5
+
+
+# --- Kill feedback -------------------------------------------------------
+
+# Called by the gun controller for every kill.
+func register_kill(points: int, world_position: Vector3, label: String) -> void:
+	var text := "+%d" % points
+	if label != "":
+		text += " " + label
+
+	var color := TEXT
+	if points >= 300:
+		color = DANGER
+	elif points >= 40:
+		color = ACCENT
+
+	spawn_popup(text, world_position, color, points >= 300)
+
+	combo_count += 1
+	combo_timer = COMBO_WINDOW
+
+
+# Floating score text that rises from where the enemy died.
+func spawn_popup(text: String, world_position: Vector3, color: Color, big: bool = false) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+
+	var popup := Label3D.new()
+	popup.text = text
+	popup.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	popup.no_depth_test = true
+	popup.fixed_size = true
+	popup.pixel_size = 0.0016 if big else 0.0011
+	popup.font_size = 48
+	popup.outline_size = 20
+	popup.modulate = color
+	popup.outline_modulate = Color(0, 0, 0, 0.85)
+	popup.render_priority = 10
+	scene.add_child(popup)
+	# A little sideways spread so several kills in one spot don't overlap.
+	popup.global_position = world_position + Vector3(randf_range(-2.0, 2.0), 3.0, randf_range(-1.0, 1.0))
+
+	var tween := popup.create_tween().set_parallel()
+	tween.tween_property(popup, "global_position:y", popup.global_position.y + 6.0, 1.0).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(popup, "modulate:a", 0.0, 0.4).set_delay(0.6)
+	tween.tween_property(popup, "outline_modulate:a", 0.0, 0.4).set_delay(0.6)
+	tween.chain().tween_callback(popup.queue_free)
+
+
+func finish_combo() -> void:
+	var count := combo_count
+	combo_count = 0
+
+	if count < 2:
+		return
+
+	var bonus := 10 * count * (count - 1)
+	Global.add_score(bonus)
+
+	var title := "MULTI KILL x%d" % count
+	match count:
+		2: title = "DOUBLE KILL"
+		3: title = "TRIPLE KILL"
+		4: title = "QUAD KILL"
+	if count >= 8:
+		title = "MASSACRE x%d" % count
+
+	combo_label.text = "%s   +%s" % [title, format_number(bonus)]
+	Sfx.play_2d("combo")
+
+	if combo_tween != null:
+		combo_tween.kill()
+	combo_label.modulate.a = 1.0
+	combo_label.scale = Vector2.ONE * 1.5
+	combo_tween = create_tween()
+	combo_tween.tween_property(combo_label, "scale", Vector2.ONE, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	combo_tween.tween_interval(1.2)
+	combo_tween.tween_property(combo_label, "modulate:a", 0.0, 0.5)
+
+
+func build_combo_label() -> void:
+	combo_label = make_label("", 38, ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	combo_label.offset_left = -400
+	combo_label.offset_right = 400
+	combo_label.offset_top = 110
+	combo_label.offset_bottom = 160
+	combo_label.pivot_offset = Vector2(400, 25)
+	combo_label.modulate.a = 0.0
+	add_child(combo_label)
+
+
+# --- Game over -----------------------------------------------------------
+
+func show_game_over(reason: String, new_best_score: bool, new_best_wave: bool) -> void:
+	if game_over_root != null:
+		return
+
+	game_over_root = Control.new()
+	game_over_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(game_over_root)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.03, 0.03, 0.03, 0.72)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_root.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_root.add_child(center)
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 10)
+	center.add_child(column)
+
+	column.add_child(make_label("GAME OVER", 72, DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	column.add_child(make_label(reason, 22, TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 12)
+	column.add_child(spacer)
+
+	column.add_child(make_label("Wave reached:  %d" % Global.wave, 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	column.add_child(make_label("Score:  %s" % format_number(Global.score), 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+
+	if new_best_score or new_best_wave:
+		column.add_child(make_label("NEW BEST!", 26, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
+	else:
+		column.add_child(make_label("Best:  wave %d  ·  %s pts" % [Global.best_wave, format_number(Global.best_score)], 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+
+	var spacer2 := Control.new()
+	spacer2.custom_minimum_size = Vector2(0, 14)
+	column.add_child(spacer2)
+
+	var retry := make_button("RETRY", true)
+	retry.pressed.connect(Global.retry)
+	column.add_child(retry)
+
+	var menu := make_button("MAIN MENU", false)
+	menu.pressed.connect(Global.go_to_menu)
+	column.add_child(menu)
+
+	retry.grab_focus()
+
+	game_over_root.modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_property(game_over_root, "modulate:a", 1.0, 0.4)
+
+
+func make_button(text: String, primary: bool) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(320, 50)
+	button.add_theme_font_size_override("font_size", 22)
+
+	var fill := ACCENT if primary else Color(0.2, 0.23, 0.21)
+	var text_color := Color(0.08, 0.08, 0.06) if primary else TEXT
+
+	for state in ["normal", "hover", "pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = fill.lightened(0.15) if state == "hover" else (fill.darkened(0.15) if state == "pressed" else fill)
+		style.set_corner_radius_all(6)
+		button.add_theme_stylebox_override(state, style)
+
+	var focus := StyleBoxFlat.new()
+	focus.draw_center = false
+	focus.set_corner_radius_all(6)
+	focus.set_border_width_all(2)
+	focus.border_color = Color(1, 1, 1, 0.6)
+	button.add_theme_stylebox_override("focus", focus)
+
+	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(key, text_color)
+	return button

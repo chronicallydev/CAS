@@ -57,6 +57,9 @@ height = 0.2
 [node name="AALauncher" type="Node3D"]
 script = ExtResource("1_aa")
 max_health = 4.0
+score_value = 40
+display_name = "SAM"
+leaves_wreck = true
 light_armor = 0.5
 missile_explosion = ExtResource("2_boom")
 

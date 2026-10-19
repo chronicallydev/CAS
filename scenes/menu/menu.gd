@@ -62,6 +62,9 @@ func build_layout() -> void:
 	var subtitle := make_label("CLOSE AIR SUPPORT", 18, MUTED)
 	column.add_child(subtitle)
 
+	if Global.best_wave > 0:
+		column.add_child(make_label("BEST   Wave %d   ·   %d pts" % [Global.best_wave, Global.best_score], 18, ACCENT))
+
 	column.add_child(make_spacer(6))
 
 	# Settings panel.

@@ -21,6 +21,7 @@ func _ready() -> void:
 
 	# Louder and deeper than a normal explosion.
 	Sfx.play_3d("explosion", position, 4.0, 0.8)
+	Global.shake(0.5, position)
 
 	await get_tree().create_timer(lifetime).timeout
 	queue_free()

@@ -62,6 +62,7 @@ func take_damage(amount: float) -> void:
 	health_bar.value = health
 	hit_flash.color.a = 0.45
 	Sfx.play_2d("heli_hit")
+	Global.shake(0.55)
 
 	if health <= 0.0:
 		shot_down()
@@ -82,13 +83,14 @@ func shot_down() -> void:
 		explosion.scale = Vector3.ONE * 1.5
 
 	body.visible = false
+	Global.shake(1.0)
 	rotor_sound.stop()
 	lock_sound.stop()
 	inbound_sound.stop()
 	set_physics_process(false)
 
 	await get_tree().create_timer(restart_delay).timeout
-	get_tree().reload_current_scene()
+	Global.game_over("Your helicopter was shot down")
 
 
 func get_muzzle_position() -> Vector3:

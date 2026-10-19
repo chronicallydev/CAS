@@ -28,20 +28,31 @@ const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
 
 @export_group("Damage")
 @export_range(0.1, 100.0, 0.1) var explosion_radius: float = 5.0
-@export_range(0.1, 100.0, 0.1) var damage: float = 4.0
+@export_range(0.1, 100.0, 0.1) var damage: float = 5.0
 
 
 @export var shake_strength: float = 5.0
 
 
 @export_group("Minigun")
-@export_range(1.0, 6000.0, 1.0) var minigun_rpm: float = 2400.0
+@export_range(1.0, 6000.0, 1.0) var minigun_rpm: float = 1800.0
 @export_range(0.0, 10.0, 0.05) var minigun_impact_delay: float = 0.35
-@export_range(0.0, 50.0, 0.1) var minigun_spread: float = 1.5
-@export_range(0.1, 100.0, 0.1) var minigun_radius: float = 2.5
+# Spread radius around the reticle when cold; grows by minigun_bloom as
+# the barrels heat up.
+@export_range(0.0, 50.0, 0.1) var minigun_spread: float = 2.0
+@export_range(0.0, 50.0, 0.1) var minigun_bloom: float = 3.0
+@export_range(0.1, 100.0, 0.1) var minigun_radius: float = 1.5
 @export_range(0.1, 100.0, 0.1) var minigun_damage: float = 1.0
 @export_range(0.05, 2.0, 0.05) var minigun_explosion_scale: float = 0.35
 @export var minigun_shake_strength: float = 1.5
+# Barrels spin up for this long before the first round.
+@export_range(0.0, 3.0, 0.05) var minigun_spin_up: float = 0.4
+# Seconds of continuous fire until it overheats.
+@export_range(0.5, 30.0, 0.1) var minigun_heat_time: float = 3.0
+# Heat lost per second while not firing (1.0 = fully cool in a second).
+@export_range(0.05, 5.0, 0.05) var minigun_cool_rate: float = 0.5
+# How long an overheat locks the gun out.
+@export_range(0.1, 10.0, 0.1) var minigun_jam_time: float = 2.0
 
 
 @export_group("Javelin")
@@ -68,19 +79,37 @@ var is_firing: bool = false
 var fire_timer: float = 0.0
 var kills : int = 0
 var javelin_cooldown: float = 0.0
+# Reticle flash when rounds land on an enemy.
+var hit_flash: float = 0.0
+var hit_was_kill: bool = false
+# Minigun state: heat 0..1, overheat lockout and barrel spin.
+var minigun_heat: float = 0.0
+var minigun_overheated: bool = false
+var minigun_spin: float = 0.0
+var heat_bar: ColorRect
+var heat_fill: ColorRect
 var weapon_label: Label
 
 @onready var default_cursor_size = cursor.scale
 
 
 func _ready() -> void:
-	# Weapon name shown under the kill counter.
+	# Weapon name, bottom right.
 	weapon_label = Label.new()
 	weapon_label.add_theme_font_size_override("font_size", 28)
-	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	weapon_label.position = kill_count.position + Vector2(0, kill_count.size.y)
-	weapon_label.size = Vector2(kill_count.size.x, 40)
+	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	weapon_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	weapon_label.add_theme_constant_override("outline_size", 6)
+	# Bottom-right corner, clear of the wave banners and the base health bar.
+	weapon_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	weapon_label.offset_left = -360
+	weapon_label.offset_top = -64
+	weapon_label.offset_right = -24
+	weapon_label.offset_bottom = -20
 	kill_count.get_parent().add_child.call_deferred(weapon_label)
+	# Kills are shown in the HUD readout now.
+	kill_count.visible = false
+	build_heat_bar()
 	update_weapon_label()
 
 
@@ -88,6 +117,7 @@ func _process(delta: float) -> void:
 
 	kill_count.text = str(kills)
 	javelin_cooldown = maxf(javelin_cooldown - delta, 0.0)
+	update_minigun(delta)
 	update_weapon_label()
 
 	if is_firing:
@@ -95,11 +125,23 @@ func _process(delta: float) -> void:
 	else:
 		cursor.scale = default_cursor_size
 
-	# Tint the reticle red while the Javelin is reloading.
+	# The minigun reticle opens up with the bloom.
+	if current_weapon == Weapon.MINIGUN:
+		cursor.scale *= 1.0 + minigun_heat * 0.45
+
+	# Tint the reticle red while the Javelin is reloading or the minigun is jammed.
 	if current_weapon == Weapon.JAVELIN and javelin_cooldown > 0.0:
 		cursor.modulate = Color(1.0, 0.4, 0.4)
+	elif current_weapon == Weapon.MINIGUN and minigun_overheated:
+		cursor.modulate = Color(1.0, 0.45, 0.25)
 	else:
 		cursor.modulate = Color.WHITE
+
+	# Flash and pop the reticle on hits (amber) and kills (red).
+	if hit_flash > 0.0:
+		hit_flash -= delta
+		cursor.modulate = Color(1.0, 0.3, 0.25) if hit_was_kill else Color(1.0, 0.85, 0.35)
+		cursor.scale *= 1.2 if hit_was_kill else 1.08
 
 	var mouse_pos := cursor.get_global_mouse_position()
 	var cursor_size := cursor.size * cursor.scale
@@ -127,6 +169,11 @@ func _process(delta: float) -> void:
 				fire_timer += interval
 
 		Weapon.MINIGUN:
+			# Nothing until the barrels are up to speed, and nothing while jammed.
+			if minigun_overheated or minigun_spin < minigun_spin_up:
+				fire_timer = 0.0
+				return
+
 			var interval: float = 60.0 / maxf(minigun_rpm, 1.0)
 			fire_timer -= delta
 
@@ -177,6 +224,8 @@ func update_weapon_label() -> void:
 
 	if current_weapon == Weapon.JAVELIN and javelin_cooldown > 0.0:
 		text += "  (%.1f)" % javelin_cooldown
+	elif current_weapon == Weapon.MINIGUN and minigun_overheated:
+		text += "  OVERHEAT"
 
 	weapon_label.text = "[Q] " + text
 
@@ -260,8 +309,71 @@ func fire_minigun_round() -> void:
 	if hit == null:
 		return
 
+	# Rounds scatter around the reticle, wider the hotter the barrels get.
+	var spread := minigun_spread + minigun_bloom * minigun_heat
+
 	play_shot_sound("gun_minigun", 1.4, 1.7)
-	schedule_explosion(hit + random_spread(minigun_spread), minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
+	schedule_explosion(hit + random_spread(spread), minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
+
+
+# Spin-up, heat build-up while firing, cooling, and the overheat lockout.
+func update_minigun(delta: float) -> void:
+	var trigger_down := is_firing and current_weapon == Weapon.MINIGUN and not minigun_overheated
+
+	if trigger_down:
+		if minigun_spin <= 0.0:
+			Sfx.play_2d("spin_up")
+		minigun_spin = minf(minigun_spin + delta, minigun_spin_up)
+	else:
+		minigun_spin = maxf(minigun_spin - delta * 2.0, 0.0)
+
+	if trigger_down and minigun_spin >= minigun_spin_up:
+		minigun_heat += delta / maxf(minigun_heat_time, 0.1)
+		if minigun_heat >= 1.0:
+			minigun_heat = 1.0
+			minigun_overheated = true
+			minigun_spin = 0.0
+			Sfx.play_2d("overheat")
+	elif minigun_overheated:
+		# Locked out until it has fully cooled.
+		minigun_heat -= delta / maxf(minigun_jam_time, 0.1)
+		if minigun_heat <= 0.0:
+			minigun_heat = 0.0
+			minigun_overheated = false
+	else:
+		minigun_heat = maxf(minigun_heat - delta * minigun_cool_rate, 0.0)
+
+	update_heat_bar()
+
+
+# Slim heat gauge under the reticle while the minigun is selected.
+const HEAT_BAR_SIZE := Vector2(80, 5)
+
+func build_heat_bar() -> void:
+	heat_bar = ColorRect.new()
+	heat_bar.color = Color(0.05, 0.05, 0.05, 0.6)
+	heat_bar.size = HEAT_BAR_SIZE
+	heat_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heat_fill = ColorRect.new()
+	heat_fill.size = Vector2(0, HEAT_BAR_SIZE.y)
+	heat_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heat_bar.add_child(heat_fill)
+	kill_count.get_parent().add_child.call_deferred(heat_bar)
+
+
+func update_heat_bar() -> void:
+	if heat_bar == null:
+		return
+
+	heat_bar.visible = current_weapon == Weapon.MINIGUN and minigun_heat > 0.01
+	heat_bar.position = get_viewport().get_mouse_position() + Vector2(-HEAT_BAR_SIZE.x * 0.5, 62)
+	heat_fill.size.x = HEAT_BAR_SIZE.x * minigun_heat
+
+	if minigun_overheated:
+		var blink := fmod(Time.get_ticks_msec() / 1000.0, 0.3) < 0.15
+		heat_fill.color = Color(1.0, 0.2, 0.15) if blink else Color(1.0, 0.6, 0.5)
+	else:
+		heat_fill.color = Color(0.95, 0.85, 0.3).lerp(Color(1.0, 0.3, 0.15), minigun_heat)
 
 
 func launch_javelin() -> void:
@@ -375,7 +487,30 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 
 		if enemy.has_method("take_damage"):
 			if enemy.take_damage(hit_damage, light_weapon):
-				kills += 1
+				register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
+			else:
+				register_hit()
 		else:
 			enemy.queue_free()
-			kills += 1
+			register_kill(enemy, 10)
+
+
+func register_hit() -> void:
+	if not (hit_flash > 0.0 and hit_was_kill):
+		hit_flash = 0.1
+		hit_was_kill = false
+	Sfx.play_2d("hit_tick")
+
+
+func register_kill(enemy: Node3D, points: int) -> void:
+	kills += 1
+	Global.add_score(points)
+	hit_flash = 0.22
+	hit_was_kill = true
+	Sfx.play_2d("kill_tick")
+
+	# Score pop-up and multi-kill tracking live in the HUD.
+	var hud := get_tree().get_first_node_in_group("game_hud")
+	if hud != null:
+		var label: String = enemy.get("display_name") if enemy.get("display_name") != null else ""
+		hud.register_kill(points, enemy.global_position, label)

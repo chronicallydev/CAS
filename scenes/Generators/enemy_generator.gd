@@ -87,10 +87,39 @@ const PRESETS := {
 @export_range(0.0, 10.0, 0.05) var progression_multiplier: float = 1.0
 
 
+@export_group("Waves")
+# Waves of enemies with breaks in between. Off = the old endless ramp.
+@export var wave_mode: bool = true
+@export_range(1, 100, 1) var first_wave_enemies: int = 6
+# Extra enemies each wave (scaled by the progression multiplier).
+@export_range(0.0, 20.0, 0.5) var enemies_per_wave: float = 3.0
+# Seconds between spawns in wave 1; shrinks a little every wave.
+@export_range(0.1, 10.0, 0.05) var wave_spawn_interval: float = 1.4
+# Break between waves, in seconds.
+@export_range(0.0, 60.0, 0.5) var breather_time: float = 6.0
+# Most enemies allowed on the map at once during a wave.
+@export_range(1, 200, 1) var wave_max_alive: int = 30
+@export_range(0, 50, 1) var boss_every: int = 5
+@export_range(1.0, 20.0, 0.5) var boss_health_multiplier: float = 5.0
+# Bonus points for clearing a wave, multiplied by the wave number.
+@export_range(0, 10000, 10) var wave_clear_bonus: int = 100
+
+signal wave_started(wave: int, is_boss: bool)
+signal wave_cleared(wave: int, bonus: int)
+
+enum WaveState { BREAK, ACTIVE }
+
 var spawned_nodes: Array[Node3D] = []
 
 var difficulty_time: float = 0.0
 var spawn_countdown: float = 0.0
+
+var wave: int = 0
+var wave_state: WaveState = WaveState.BREAK
+var break_left: float = 0.0
+var wave_queue: Array = []
+var wave_spawn_timer: float = 0.0
+var wave_had_enemies: bool = false
 
 
 func _ready() -> void:
@@ -115,13 +144,23 @@ func _ready() -> void:
 	if difficulty != Difficulty.CUSTOM:
 		apply_preset(difficulty)
 
+	Global.reset_run()
+	set_process(true)
+
+	if wave_mode:
+		# Starting level N skips the first N waves.
+		wave = starting_level
+		Global.wave = wave
+		wave_state = WaveState.BREAK
+		break_left = 3.0
+		return
+
 	difficulty_time = float(starting_level) * maxf(difficulty_ramp_seconds, 1.0)
 
 	# Spawn the first enemy immediately.
 	spawn_random_node()
 
 	spawn_countdown = get_current_spawn_interval()
-	set_process(true)
 
 
 # Settings picked in the main menu override the Inspector values.
@@ -151,6 +190,10 @@ func apply_preset(preset: Difficulty) -> void:
 
 
 func _process(delta: float) -> void:
+	if wave_mode:
+		process_waves(delta)
+		return
+
 	# Difficulty progresses according to game_speed and the difficulty setting.
 	difficulty_time += delta * maxf(game_speed, 0.0) * maxf(progression_multiplier, 0.0)
 
@@ -169,7 +212,117 @@ func _process(delta: float) -> void:
 	spawn_countdown = get_current_spawn_interval()
 
 
+# --- Waves ---------------------------------------------------------------
+
+func process_waves(delta: float) -> void:
+	prune_spawned()
+
+	if wave_state == WaveState.BREAK:
+		break_left -= delta
+		if break_left <= 0.0:
+			begin_wave(wave + 1)
+		return
+
+	wave_spawn_timer -= delta
+
+	if wave_spawn_timer <= 0.0 and not wave_queue.is_empty():
+		for i in get_wave_burst_size():
+			if wave_queue.is_empty() or alive_count() >= wave_max_alive:
+				break
+			var entry = wave_queue.pop_front()
+			if entry is String and entry == "boss":
+				spawn_boss()
+			else:
+				spawn_enemy(entry)
+		wave_spawn_timer = get_wave_spawn_interval()
+
+	if wave_queue.is_empty() and alive_count() == 0:
+		clear_wave()
+
+
+func begin_wave(number: int) -> void:
+	wave = number
+	Global.wave = number
+	wave_state = WaveState.ACTIVE
+	wave_spawn_timer = 0.5
+	wave_queue.clear()
+
+	var count := int(round(first_wave_enemies + (number - 1) * enemies_per_wave * maxf(progression_multiplier, 0.0)))
+	for i in count:
+		var scene := pick_enemy_scene()
+		if scene != null:
+			wave_queue.append(scene)
+
+	var is_boss := boss_every > 0 and number % boss_every == 0 and tank_scene != null
+	if is_boss:
+		# The boss rolls in after the first few escorts.
+		wave_queue.insert(mini(2, wave_queue.size()), "boss")
+
+	wave_had_enemies = not wave_queue.is_empty()
+	wave_started.emit(number, is_boss)
+
+
+func clear_wave() -> void:
+	var bonus := wave_clear_bonus * wave if wave_had_enemies else 0
+	Global.add_score(bonus)
+	wave_state = WaveState.BREAK
+	break_left = breather_time
+	wave_cleared.emit(wave, bonus)
+
+
+func get_wave_spawn_interval() -> float:
+	var interval := wave_spawn_interval * pow(0.93, wave - 1) / maxf(spawn_rate_multiplier, 0.1)
+	return maxf(interval, maxf(min_spawn_interval, 0.1))
+
+
+func get_wave_burst_size() -> int:
+	return clampi(1 + (wave - 1) / 3, 1, maxi(max_burst_size, 1))
+
+
+func prune_spawned() -> void:
+	for i in range(spawned_nodes.size() - 1, -1, -1):
+		if not is_instance_valid(spawned_nodes[i]):
+			spawned_nodes.remove_at(i)
+
+
+func alive_count() -> int:
+	var count := 0
+	for enemy in spawned_nodes:
+		if is_instance_valid(enemy) and not enemy.is_queued_for_deletion():
+			count += 1
+	return count
+
+
+# Enemies still to come in this wave, including those on the map.
+func enemies_left() -> int:
+	return wave_queue.size() + alive_count()
+
+
+# A super-sized tank: much tougher, hits harder, worth more points.
+func spawn_boss() -> void:
+	var boss = spawn_enemy(tank_scene)
+	if boss == null:
+		return
+
+	boss.add_to_group("boss")
+	boss.scale = Vector3.ONE * 1.5
+	boss.max_health *= boss_health_multiplier
+	boss.health = boss.max_health
+	boss.update_health_bar()
+	if "shell_damage" in boss:
+		boss.shell_damage *= 1.5
+	if "fire_interval" in boss:
+		boss.fire_interval *= 0.7
+	boss.display_name = "BOSS"
+	if "score_value" in boss:
+		boss.score_value *= 6
+
+
 func get_difficulty_level() -> int:
+	if wave_mode:
+		# Each wave counts as a level for enemy unlocks.
+		return maxi(wave - 1, 0)
+
 	var ramp_time := maxf(difficulty_ramp_seconds, 1.0)
 
 	return int(floor(difficulty_time / ramp_time))
@@ -266,14 +419,20 @@ func spawn_random_node() -> void:
 		return
 
 	# Remove references to enemies that have already been freed.
-	for i in range(spawned_nodes.size() - 1, -1, -1):
-		if not is_instance_valid(spawned_nodes[i]):
-			spawned_nodes.remove_at(i)
+	prune_spawned()
 
 	# Enforce the current alive limit.
 	# Skip spawning until some enemies have been killed.
 	if spawned_nodes.size() >= get_current_alive_limit():
 		return
+
+	spawn_enemy(scene)
+
+
+# Spawn one enemy of the given scene on a random edge of the spawn square.
+func spawn_enemy(scene: PackedScene) -> Node3D:
+	if scene == null:
+		return null
 
 	# Choose a random position along one of the square's edges.
 	var half_size: float = square_size / 2.0
@@ -298,7 +457,7 @@ func spawn_random_node() -> void:
 	if not instance is Node3D:
 		instance.free()
 		push_warning("The root of each enemy scene must inherit from Node3D.")
-		return
+		return null
 
 	var new_node := instance as Node3D
 
@@ -307,3 +466,4 @@ func spawn_random_node() -> void:
 	new_node.position = spawn_position
 
 	spawned_nodes.append(new_node)
+	return new_node

@@ -1,5 +1,7 @@
 extends Node3D
 
+const Wreck := preload("res://scenes/Enemies/wreck.gd")
+
 # Shared enemy behaviour: group membership and health.
 # Weapons call take_damage(); it returns true when the hit killed the enemy.
 
@@ -8,6 +10,12 @@ extends Node3D
 @export var contact_damage: float = 10.0
 # Fraction of light-weapon (minigun) damage blocked by armour. 0 = none, 1 = immune.
 @export_range(0.0, 1.0, 0.01) var light_armor: float = 0.0
+# Points awarded when the player destroys this enemy.
+@export var score_value: int = 10
+# Shown in the score pop-up, e.g. "+50 TANK". Empty = just the points.
+@export var display_name: String = ""
+# Vehicles leave a burning wreck when destroyed.
+@export var leaves_wreck: bool = false
 
 var health: float = 0.0
 
@@ -40,6 +48,8 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 
 
 func die() -> void:
+	if leaves_wreck:
+		Wreck.create_from(self)
 	queue_free()
 
 

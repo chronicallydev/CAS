@@ -1,6 +1,9 @@
 
 extends Area3D
 
+# Emitted whenever the rig takes damage (for HUD warnings).
+signal damaged
+
 @onready var health_bar_3d: HealthBar = %HealthBar3D
 
 @export var zone_size: float = 20.0
@@ -25,11 +28,11 @@ func _physics_process(delta: float) -> void:
 		check_enemies()
 		
 	if health <= 0:
-		get_tree().reload_current_scene()
+		Global.game_over("The oil rig was destroyed")
 
 
 func take_damage(amount: float) -> void:
-	play_hit_sound()
+	on_damaged()
 	health = maxf(health - amount, 0.0)
 	health_bar_3d.update_health(health, max_health)
 
@@ -56,7 +59,7 @@ func check_enemies() -> void:
 			damage_taken += enemy.contact_damage if "contact_damage" in enemy else damage_per_enemy
 
 	if damage_taken > 0.0:
-		play_hit_sound()
+		on_damaged()
 		health = maxf(
 			health - damage_taken,
 			0.0
@@ -65,5 +68,7 @@ func check_enemies() -> void:
 		health_bar_3d.update_health(health, max_health)
 
 
-func play_hit_sound() -> void:
+func on_damaged() -> void:
+	damaged.emit()
 	Sfx.play_3d("base_hit", global_position + Vector3.UP * 3.0)
+	Global.shake(0.06, global_position)
