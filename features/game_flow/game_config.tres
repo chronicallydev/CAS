@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="GameConfig" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/campaign_catalog.tres" id="1_a2m5d"]
+[ext_resource type="Script" path="res://features/mission/waves/difficulty_preset.gd" id="2_xi4ac"]
+[ext_resource type="Resource" path="res://features/mission/waves/difficulty/easy.tres" id="3_3mt0g"]
+[ext_resource type="Resource" path="res://features/mission/waves/difficulty/normal.tres" id="4_syw5t"]
+[ext_resource type="Resource" path="res://features/mission/waves/difficulty/hard.tres" id="5_bfu54"]
+[ext_resource type="Resource" path="res://features/mission/waves/difficulty/brutal.tres" id="6_n4die"]
+[ext_resource type="Resource" path="res://features/loadout/content/loadout_catalog.tres" id="7_qg70f"]
+[ext_resource type="Script" path="res://features/game_flow/game_config.gd" id="8_v27w3"]
+
+[resource]
+script = ExtResource("8_v27w3")
+loadout_catalog = ExtResource("7_qg70f")
+campaign_catalog = ExtResource("1_a2m5d")
+difficulty_presets = Array[ExtResource("2_xi4ac")]([ExtResource("3_3mt0g"), ExtResource("4_syw5t"), ExtResource("5_bfu54"), ExtResource("6_n4die")])

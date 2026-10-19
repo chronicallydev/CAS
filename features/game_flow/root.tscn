@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/game_flow/root_context.gd" id="1_root"]
+[ext_resource type="Resource" path="res://features/game_flow/game_config.tres" id="2_config"]
+[ext_resource type="PackedScene" path="res://features/menu/menu.tscn" id="3_menu"]
+[ext_resource type="PackedScene" path="res://features/hangar/hangar.tscn" id="4_hangar"]
+[ext_resource type="PackedScene" path="res://features/map/map.tscn" id="5_map"]
+[ext_resource type="PackedScene" path="res://features/mission/mission.tscn" id="6_mission"]
+
+[node name="Root" type="Node"]
+script = ExtResource("1_root")
+config = ExtResource("2_config")
+menu_scene = ExtResource("3_menu")
+hangar_scene = ExtResource("4_hangar")
+map_scene = ExtResource("5_map")
+mission_scene = ExtResource("6_mission")

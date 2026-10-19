@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/hangar/hangar_context.gd" id="1_ctx"]
+[ext_resource type="Script" path="res://features/hangar/hangar_world.gd" id="2_world"]
+[ext_resource type="Script" path="res://features/hangar/hangar_ui.gd" id="3_ui"]
+
+[node name="Hangar" type="Node" node_paths=PackedStringArray("world", "ui")]
+script = ExtResource("1_ctx")
+world = NodePath("HangarWorld")
+ui = NodePath("HangarUI")
+
+[node name="HangarWorld" type="Node3D" parent="."]
+script = ExtResource("2_world")
+
+[node name="HangarUI" type="CanvasLayer" parent="."]
+script = ExtResource("3_ui")

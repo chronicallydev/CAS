@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="RigData" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/garrisons/motor.tres" id="1_i558p"]
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="2_jfshj"]
+
+[resource]
+script = ExtResource("2_jfshj")
+id = "saltflat"
+display_name = "Salt Flat Well"
+description = "Open ground patrolled by fast technicals."
+map_position = Vector2(0.37, 0.83)
+links = PackedStringArray("home", "refinery")
+threat_level = 2
+garrison = ExtResource("1_i558p")
+biome = "saltflat"
+bunkers = 2
+flak_guns = 1
+income = 300

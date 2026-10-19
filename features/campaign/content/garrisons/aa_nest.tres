@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="GarrisonData" format=3]
+
+[ext_resource type="Script" path="res://features/campaign/data/garrison_data.gd" id="1_gcti2"]
+
+[resource]
+script = ExtResource("1_gcti2")
+label = "AA nest"
+infantry_weight = 0.5
+car_weight = 0.15
+tank_weight = 0.05
+aa_weight = 0.3

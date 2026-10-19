@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="GarrisonData" format=3]
+
+[ext_resource type="Script" path="res://features/campaign/data/garrison_data.gd" id="1_3lkg1"]
+
+[resource]
+script = ExtResource("1_3lkg1")
+label = "Infantry swarm"
+infantry_weight = 1.0
+car_weight = 0.12
+tank_weight = 0.0
+aa_weight = 0.0

@@ -1,0 +1,132 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/aa_launcher.gd" id="1_aa"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+[ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_truck"]
+albedo_color = Color(0.42, 0.4, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_cab"]
+material = SubResource("Mat_truck")
+size = Vector3(2.3, 1.7, 1.9)
+
+[sub_resource type="BoxMesh" id="Mesh_bed"]
+material = SubResource("Mat_truck")
+size = Vector3(2.5, 0.5, 4.2)
+
+[sub_resource type="StandardMaterial3D" id="Mat_glass"]
+albedo_color = Color(0.15, 0.22, 0.3, 1)
+roughness = 0.15
+
+[sub_resource type="BoxMesh" id="Mesh_window"]
+material = SubResource("Mat_glass")
+size = Vector3(2.0, 0.6, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wheel"]
+albedo_color = Color(0.25, 0.25, 0.27, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_wheel"]
+material = SubResource("Mat_wheel")
+top_radius = 0.5
+bottom_radius = 0.5
+height = 0.45
+
+[sub_resource type="BoxMesh" id="Mesh_turntable"]
+material = SubResource("Mat_wheel")
+size = Vector3(1.6, 0.5, 1.6)
+
+[sub_resource type="StandardMaterial3D" id="Mat_tube"]
+albedo_color = Color(0.85, 0.85, 0.8, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_tube"]
+material = SubResource("Mat_tube")
+top_radius = 0.24
+bottom_radius = 0.24
+height = 3.2
+
+[sub_resource type="StandardMaterial3D" id="Mat_cap"]
+albedo_color = Color(0.85, 0.2, 0.12, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_cap"]
+material = SubResource("Mat_cap")
+top_radius = 0.25
+bottom_radius = 0.25
+height = 0.2
+
+[node name="AALauncher" type="Node3D"]
+script = ExtResource("1_aa")
+max_health = 4.0
+score_value = 40
+display_name = "SAM"
+leaves_wreck = true
+detach_parts = PackedStringArray("Launcher")
+light_armor = 0.5
+missile_explosion = ExtResource("2_boom")
+
+[node name="Cab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, -2.3)
+mesh = SubResource("Mesh_cab")
+
+[node name="Windscreen" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, -3.27)
+mesh = SubResource("Mesh_window")
+
+[node name="Bed" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0.8)
+mesh = SubResource("Mesh_bed")
+
+[node name="WheelFL" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -1.2, 0.5, -2.2)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelFR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 1.2, 0.5, -2.2)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelML" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -1.2, 0.5, 0.4)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelMR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 1.2, 0.5, 0.4)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelBL" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -1.2, 0.5, 2.0)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelBR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 1.2, 0.5, 2.0)
+mesh = SubResource("Mesh_wheel")
+
+[node name="Launcher" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 1.2)
+
+[node name="Turntable" type="MeshInstance3D" parent="Launcher"]
+mesh = SubResource("Mesh_turntable")
+
+[node name="Rails" type="Node3D" parent="Launcher"]
+transform = Transform3D(1, 0, 0, 0, 0.819152, -0.573576, 0, 0.573576, 0.819152, 0, 0.7, 0)
+
+[node name="TubeL" type="MeshInstance3D" parent="Launcher/Rails"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.32, 0, 0)
+mesh = SubResource("Mesh_tube")
+
+[node name="TubeR" type="MeshInstance3D" parent="Launcher/Rails"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0.32, 0, 0)
+mesh = SubResource("Mesh_tube")
+
+[node name="CapL" type="MeshInstance3D" parent="Launcher/Rails"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.32, 0, -1.65)
+mesh = SubResource("Mesh_cap")
+
+[node name="CapR" type="MeshInstance3D" parent="Launcher/Rails"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0.32, 0, -1.65)
+mesh = SubResource("Mesh_cap")
+
+[node name="Muzzle" type="Marker3D" parent="Launcher/Rails"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.0)
+
+[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 4.4, 0)

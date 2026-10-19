@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CampaignCatalog" format=3]
+
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="1_1xvpx"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/home.tres" id="2_gyrgu"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/wadi.tres" id="3_gfg0f"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/saltflat.tres" id="4_bf3d4"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/ridge.tres" id="5_ahopx"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/refinery.tres" id="6_jypbo"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/terminal.tres" id="7_bruyk"]
+[ext_resource type="Resource" path="res://features/campaign/content/rigs/citadel.tres" id="8_5nq80"]
+[ext_resource type="Script" path="res://features/campaign/data/campaign_catalog.gd" id="9_w8d8q"]
+
+[resource]
+script = ExtResource("9_w8d8q")
+rigs = Array[ExtResource("1_1xvpx")]([ExtResource("2_gyrgu"), ExtResource("3_gfg0f"), ExtResource("4_bf3d4"), ExtResource("5_ahopx"), ExtResource("6_jypbo"), ExtResource("7_bruyk"), ExtResource("8_5nq80")])

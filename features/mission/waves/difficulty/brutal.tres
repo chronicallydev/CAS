@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="DifficultyPreset" format=3]
+
+[ext_resource type="Script" path="res://features/mission/waves/difficulty_preset.gd" id="1_b44sl"]
+
+[resource]
+script = ExtResource("1_b44sl")
+display_name = "Brutal"
+health = 2.0
+speed = 1.4
+damage = 2.0
+spawn_rate = 1.7
+progression = 1.6

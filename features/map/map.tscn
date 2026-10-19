@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/map/map_context.gd" id="1_ctx"]
+[ext_resource type="Script" path="res://features/map/map_world.gd" id="2_world"]
+[ext_resource type="Script" path="res://features/map/map_ui.gd" id="3_ui"]
+
+[node name="Map" type="Node" node_paths=PackedStringArray("world", "ui")]
+script = ExtResource("1_ctx")
+world = NodePath("MapWorld")
+ui = NodePath("MapUI")
+
+[node name="MapWorld" type="Node3D" parent="."]
+script = ExtResource("2_world")
+
+[node name="MapUI" type="CanvasLayer" parent="."]
+script = ExtResource("3_ui")

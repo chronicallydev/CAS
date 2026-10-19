@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="RigData" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/garrisons/swarm.tres" id="1_eqa0r"]
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="2_v0h8l"]
+
+[resource]
+script = ExtResource("2_v0h8l")
+id = "wadi"
+display_name = "Wadi Pumpjack"
+description = "A lightly held pump station. Lots of infantry, little armour."
+map_position = Vector2(0.31, 0.47)
+links = PackedStringArray("home", "ridge", "refinery")
+threat_level = 1
+garrison = ExtResource("1_eqa0r")
+biome = "wadi"
+bunkers = 2
+flak_guns = 1
+income = 250

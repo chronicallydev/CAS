@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="RigData" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/garrisons/combined.tres" id="1_ruj17"]
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="2_c6663"]
+
+[resource]
+script = ExtResource("2_c6663")
+id = "terminal"
+display_name = "Gulf Terminal"
+description = "The export terminal. Rich and heavily defended."
+map_position = Vector2(0.84, 0.76)
+links = PackedStringArray("refinery", "citadel")
+threat_level = 7
+waves = 5
+garrison = ExtResource("1_ruj17")
+biome = "terminal"
+bunkers = 3
+flak_guns = 2
+income = 900

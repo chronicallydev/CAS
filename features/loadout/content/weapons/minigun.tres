@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://features/loadout/data/weapon_data.gd" id="1_vjqms"]
+[ext_resource type="Script" path="res://features/loadout/data/upgrade_data.gd" id="2_212br"]
+
+[sub_resource type="Resource" id="Resource_47n2y"]
+script = ExtResource("2_212br")
+id = "minigun_damage"
+label = "Damage"
+per_level = 0.15
+base_cost = 450
+target_properties = PackedStringArray("minigun_damage")
+bar_max = 2.5
+
+[sub_resource type="Resource" id="Resource_8j6bk"]
+script = ExtResource("2_212br")
+id = "minigun_cooling"
+label = "Heat capacity"
+per_level = 0.15
+target_properties = PackedStringArray("minigun_heat_time")
+bar_base = 3.0
+bar_max = 7.0
+
+[sub_resource type="Resource" id="Resource_ys1mu"]
+script = ExtResource("2_212br")
+id = "minigun_accuracy"
+label = "Accuracy"
+mode = 2
+base_cost = 350
+target_properties = PackedStringArray("minigun_spread", "minigun_bloom")
+bar_max = 2.0
+
+[resource]
+script = ExtResource("1_vjqms")
+id = "minigun"
+display_name = "M134 Minigun"
+weight_class = "LIGHT"
+description = "A hose of lead for infantry and stragglers. Spins up, blooms as it heats and jams if you hold it too long."
+price = 1200
+model = "minigun"
+upgrades = Array[ExtResource("2_212br")]([SubResource("Resource_47n2y"), SubResource("Resource_8j6bk"), SubResource("Resource_ys1mu")])

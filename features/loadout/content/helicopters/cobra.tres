@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="HelicopterData" format=3]
+
+[ext_resource type="Script" path="res://features/loadout/data/helicopter_data.gd" id="1_3a8jq"]
+[ext_resource type="Script" path="res://features/loadout/data/hardpoint_data.gd" id="1_t8gy2"]
+
+[sub_resource type="Resource" id="Resource_3osuj"]
+script = ExtResource("1_t8gy2")
+label = "Chin"
+kind = 0
+position = Vector3(0, -0.94299996, -1.925)
+
+[sub_resource type="Resource" id="Resource_sf11b"]
+script = ExtResource("1_t8gy2")
+label = "Left wing"
+position = Vector3(-1.62, -0.45, 0.1)
+
+[sub_resource type="Resource" id="Resource_24dq6"]
+script = ExtResource("1_t8gy2")
+label = "Right wing"
+position = Vector3(1.62, -0.45, 0.1)
+
+[sub_resource type="Resource" id="Resource_dulax"]
+script = ExtResource("1_t8gy2")
+label = "Belly"
+kind = 2
+position = Vector3(0, -1.1999999, 0.4)
+
+[resource]
+script = ExtResource("1_3a8jq")
+id = "cobra"
+display_name = "Cobra (AH-1)"
+weight_class = "MEDIUM"
+description = "Lean and lethal. The all-rounder: good speed, steady handling and a solid hull."
+hardpoints = Array[ExtResource("1_t8gy2")]([SubResource("Resource_3osuj"), SubResource("Resource_sf11b"), SubResource("Resource_24dq6"), SubResource("Resource_dulax")])
+default_loadout = PackedStringArray("cannon", "rockets", "rockets", "")
+allowed_weapons = PackedStringArray("cannon", "minigun", "javelin", "rockets")

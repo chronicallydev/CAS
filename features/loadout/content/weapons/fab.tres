@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://features/loadout/data/weapon_data.gd" id="1_sh7es"]
+[ext_resource type="Script" path="res://features/loadout/data/upgrade_data.gd" id="2_pi6a3"]
+
+[sub_resource type="Resource" id="Resource_4psob"]
+script = ExtResource("2_pi6a3")
+id = "fab_blast"
+label = "Blast radius"
+per_level = 0.08
+base_cost = 600
+target_properties = PackedStringArray("fab_radius")
+bar_base = 16.0
+bar_max = 26.0
+
+[sub_resource type="Resource" id="Resource_qj6kg"]
+script = ExtResource("2_pi6a3")
+id = "fab_damage"
+label = "Damage"
+per_level = 0.15
+base_cost = 500
+target_properties = PackedStringArray("fab_damage")
+bar_base = 40.0
+bar_max = 90.0
+
+[sub_resource type="Resource" id="Resource_onr6t"]
+script = ExtResource("2_pi6a3")
+id = "fab_reload"
+label = "Reload speed"
+mode = 2
+per_level = 0.12
+base_cost = 600
+target_properties = PackedStringArray("fab_reload")
+bar_max = 2.0
+
+[resource]
+script = ExtResource("1_sh7es")
+id = "fab"
+display_name = "FAB-500 Bomb"
+weight_class = "BOMB"
+description = "Half a tonne of high explosive dropped from the belly. Aim with the helicopter, not the cursor: the red ring shows where it lands."
+price = 2000
+model = "bomb"
+upgrades = Array[ExtResource("2_pi6a3")]([SubResource("Resource_4psob"), SubResource("Resource_qj6kg"), SubResource("Resource_onr6t")])

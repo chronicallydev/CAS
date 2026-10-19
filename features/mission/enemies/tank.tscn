@@ -1,0 +1,70 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/tank.gd" id="1_tank"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+[ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_hull"]
+albedo_color = Color(0.4, 0.45, 0.28, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_hull"]
+material = SubResource("Mat_hull")
+size = Vector3(3.2, 1.1, 5.2)
+
+[sub_resource type="StandardMaterial3D" id="Mat_track"]
+albedo_color = Color(0.35, 0.33, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_track"]
+material = SubResource("Mat_track")
+size = Vector3(0.8, 1.0, 5.6)
+
+[sub_resource type="StandardMaterial3D" id="Mat_turret"]
+albedo_color = Color(0.36, 0.41, 0.25, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_turret"]
+material = SubResource("Mat_turret")
+size = Vector3(2.2, 0.9, 2.4)
+
+[sub_resource type="CylinderMesh" id="Mesh_barrel"]
+material = SubResource("Mat_turret")
+top_radius = 0.15
+bottom_radius = 0.18
+height = 3.2
+
+[node name="Tank" type="Node3D"]
+script = ExtResource("1_tank")
+max_health = 12.0
+score_value = 50
+display_name = "TANK"
+leaves_wreck = true
+detach_parts = PackedStringArray("Turret")
+light_armor = 0.97
+shell_explosion = ExtResource("2_boom")
+
+[node name="Hull" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0)
+mesh = SubResource("Mesh_hull")
+
+[node name="TrackL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0.5, 0)
+mesh = SubResource("Mesh_track")
+
+[node name="TrackR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9, 0.5, 0)
+mesh = SubResource("Mesh_track")
+
+[node name="Turret" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0.2)
+
+[node name="TurretBody" type="MeshInstance3D" parent="Turret"]
+mesh = SubResource("Mesh_turret")
+
+[node name="Barrel" type="MeshInstance3D" parent="Turret"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0.1, -2.6)
+mesh = SubResource("Mesh_barrel")
+
+[node name="Muzzle" type="Marker3D" parent="Turret"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -4.3)
+
+[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 4.2, 0)

@@ -11,29 +11,27 @@ config_version=5
 [application]
 
 config/name="CasSimPrototype"
-run/main_scene="res://scenes/menu/menu.tscn"
+run/main_scene="res://features/game_flow/root.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
-Global="*res://global.gd"
-Sfx="*res://scenes/audio/sfx.gd"
-PixelArt="*res://scenes/pixelart/pixel_art.gd"
+Sfx="*res://shared/audio/sfx.gd"
+PixelArt="*res://shared/pixelart/pixel_art.gd"
 
 [display]
 
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[global_group]
+
+enemies=""
+
 [gui]
 
 theme/custom_font="res://assets/fonts/monogram.ttf"
-
-[global_group]
-
-Base=""
-enemies=""
 
 [physics]
 

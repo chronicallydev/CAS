@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="HelicopterData" format=3]
+
+[ext_resource type="Script" path="res://features/loadout/data/hardpoint_data.gd" id="1_pcruc"]
+[ext_resource type="Script" path="res://features/loadout/data/helicopter_data.gd" id="1_w1u7d"]
+
+[sub_resource type="Resource" id="Resource_41xjp"]
+script = ExtResource("1_pcruc")
+label = "Chin"
+kind = 0
+position = Vector3(0, -1.107, -2.38)
+
+[sub_resource type="Resource" id="Resource_ktcfa"]
+script = ExtResource("1_pcruc")
+label = "Left inner wing"
+position = Vector3(-1.8449999, -0.45, 0.1)
+
+[sub_resource type="Resource" id="Resource_f67dn"]
+script = ExtResource("1_pcruc")
+label = "Left outer wing"
+position = Vector3(-2.595, -0.45, 0.1)
+
+[sub_resource type="Resource" id="Resource_gafoa"]
+script = ExtResource("1_pcruc")
+label = "Right inner wing"
+position = Vector3(1.8449999, -0.45, 0.1)
+
+[sub_resource type="Resource" id="Resource_n8knm"]
+script = ExtResource("1_pcruc")
+label = "Right outer wing"
+position = Vector3(2.595, -0.45, 0.1)
+
+[sub_resource type="Resource" id="Resource_s1p42"]
+script = ExtResource("1_pcruc")
+label = "Belly"
+kind = 2
+position = Vector3(0, -1.4, 0.4)
+
+[resource]
+script = ExtResource("1_w1u7d")
+id = "hind"
+display_name = "Hind (Mi-24)"
+weight_class = "HEAVY"
+description = "A flying tank. Slow to turn and slow to stop, but shrugs off hits that would down anything else."
+price = 9000
+speed = 19.0
+acceleration = 3.4
+max_health = 170.0
+turn_speed = 4.5
+hardpoints = Array[ExtResource("1_pcruc")]([SubResource("Resource_41xjp"), SubResource("Resource_ktcfa"), SubResource("Resource_f67dn"), SubResource("Resource_gafoa"), SubResource("Resource_n8knm"), SubResource("Resource_s1p42")])
+default_loadout = PackedStringArray("cannon", "rockets", "", "rockets", "", "")
+allowed_weapons = PackedStringArray("cannon", "minigun", "javelin", "rockets", "fab")
+color = Color(0.47, 0.42, 0.3, 1)
+fuselage = Vector3(1.55, 1.35, 3.2)
+tail_length = 7.6
+rotor_radius = 5.6
+blades = 5
+wing_span = 5.8
+wheels = true
+model_scale = 1.1

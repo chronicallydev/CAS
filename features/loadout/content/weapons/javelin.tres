@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://features/loadout/data/weapon_data.gd" id="1_n7f77"]
+[ext_resource type="Script" path="res://features/loadout/data/upgrade_data.gd" id="2_ua8n6"]
+
+[sub_resource type="Resource" id="Resource_4elyk"]
+script = ExtResource("2_ua8n6")
+id = "javelin_damage"
+label = "Damage"
+per_level = 0.15
+base_cost = 600
+target_properties = PackedStringArray("javelin_damage")
+bar_base = 15.0
+bar_max = 40.0
+
+[sub_resource type="Resource" id="Resource_1jcl3"]
+script = ExtResource("2_ua8n6")
+id = "javelin_reload"
+label = "Reload speed"
+mode = 2
+per_level = 0.12
+base_cost = 550
+target_properties = PackedStringArray("javelin_reload")
+bar_max = 2.0
+
+[sub_resource type="Resource" id="Resource_pnqkr"]
+script = ExtResource("2_ua8n6")
+id = "javelin_speed"
+label = "Missile speed"
+per_level = 0.12
+target_properties = PackedStringArray("javelin_speed", "javelin_dive_speed")
+bar_base = 15.0
+bar_max = 35.0
+
+[resource]
+script = ExtResource("1_n7f77")
+id = "javelin"
+display_name = "Javelin Missile"
+weight_class = "GUIDED"
+description = "Locks the nearest enemy to your click, climbs and dives onto it. The answer to tanks and SAMs."
+price = 2500
+model = "rail"
+upgrades = Array[ExtResource("2_ua8n6")]([SubResource("Resource_4elyk"), SubResource("Resource_1jcl3"), SubResource("Resource_pnqkr")])

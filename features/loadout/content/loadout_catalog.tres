@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="LoadoutCatalog" format=3]
+
+[ext_resource type="Script" path="res://features/loadout/data/upgrade_data.gd" id="1_2nkp8"]
+[ext_resource type="Script" path="res://features/loadout/data/helicopter_data.gd" id="2_6qagn"]
+[ext_resource type="Resource" path="res://features/loadout/content/helicopters/littlebird.tres" id="3_on0g0"]
+[ext_resource type="Resource" path="res://features/loadout/content/helicopters/cobra.tres" id="4_5prn8"]
+[ext_resource type="Resource" path="res://features/loadout/content/helicopters/hind.tres" id="5_da3j2"]
+[ext_resource type="Script" path="res://features/loadout/data/loadout_catalog.gd" id="6_f4aaf"]
+[ext_resource type="Script" path="res://features/loadout/data/weapon_data.gd" id="7_mab37"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/cannon.tres" id="8_thchi"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/minigun.tres" id="9_rfyjw"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/javelin.tres" id="10_epcjp"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/rockets.tres" id="11_oq617"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/fab.tres" id="12_ynd3n"]
+
+[sub_resource type="Resource" id="Resource_exk3s"]
+script = ExtResource("1_2nkp8")
+id = "speed"
+label = "Speed"
+per_level = 0.06
+target_properties = PackedStringArray("speed")
+bar_base = 0.0
+bar_max = 40.0
+
+[sub_resource type="Resource" id="Resource_xgtjn"]
+script = ExtResource("1_2nkp8")
+id = "acceleration"
+label = "Accel"
+base_cost = 350
+target_properties = PackedStringArray("acceleration")
+bar_base = 0.0
+bar_max = 10.0
+
+[sub_resource type="Resource" id="Resource_ade6k"]
+script = ExtResource("1_2nkp8")
+id = "health"
+label = "Hull"
+mode = 1
+per_level = 15.0
+base_cost = 500
+target_properties = PackedStringArray("max_health")
+bar_base = 0.0
+bar_max = 250.0
+
+[sub_resource type="Resource" id="Resource_fw3xu"]
+script = ExtResource("1_2nkp8")
+id = "turn_speed"
+label = "Agility"
+base_cost = 300
+target_properties = PackedStringArray("turn_speed")
+bar_base = 0.0
+bar_max = 11.0
+
+[resource]
+script = ExtResource("6_f4aaf")
+helicopters = Array[ExtResource("2_6qagn")]([ExtResource("3_on0g0"), ExtResource("4_5prn8"), ExtResource("5_da3j2")])
+weapons = Array[ExtResource("7_mab37")]([ExtResource("8_thchi"), ExtResource("9_rfyjw"), ExtResource("10_epcjp"), ExtResource("11_oq617"), ExtResource("12_ynd3n")])
+airframe_upgrades = Array[ExtResource("1_2nkp8")]([SubResource("Resource_exk3s"), SubResource("Resource_xgtjn"), SubResource("Resource_ade6k"), SubResource("Resource_fw3xu")])

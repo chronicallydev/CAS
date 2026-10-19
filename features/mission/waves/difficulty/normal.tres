@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="DifficultyPreset" format=3]
+
+[ext_resource type="Script" path="res://features/mission/waves/difficulty_preset.gd" id="1_avldp"]
+
+[resource]
+script = ExtResource("1_avldp")

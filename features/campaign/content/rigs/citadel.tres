@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="RigData" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/garrisons/aa_nest.tres" id="1_p1r0o"]
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="2_5bqyq"]
+
+[resource]
+script = ExtResource("2_5bqyq")
+id = "citadel"
+display_name = "Qasr Oil Field"
+description = "The enemy's crown jewel. Everything they have is here."
+map_position = Vector2(0.82, 0.28)
+links = PackedStringArray("ridge", "terminal")
+threat_level = 9
+waves = 5
+garrison = ExtResource("1_p1r0o")
+biome = "oilfield"
+bunkers = 4
+flak_guns = 4
+income = 1300

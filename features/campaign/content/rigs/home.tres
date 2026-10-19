@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RigData" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/garrisons/combined.tres" id="1_mt6ba"]
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="2_e4b68"]
+
+[resource]
+script = ExtResource("2_e4b68")
+id = "home"
+display_name = "Home Rig"
+description = "Your base of operations. Defend it to earn money from kills."
+map_position = Vector2(0.14, 0.7)
+links = PackedStringArray("wadi", "saltflat")
+waves = 0
+garrison = ExtResource("1_mt6ba")
+income = 150

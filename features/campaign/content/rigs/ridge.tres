@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="RigData" format=3]
+
+[ext_resource type="Resource" path="res://features/campaign/content/garrisons/aa_nest.tres" id="1_qwjca"]
+[ext_resource type="Script" path="res://features/campaign/data/rig_data.gd" id="2_hqhm7"]
+
+[resource]
+script = ExtResource("2_hqhm7")
+id = "ridge"
+display_name = "Ridge Derrick"
+description = "A derrick on high ground ringed with AA launchers. Keep moving."
+map_position = Vector2(0.5, 0.22)
+links = PackedStringArray("wadi", "citadel")
+threat_level = 4
+waves = 4
+garrison = ExtResource("1_qwjca")
+biome = "ridge"
+bunkers = 1
+flak_guns = 3
+income = 450

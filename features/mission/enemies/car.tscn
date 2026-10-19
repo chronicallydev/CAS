@@ -1,0 +1,88 @@
+[gd_scene format=3 uid="uid://djaquq00rer4f"]
+
+[ext_resource type="Script" uid="uid://o4wfsvlqg75q" path="res://features/mission/enemies/car.gd" id="1_car"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.75, 0.2, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_body"]
+material = SubResource("Mat_body")
+size = Vector3(2.2, 0.9, 4.4)
+
+[sub_resource type="StandardMaterial3D" id="Mat_cabin"]
+albedo_color = Color(0.55, 0.6, 0.65, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_cabin"]
+material = SubResource("Mat_cabin")
+size = Vector3(1.9, 0.7, 2)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wheel"]
+albedo_color = Color(0.3, 0.3, 0.32, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_wheel"]
+material = SubResource("Mat_wheel")
+top_radius = 0.45
+bottom_radius = 0.45
+height = 0.4
+
+[sub_resource type="StandardMaterial3D" id="Mat_gun"]
+albedo_color = Color(0.35, 0.37, 0.4, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_gun_base"]
+material = SubResource("Mat_gun")
+size = Vector3(0.5, 0.35, 0.6)
+
+[sub_resource type="CylinderMesh" id="Mesh_gun_barrel"]
+material = SubResource("Mat_gun")
+top_radius = 0.07
+bottom_radius = 0.07
+height = 1.4
+
+[node name="Car" type="Node3D" unique_id=274158243]
+script = ExtResource("1_car")
+speed = 5.24
+max_health = 3.0
+light_armor = 0.4
+score_value = 25
+display_name = "CAR"
+leaves_wreck = true
+detach_parts = PackedStringArray("Gun", "WheelFL", "WheelFR", "WheelBL", "WheelBR")
+hit_effect = ExtResource("2_boom")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=41011142]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("Mesh_body")
+
+[node name="Cabin" type="MeshInstance3D" parent="." unique_id=1855138440]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0.3)
+mesh = SubResource("Mesh_cabin")
+
+[node name="WheelFL" type="MeshInstance3D" parent="." unique_id=1340112695]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -1.15, 0.45, -1.4)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelFR" type="MeshInstance3D" parent="." unique_id=1857199132]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 1.15, 0.45, -1.4)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelBL" type="MeshInstance3D" parent="." unique_id=809577528]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -1.15, 0.45, 1.4)
+mesh = SubResource("Mesh_wheel")
+
+[node name="WheelBR" type="MeshInstance3D" parent="." unique_id=1641302145]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 1.15, 0.45, 1.4)
+mesh = SubResource("Mesh_wheel")
+
+[node name="Gun" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0.3)
+
+[node name="GunBase" type="MeshInstance3D" parent="Gun"]
+mesh = SubResource("Mesh_gun_base")
+
+[node name="Barrel" type="MeshInstance3D" parent="Gun"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0.05, -0.8)
+mesh = SubResource("Mesh_gun_barrel")
+
+[node name="Muzzle" type="Marker3D" parent="Gun"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -1.55)
