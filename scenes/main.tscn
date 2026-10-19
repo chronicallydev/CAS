@@ -34,7 +34,7 @@ color_ramp = SubResource("Gradient_sand")
 noise = SubResource("Noise_sand")
 
 [sub_resource type="StandardMaterial3D" id="Material_sand"]
-albedo_color = Color(0.8, 0.63, 0.42, 1)
+albedo_color = Color(0.72, 0.6, 0.46, 1)
 albedo_texture = SubResource("NoiseTexture_sand")
 roughness = 1.0
 uv1_scale = Vector3(0.02, 0.02, 0.02)
@@ -56,8 +56,14 @@ tonemap_mode = 2
 ssao_enabled = true
 glow_enabled = true
 fog_enabled = true
-fog_light_color = Color(0.86, 0.8, 0.7, 1)
-fog_density = 0.0025
+fog_light_color = Color(0.9, 0.72, 0.55, 1)
+fog_density = 0.0015
+ambient_light_source = 2
+ambient_light_color = Color(0.42, 0.4, 0.5, 1)
+ambient_light_energy = 0.75
+adjustment_enabled = true
+adjustment_contrast = 1.12
+adjustment_saturation = 1.0
 fog_sky_affect = 0.3
 
 [node name="Main" type="Node3D" unique_id=373985464]
@@ -81,9 +87,9 @@ target = NodePath("../Helicopter")
 [node name="Atmosphere" type="Node3D" parent="." unique_id=1077662930]
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Atmosphere" unique_id=1144913077]
-transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
-light_color = Color(1, 0.94, 0.84, 1)
-light_energy = 1.15
+transform = Transform3D(-0.69542146, -0.36031133, 0.6217433, 0, 0.8652122, 0.5014059, -0.7186021, 0.34868842, -0.60168713, 0, 0, 0)
+light_color = Color(1, 0.84, 0.66, 1)
+light_energy = 1.3
 shadow_enabled = true
 directional_shadow_max_distance = 160.0
 

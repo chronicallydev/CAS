@@ -16,6 +16,8 @@ var car_enabled: bool = true
 var tank_enabled: bool = true
 var aa_enabled: bool = true
 var starting_level: int = 0
+# Pixel-art rendering (see scenes/pixelart/pixel_art.gd).
+var pixel_art: bool = true
 
 # Current run.
 var score: int = 0
@@ -137,6 +139,7 @@ func save_settings() -> void:
 	config.set_value("game", "tank_enabled", tank_enabled)
 	config.set_value("game", "aa_enabled", aa_enabled)
 	config.set_value("game", "starting_level", starting_level)
+	config.set_value("graphics", "pixel_art", pixel_art)
 	config.set_value("records", "best_score", best_score)
 	config.set_value("records", "best_wave", best_wave)
 	config.set_value("hangar", "money", money)
@@ -158,6 +161,7 @@ func load_settings() -> void:
 	tank_enabled = config.get_value("game", "tank_enabled", tank_enabled)
 	aa_enabled = config.get_value("game", "aa_enabled", aa_enabled)
 	starting_level = config.get_value("game", "starting_level", starting_level)
+	pixel_art = config.get_value("graphics", "pixel_art", pixel_art)
 	best_score = config.get_value("records", "best_score", best_score)
 	best_wave = config.get_value("records", "best_wave", best_wave)
 	money = config.get_value("hangar", "money", money)

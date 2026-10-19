@@ -16,6 +16,7 @@ var infantry_check: CheckBox
 var car_check: CheckBox
 var tank_check: CheckBox
 var aa_check: CheckBox
+var pixel_check: CheckBox
 var level_spin: SpinBox
 var warning_label: Label
 
@@ -56,7 +57,7 @@ func build_layout() -> void:
 	column.add_theme_constant_override("separation", 10)
 	center.add_child(column)
 
-	var title := make_label("CAS SIM", 64, ACCENT)
+	var title := make_label("CAS SIM", 50, ACCENT)
 	column.add_child(title)
 
 	var subtitle := make_label("CLOSE AIR SUPPORT", 18, MUTED)
@@ -81,7 +82,7 @@ func build_layout() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 32)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.add_theme_constant_override("v_separation", 8)
 	panel.add_child(grid)
 
 	grid.add_child(make_label("Difficulty", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
@@ -112,6 +113,10 @@ func build_layout() -> void:
 	enemies.add_child(tank_check)
 	enemies.add_child(aa_check)
 	grid.add_child(enemies)
+
+	grid.add_child(make_label("Graphics", 20, TEXT, HORIZONTAL_ALIGNMENT_LEFT))
+	pixel_check = make_check("Pixel art")
+	grid.add_child(pixel_check)
 
 	warning_label = make_label("Enable at least one enemy type", 16, Color(1.0, 0.45, 0.4))
 	column.add_child(warning_label)
@@ -232,6 +237,7 @@ func load_from_global() -> void:
 	car_check.button_pressed = Global.car_enabled
 	tank_check.button_pressed = Global.tank_enabled
 	aa_check.button_pressed = Global.aa_enabled
+	pixel_check.button_pressed = Global.pixel_art
 
 
 func any_enemy_enabled() -> bool:
@@ -254,6 +260,7 @@ func save_to_global() -> void:
 	Global.car_enabled = car_check.button_pressed
 	Global.tank_enabled = tank_check.button_pressed
 	Global.aa_enabled = aa_check.button_pressed
+	Global.pixel_art = pixel_check.button_pressed
 	Global.save_settings()
 
 

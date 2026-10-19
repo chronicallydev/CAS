@@ -723,9 +723,18 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 				register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
 			else:
 				register_hit()
+				if enemy.has_method("register_hit"):
+					enemy.register_hit(get_shot_origin(), light_weapon)
 		else:
 			enemy.queue_free()
 			register_kill(enemy, 10)
+
+
+# Where shots come from, for placing hit marks on the side that was hit.
+func get_shot_origin() -> Vector3:
+	if shooter != null and shooter.has_method("get_muzzle_position"):
+		return shooter.get_muzzle_position()
+	return camera.global_position if camera != null else global_position
 
 
 func register_hit() -> void:

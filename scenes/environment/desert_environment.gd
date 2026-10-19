@@ -56,7 +56,7 @@ func rebuild() -> void:
 func build() -> void:
 	rng.seed = seed_value
 
-	sand = P.material(Color(0.8, 0.63, 0.42), 1.0)
+	sand = P.material(Color(0.72, 0.6, 0.46), 1.0)
 	dirt = P.material(Color(0.62, 0.48, 0.33), 1.0)
 	concrete = P.material(Color(0.66, 0.64, 0.6), 0.95)
 	steel = P.material(Color(0.36, 0.38, 0.4), 0.5, 0.6)
@@ -104,7 +104,7 @@ func build_roads(farm_pos: Vector3) -> void:
 
 
 func build_dunes() -> void:
-	var dune_mat := P.material(Color(0.78, 0.61, 0.4), 1.0)
+	var dune_mat := P.material(Color(0.7, 0.58, 0.44), 1.0)
 
 	for i in dune_count:
 		var pos := random_ground_point(80.0, outer_radius)

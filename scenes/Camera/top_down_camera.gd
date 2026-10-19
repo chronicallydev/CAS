@@ -5,8 +5,11 @@ extends Node3D
 
 @export var target: Node3D
 # Camera position relative to the point on the ground under the target.
-@export var offset: Vector3 = Vector3(0.0, 50.0, 24.0)
+@export var offset: Vector3 = Vector3(0.0, 42.0, 42.0)
 @export var follow_speed: float = 5.0
+# Orthographic suits the pixel-art look; size is the visible height.
+@export var orthographic: bool = true
+@export var ortho_size: float = 60.0
 
 @export_group("Shake")
 # Largest sideways offset of the view at full trauma, in metres.
@@ -22,6 +25,9 @@ var time: float = 0.0
 
 func _ready() -> void:
 	add_to_group("game_camera")
+	if camera != null and orthographic:
+		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+		camera.size = ortho_size
 	# Move after the target has moved this physics frame.
 	process_physics_priority = 10
 

@@ -47,6 +47,7 @@ light_armor = 0.4
 score_value = 25
 display_name = "CAR"
 leaves_wreck = true
+detach_parts = PackedStringArray("Gun", "WheelFL", "WheelFR", "WheelBL", "WheelBR")
 hit_effect = ExtResource("2_boom")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=41011142]

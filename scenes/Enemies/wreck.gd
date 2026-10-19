@@ -27,7 +27,8 @@ static func create_from(source: Node3D) -> Node3D:
 	burnt.roughness = 1.0
 
 	for child in source.get_children():
-		if child is Sprite3D or child is Marker3D or not child is Node3D:
+		# Live smoke/fire is skipped: the wreck makes its own.
+		if child is Sprite3D or child is Marker3D or child is CPUParticles3D or not child is Node3D:
 			continue
 		var copy: Node3D = child.duplicate()
 		wreck.add_child(copy)

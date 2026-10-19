@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 Global="*res://global.gd"
 Sfx="*res://scenes/audio/sfx.gd"
+PixelArt="*res://scenes/pixelart/pixel_art.gd"
 
 [display]
 
@@ -37,3 +38,6 @@ enemies=""
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=0
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=0
+textures/decals/filter=0

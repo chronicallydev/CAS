@@ -254,31 +254,26 @@ func register_kill(points: int, world_position: Vector3, label: String) -> void:
 	combo_timer = COMBO_WINDOW
 
 
-# Floating score text that rises from where the enemy died.
+# Floating score text that rises from where the enemy died. Drawn on the
+# HUD (not in 3D) so it stays crisp over the pixel-art scene.
 func spawn_popup(text: String, world_position: Vector3, color: Color, big: bool = false) -> void:
-	var scene := get_tree().current_scene
-	if scene == null:
-		return
+	var popup := make_label(text, 30 if big else 21, color, HORIZONTAL_ALIGNMENT_CENTER)
+	popup.size = Vector2(240, 40)
+	popup.pivot_offset = popup.size * 0.5
+	add_child(popup)
 
-	var popup := Label3D.new()
-	popup.text = text
-	popup.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	popup.no_depth_test = true
-	popup.fixed_size = true
-	popup.pixel_size = 0.0016 if big else 0.0011
-	popup.font_size = 48
-	popup.outline_size = 20
-	popup.modulate = color
-	popup.outline_modulate = Color(0, 0, 0, 0.85)
-	popup.render_priority = 10
-	scene.add_child(popup)
 	# A little sideways spread so several kills in one spot don't overlap.
-	popup.global_position = world_position + Vector3(randf_range(-2.0, 2.0), 3.0, randf_range(-1.0, 1.0))
+	var anchor := world_position + Vector3(randf_range(-2.0, 2.0), 3.0, randf_range(-1.0, 1.0))
+	var follow := func(rise: float) -> void:
+		var camera := get_viewport().get_camera_3d()
+		if camera == null or not is_instance_valid(popup):
+			return
+		popup.position = camera.unproject_position(anchor) - popup.size * 0.5 - Vector2(0, rise)
+	follow.call(0.0)
 
 	var tween := popup.create_tween().set_parallel()
-	tween.tween_property(popup, "global_position:y", popup.global_position.y + 6.0, 1.0).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_method(follow, 0.0, 48.0, 1.0).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(popup, "modulate:a", 0.0, 0.4).set_delay(0.6)
-	tween.tween_property(popup, "outline_modulate:a", 0.0, 0.4).set_delay(0.6)
 	tween.chain().tween_callback(popup.queue_free)
 
 

@@ -1,6 +1,8 @@
 extends Node3D
 
 const Wreck := preload("res://scenes/Enemies/wreck.gd")
+const VehicleDamage := preload("res://scenes/Enemies/vehicle_damage.gd")
+const Debris := preload("res://scenes/Enemies/debris.gd")
 
 # Shared enemy behaviour: group membership and health.
 # Weapons call take_damage(); it returns true when the hit killed the enemy.
@@ -16,17 +18,25 @@ const Wreck := preload("res://scenes/Enemies/wreck.gd")
 @export var display_name: String = ""
 # Vehicles leave a burning wreck when destroyed.
 @export var leaves_wreck: bool = false
+# Child nodes thrown off when destroyed (e.g. "Turret"). With several, each
+# has a chance to come off, so wrecks vary.
+@export var detach_parts: PackedStringArray = []
 
 var health: float = 0.0
 
 # Optional health bar child (see health_bar_3d.tscn).
 var health_bar: Node
+# Holes, sparks, smoke and fire for vehicles (see vehicle_damage.gd).
+var damage_fx: Node
 
 
 func _ready() -> void:
 	add_to_group("enemies")
 	health = max_health
 	health_bar = get_node_or_null("HealthBar3D")
+	if leaves_wreck:
+		damage_fx = VehicleDamage.new()
+		add_child(damage_fx)
 	update_health_bar()
 
 
@@ -38,6 +48,8 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 		amount *= 1.0 - clampf(light_armor, 0.0, 1.0)
 
 	health -= amount
+	if damage_fx != null:
+		damage_fx.update_damage_state(health / maxf(max_health, 0.001))
 	update_health_bar()
 
 	if health <= 0.0:
@@ -49,6 +61,7 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 
 func die() -> void:
 	if leaves_wreck:
+		launch_parts()
 		Wreck.create_from(self)
 	queue_free()
 
@@ -72,3 +85,20 @@ func flat_direction_to_center() -> Vector3:
 func face_direction(direction: Vector3) -> void:
 	if direction.length() > 0.01:
 		look_at(global_position + direction, Vector3.UP)
+
+
+# Visible damage for a hit that didn't destroy this enemy. `from` is where
+# the shot came from.
+func register_hit(from: Vector3, light_weapon: bool) -> void:
+	if damage_fx != null:
+		damage_fx.register_hit(from, light_weapon, light_weapon and light_armor >= 0.9)
+
+
+func launch_parts() -> void:
+	for part_name in detach_parts:
+		var part := get_node_or_null(NodePath(part_name)) as Node3D
+		if part == null:
+			continue
+		if detach_parts.size() > 1 and randf() > 0.6:
+			continue
+		Debris.launch_part(part, global_position, detach_parts.size() == 1)

@@ -60,6 +60,7 @@ max_health = 4.0
 score_value = 40
 display_name = "SAM"
 leaves_wreck = true
+detach_parts = PackedStringArray("Launcher")
 light_armor = 0.5
 missile_explosion = ExtResource("2_boom")
 

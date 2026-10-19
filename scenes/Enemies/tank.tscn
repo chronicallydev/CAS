@@ -37,6 +37,7 @@ max_health = 12.0
 score_value = 50
 display_name = "TANK"
 leaves_wreck = true
+detach_parts = PackedStringArray("Turret")
 light_armor = 0.97
 shell_explosion = ExtResource("2_boom")
 
