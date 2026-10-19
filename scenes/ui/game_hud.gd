@@ -66,6 +66,12 @@ func _ready() -> void:
 	if generator != null:
 		generator.wave_started.connect(on_wave_started)
 		generator.wave_cleared.connect(on_wave_cleared)
+		generator.fort_destroyed.connect(on_fort_destroyed)
+
+	# Assaulting an enemy rig: there's no friendly rig to watch.
+	if Global.is_assault():
+		rig_bar.get_parent().visible = false
+		indicators.home = null
 
 
 func _process(delta: float) -> void:
@@ -82,8 +88,9 @@ func _process(delta: float) -> void:
 	if gun != null:
 		score_label.text += "     KILLS  %d" % gun.kills
 	wave_label.text = "WAVE %d" % maxi(Global.wave, 1) if Global.wave > 0 else "GET READY"
-	if is_assault() and Global.wave > generator.starting_level:
-		wave_label.text = "WAVE %d / %d" % [Global.wave - generator.starting_level, generator.target_waves]
+	if is_assault():
+		var count: int = Global.wave - generator.starting_level
+		wave_label.text = "WAVE %d / %d" % [count, generator.target_waves] if count > 0 else "GET READY"
 
 	if generator == null or not generator.wave_mode:
 		status_label.text = ""
@@ -91,6 +98,13 @@ func _process(delta: float) -> void:
 		status_label.text = "Next wave in %d" % ceili(maxf(generator.break_left, 0.0))
 	else:
 		status_label.text = "Enemies left: %d" % generator.enemies_left()
+
+	if is_assault():
+		var forts: int = generator.forts_left()
+		if generator.waves_done:
+			status_label.text = "Destroy the last defences: %d" % forts if forts > 0 else "Rig secured"
+		elif forts > 0:
+			status_label.text += "   |   Defences left: %d" % forts
 
 
 func format_number(value: int) -> String:
@@ -203,10 +217,23 @@ func on_wave_started(number: int, is_boss: bool) -> void:
 func on_wave_cleared(number: int, bonus: int) -> void:
 	var subtitle := "+%s bonus" % format_number(bonus) if bonus > 0 else ""
 	if is_assault() and generator.is_final_wave(number):
-		show_banner("RIG SECURED", subtitle, Color(0.5, 0.9, 0.55))
+		var forts: int = generator.forts_left()
+		if forts > 0:
+			show_banner("WAVES CLEARED", "Destroy the last %d defences to take the rig" % forts, ACCENT)
+		else:
+			show_banner("RIG SECURED", subtitle, Color(0.5, 0.9, 0.55))
 		return
 	var title := "WAVE %d CLEARED" % (number - generator.starting_level if is_assault() else number)
 	show_banner(title, subtitle, Color(0.5, 0.9, 0.55))
+
+
+func on_fort_destroyed(left: int) -> void:
+	if left > 0:
+		show_banner("DEFENCE DESTROYED", "%d left around the rig" % left, Color(0.5, 0.9, 0.55))
+	elif generator.waves_done:
+		show_banner("RIG SECURED", "All defences destroyed", Color(0.5, 0.9, 0.55))
+	else:
+		show_banner("ALL DEFENCES DOWN", "Clear the remaining waves to take the rig", Color(0.5, 0.9, 0.55))
 
 
 # --- Rig status ----------------------------------------------------------

@@ -46,36 +46,43 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	global_position.y = ride_height
-	var flat_position := Vector3(global_position.x, 0.0, global_position.z)
+	# Orbit centre: the rig, or the helicopter's ground spot in an assault.
+	var centre := objective_ground()
 
 	if not orbiting:
 		var direction := flat_direction_to_center()
 		global_position += direction * speed * delta
 		face_direction(direction)
 
-		if flat_position.length() <= orbit_radius:
+		if objective_distance() <= orbit_radius:
 			orbiting = true
-			orbit_angle = atan2(global_position.z, global_position.x)
+			orbit_angle = atan2(global_position.z - centre.z, global_position.x - centre.x)
 		return
 
-	orbit_radius = maxf(orbit_radius - spiral_speed * delta, 0.0)
+	# Hunting the helicopter the circle never closes in all the way.
+	var min_radius := 12.0 if Global.is_assault() else 0.0
+	orbit_radius = maxf(orbit_radius - spiral_speed * delta, min_radius)
 	orbit_angle += orbit_sign * speed / maxf(orbit_radius, 1.0) * delta
 
-	var target := Vector3(cos(orbit_angle) * orbit_radius, ride_height, sin(orbit_angle) * orbit_radius)
+	var target := centre + Vector3(cos(orbit_angle) * orbit_radius, 0.0, sin(orbit_angle) * orbit_radius)
+	target.y = ride_height
 	var move := target - global_position
-	global_position = target
+	# A moving centre could jump the car; drive there at most a bit over speed.
+	if move.length() > speed * 1.4 * delta:
+		move = move.normalized() * speed * 1.4 * delta
+	global_position += move
 	face_direction(Vector3(move.x, 0.0, move.z))
 
 	update_gun(delta)
 
 
 func update_gun(delta: float) -> void:
-	var base := get_tree().get_first_node_in_group("Base") as Node3D
+	var base := objective()
 
 	if base == null:
 		return
 
-	# Keep the roof gun pointed at the base.
+	# Keep the roof gun pointed at the target.
 	if gun != null:
 		var to_base := base.global_position - gun.global_position
 		gun.rotation.y = atan2(-to_base.x, -to_base.z) - global_rotation.y
@@ -116,7 +123,4 @@ func shot_hit(position: Vector3) -> void:
 			effect.global_position = position
 			effect.scale = Vector3.ONE * 0.15
 
-	var base := get_tree().get_first_node_in_group("Base")
-
-	if base != null and base.has_method("take_damage"):
-		base.take_damage(shot_damage)
+	hit_objective(position, shot_damage)

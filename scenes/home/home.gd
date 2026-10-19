@@ -23,6 +23,12 @@ func _ready() -> void:
 		health = max_health
 	health_bar_3d.update_health(health, max_health)
 
+	# Assaulting: this is the enemy's rig. It can't be hurt and isn't
+	# defended, so it has no health bar or contact damage.
+	if Global.is_assault():
+		health_bar_3d.visible = false
+		set_physics_process(false)
+
 
 func _physics_process(delta: float) -> void:
 	check_timer += delta

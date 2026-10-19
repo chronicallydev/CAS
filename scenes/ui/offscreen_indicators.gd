@@ -14,9 +14,11 @@ const COLORS := {
 	"CAR": Color(1.0, 0.5, 0.25),
 	"TANK": Color(0.95, 0.8, 0.2),
 	"SAM": Color(0.95, 0.35, 0.85),
+	"BUNKER": Color(0.75, 0.75, 0.72),
+	"FLAK": Color(1.0, 0.6, 0.45),
 	"BOSS": Color(1.0, 0.2, 0.15),
 }
-const SIZES := {"": 8.0, "CAR": 11.0, "TANK": 13.0, "SAM": 13.0, "BOSS": 20.0}
+const SIZES := {"": 8.0, "CAR": 11.0, "TANK": 13.0, "SAM": 13.0, "BUNKER": 15.0, "FLAK": 15.0, "BOSS": 20.0}
 
 const RIG_COLOR := Color(0.45, 0.75, 1.0)
 const DANGER := Color(1.0, 0.2, 0.15)

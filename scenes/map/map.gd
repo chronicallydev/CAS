@@ -335,12 +335,15 @@ func build_info() -> void:
 	info.add_child(briefing("[gold]%s:[/gold] %s\n[gold]Garrison: %s.[/gold]" % [rig["name"].to_upper(), rig["description"], Campaign.profile(selected)["label"]]))
 
 	info.add_child(section("OBJECTIVES"))
-	info.add_child(table_row("", ["WAVES", "BONUS"], MUTED))
+	info.add_child(table_row("", ["COUNT", "BONUS"], MUTED))
 	if owned:
 		info.add_child(table_row("Hold the rig", ["Endless", "Kills"]))
 	else:
-		info.add_child(table_row("Clear the garrison", [str(rig["waves"]), "$%s" % format_money(Campaign.capture_bonus(selected))]))
-		info.add_child(table_row("Destroy the commander", ["Final", "Capture"]))
+		var forts: Array = rig["forts"]
+		info.add_child(table_row("Clear the garrison", ["%d waves" % rig["waves"], "$%s" % format_money(Campaign.capture_bonus(selected))]))
+		info.add_child(table_row("Destroy bunkers", [str(forts[0]), "Required"]))
+		info.add_child(table_row("Destroy flak guns", [str(forts[1]), "Required"]))
+		info.add_child(table_row("Kill the commander", ["Final", "Capture"]))
 
 	info.add_child(section("REWARD"))
 	var income: int = Campaign.income(selected) if owned else rig["income"]

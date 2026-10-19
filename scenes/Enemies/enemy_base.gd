@@ -77,9 +77,46 @@ func update_health_bar() -> void:
 		health_bar.update_health(health, max_health)
 
 
-# Direction on the ground plane from this enemy to the map centre (the base).
+# What this enemy is after. Defending, that's the rig at the map centre;
+# in an assault there's no friendly rig, so it hunts the helicopter.
+func objective() -> Node3D:
+	if Global.is_assault():
+		var heli := get_tree().get_first_node_in_group("player") as Node3D
+		if heli != null and not heli.get("dead"):
+			return heli
+		return null
+	return get_tree().get_first_node_in_group("Base") as Node3D
+
+
+# The objective's spot on the ground (the map centre if there is none).
+func objective_ground() -> Vector3:
+	var target := objective()
+	if target == null or not Global.is_assault():
+		return Vector3.ZERO
+	return Vector3(target.global_position.x, 0.0, target.global_position.z)
+
+
+# Ground distance from this enemy to its objective.
+func objective_distance() -> float:
+	var target := objective_ground()
+	return Vector2(global_position.x - target.x, global_position.z - target.z).length()
+
+
+# Deal damage to the objective. Shots at the helicopter only count if they
+# land close to where it is now, so it can dodge by moving.
+func hit_objective(at: Vector3, amount: float, hit_radius: float = 3.0) -> void:
+	var target := objective()
+	if target == null or not target.has_method("take_damage"):
+		return
+	if Global.is_assault() and target.global_position.distance_to(at) > hit_radius:
+		return
+	target.take_damage(amount)
+
+
+# Direction on the ground plane from this enemy to its objective.
 func flat_direction_to_center() -> Vector3:
-	var direction := Vector3(-global_position.x, 0.0, -global_position.z)
+	var target := objective_ground()
+	var direction := Vector3(target.x - global_position.x, 0.0, target.z - global_position.z)
 
 	if direction.length() > 0.01:
 		return direction.normalized()

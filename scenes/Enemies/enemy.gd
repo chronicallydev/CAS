@@ -1,18 +1,28 @@
 extends "res://scenes/Enemies/enemy_base.gd"
 
-# Infantry: a soldier with a rifle who walks straight at the base.
+# Infantry: a soldier with a rifle who walks straight at the base. In an
+# assault there is no base to reach, so soldiers close in on the helicopter
+# and stop to fire short bursts up at it.
 # The model is built from primitives and animated in code: legs stride,
 # arms sway with the rifle and the body bobs with each step. Blasts nearby
 # make soldiers run from them and dive flat; death is in soldier_death.gd.
 
 const P := preload("res://scenes/environment/prop_builder.gd")
 const SoldierDeath := preload("res://scenes/Enemies/soldier_death.gd")
+const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
 
 @export var speed: float = 5.0
 # Height of the ground surface (the soldier's feet).
 @export var ground_y: float = -0.4
 # Overall size; a bit larger than life so soldiers read from the air.
 @export var model_scale: float = 1.8
+
+@export_group("Rifle")
+# Damage per round that hits the helicopter (assaults only).
+@export var shot_damage: float = 0.4
+@export var fire_range_min: float = 12.0
+@export var fire_range_max: float = 20.0
+@export var burst_cooldown: float = 3.0
 
 var model: Node3D
 var body: Node3D
@@ -30,12 +40,18 @@ var panic_time: float = 0.0
 var prone_time: float = 0.0
 var panic_dir: Vector3 = Vector3.ZERO
 
+var fire_range: float = 0.0
+var fire_timer: float = 0.0
+var burst_left: int = 0
+
 
 func _ready() -> void:
 	super()
 	build_model()
 	# Out of step with each other, so a group doesn't march in lockstep.
 	walk_phase = randf() * TAU
+	fire_range = randf_range(fire_range_min, fire_range_max)
+	fire_timer = randf_range(1.0, burst_cooldown)
 
 
 func _physics_process(delta: float) -> void:
@@ -54,8 +70,37 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var direction := flat_direction_to_center()
+	if Global.is_assault() and objective() != null and objective_distance() <= fire_range:
+		face_direction(direction)
+		update_rifle(delta)
+		return
 	global_position += direction * speed * delta
 	face_direction(direction)
+
+
+# Short bursts at the helicopter overhead.
+func update_rifle(delta: float) -> void:
+	fire_timer -= delta
+	if fire_timer > 0.0:
+		return
+	if burst_left <= 0:
+		burst_left = 3
+	burst_left -= 1
+	fire_timer = 0.14 if burst_left > 0 else burst_cooldown * randf_range(0.8, 1.3)
+
+	var heli := objective()
+	var from := rifle.global_position
+	var target := heli.global_position + Vector3(randf_range(-3.0, 3.0), randf_range(-1.0, 1.0), randf_range(-3.0, 3.0))
+	var tracer := Tracer.new()
+	tracer.radius = 0.12
+	tracer.color = Color(1.0, 0.9, 0.5)
+	get_tree().current_scene.add_child(tracer)
+	tracer.setup(from, target, 0.3, 0.0, rifle_hit)
+	Sfx.play_3d("car_gun", from)
+
+
+func rifle_hit(at: Vector3) -> void:
+	hit_objective(at, shot_damage, 2.5)
 
 
 func _process(delta: float) -> void:

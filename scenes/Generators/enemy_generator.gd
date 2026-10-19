@@ -105,12 +105,21 @@ const PRESETS := {
 @export_range(0, 10000, 10) var wave_clear_bonus: int = 100
 
 const Campaign := preload("res://scenes/map/campaign.gd")
+const Bunker := preload("res://scenes/Enemies/bunker.gd")
+const FlakGun := preload("res://scenes/Enemies/flak_gun.gd")
 
 # Assault missions: waves to clear to win. 0 = endless.
 var target_waves: int = 0
+# Assaults: the last wave has been cleared (forts may still stand).
+var waves_done: bool = false
+var assault_won: bool = false
+# Spawn-square edges enemies never come from (e.g. the sea side).
+var blocked_edges: Array = []
 
 signal wave_started(wave: int, is_boss: bool)
 signal wave_cleared(wave: int, bonus: int)
+# A fort around an assaulted rig was destroyed; `left` are still standing.
+signal fort_destroyed(left: int)
 
 enum WaveState { BREAK, ACTIVE }
 
@@ -153,6 +162,8 @@ func _ready() -> void:
 		apply_preset(difficulty)
 
 	Global.reset_run()
+	if target_waves > 0:
+		spawn_forts()
 	set_process(true)
 
 	if wave_mode:
@@ -208,6 +219,9 @@ func apply_mission() -> void:
 	tank_min_level = 0
 	aa_min_level = 0
 	target_waves = rig["waves"] if Global.is_assault() else 0
+	if rig["biome"] == "terminal":
+		# The gulf is on the right-hand edge.
+		blocked_edges = [3]
 
 
 # Waves still to clear before an assault is won.
@@ -255,6 +269,9 @@ func _process(delta: float) -> void:
 
 func process_waves(delta: float) -> void:
 	prune_spawned()
+
+	if waves_done:
+		return
 
 	if wave_state == WaveState.BREAK:
 		break_left -= delta
@@ -312,10 +329,58 @@ func clear_wave() -> void:
 	wave_cleared.emit(wave, bonus)
 
 	if is_final_wave(wave):
-		set_process(false)
-		# A moment to enjoy the last explosion before the victory screen.
-		await get_tree().create_timer(2.0).timeout
-		Global.mission_won()
+		waves_done = true
+		check_assault_won()
+
+
+# --- Assault forts -------------------------------------------------------
+
+# Bunkers and flak guns in a ring around the enemy rig.
+func spawn_forts() -> void:
+	var counts: Array = Campaign.RIGS[Global.mission["rig"]]["forts"]
+	var kinds: Array = []
+	for i in counts[0]:
+		kinds.append(Bunker)
+	for i in counts[1]:
+		kinds.append(FlakGun)
+	kinds.shuffle()
+
+	var start := randf() * TAU
+	for i in kinds.size():
+		var angle := start + TAU * i / kinds.size() + randf_range(-0.25, 0.25)
+		var radius := randf_range(15.0, 28.0)
+		var fort: Node3D = kinds[i].new()
+		apply_modifiers(fort)
+		add_child(fort)
+		fort.position = Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+		fort.rotation.y = -angle + PI / 2.0
+		fort.tree_exiting.connect(on_fort_exiting.bind(fort))
+
+
+func forts_left() -> int:
+	var count := 0
+	for fort in get_tree().get_nodes_in_group("forts"):
+		if not fort.is_queued_for_deletion() and fort.health > 0.0:
+			count += 1
+	return count
+
+
+func on_fort_exiting(fort: Node3D) -> void:
+	# Only count forts that were destroyed, not ones freed with the scene.
+	if fort.health > 0.0 or Global.is_game_over or not is_inside_tree():
+		return
+	fort_destroyed.emit(forts_left())
+	check_assault_won()
+
+
+# The rig is captured once the last wave is cleared and every fort is down.
+func check_assault_won() -> void:
+	if assault_won or not waves_done or forts_left() > 0:
+		return
+	assault_won = true
+	# A moment to enjoy the last explosion before the victory screen.
+	await get_tree().create_timer(2.0).timeout
+	Global.mission_won()
 
 
 func get_wave_spawn_interval() -> float:
@@ -486,6 +551,8 @@ func spawn_enemy(scene: PackedScene) -> Node3D:
 	var half_size: float = square_size / 2.0
 	var coordinate: float = randf_range(-half_size, half_size)
 	var edge: int = randi_range(0, 3)
+	while blocked_edges.has(edge) and blocked_edges.size() < 4:
+		edge = randi_range(0, 3)
 
 	var spawn_position: Vector3
 

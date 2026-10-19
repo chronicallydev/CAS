@@ -33,7 +33,10 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	global_position.y = ride_height
-	var flat_distance := Vector2(global_position.x, global_position.z).length()
+	var flat_distance := objective_distance()
+	# A helicopter can fly off; roll after it once it's well out of range.
+	if in_position and flat_distance > firing_range + 10.0:
+		in_position = false
 
 	if not in_position:
 		var direction := flat_direction_to_center()
@@ -44,12 +47,12 @@ func _physics_process(delta: float) -> void:
 			in_position = true
 		return
 
-	var base := get_tree().get_first_node_in_group("Base") as Node3D
+	var base := objective()
 
 	if base == null:
 		return
 
-	# Rotate the turret toward the base around the vertical axis.
+	# Rotate the turret toward the target around the vertical axis.
 	var to_base := base.global_position - turret.global_position
 	var desired_yaw := atan2(-to_base.x, -to_base.z) - global_rotation.y
 	turret.rotation.y = lerp_angle(turret.rotation.y, desired_yaw, clampf(turret_turn_speed * delta, 0.0, 1.0))
@@ -62,7 +65,8 @@ func _physics_process(delta: float) -> void:
 
 
 func fire_at(base: Node3D) -> void:
-	var target := base.global_position + Vector3(randf_range(-2.0, 2.0), 1.0, randf_range(-2.0, 2.0))
+	var lift := 0.0 if Global.is_assault() else 1.0
+	var target := base.global_position + Vector3(randf_range(-2.0, 2.0), lift, randf_range(-2.0, 2.0))
 
 	var shell := TankShell.new()
 	get_tree().current_scene.add_child(shell)
@@ -75,10 +79,8 @@ func fire_at(base: Node3D) -> void:
 func shell_hit(position: Vector3) -> void:
 	spawn_explosion(position, 0.6)
 
-	var base := get_tree().get_first_node_in_group("Base")
-
-	if base != null and base.has_method("take_damage"):
-		base.take_damage(shell_damage)
+	# A shell bursting near the helicopter hurts more than a hit on the rig.
+	hit_objective(position, shell_damage * (2.0 if Global.is_assault() else 1.0), 5.0)
 
 
 func spawn_explosion(position: Vector3, vfx_scale: float) -> void:

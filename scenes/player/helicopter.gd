@@ -66,9 +66,11 @@ func take_damage(amount: float) -> void:
 
 	health = maxf(health - amount, 0.0)
 	health_bar.value = health
-	hit_flash.color.a = 0.45
+	# Small-arms hits only tint the screen a little; missiles flash it red.
+	hit_flash.color.a = maxf(hit_flash.color.a, clampf(0.06 + amount / 55.0, 0.06, 0.45))
 	Sfx.play_2d("heli_hit")
-	Global.shake(0.55)
+	# Rifle rounds rattle the cabin; missiles throw it about.
+	Global.shake(clampf(0.12 + amount / 40.0, 0.12, 0.55))
 
 	if health <= 0.0:
 		shot_down()
