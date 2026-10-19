@@ -30,7 +30,6 @@ const Missile := preload("res://features/mission/enemies/projectiles/aa_missile.
 var firing_range: float = 0.0
 var in_position: bool = false
 var reload_timer: float = 0.0
-var lock_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -55,9 +54,9 @@ func _physics_process(delta: float) -> void:
 			in_position = true
 		return
 
-	var heli: Helicopter = mission.helicopter if mission != null else null
+	var heli := helicopter()
 
-	if heli == null or heli.dead:
+	if heli == null:
 		lock_timer = 0.0
 		return
 
@@ -76,13 +75,8 @@ func _physics_process(delta: float) -> void:
 		lock_timer = 0.0
 		return
 
-	lock_timer += delta
-
-	if heli.has_method("warn_lock"):
-		heli.warn_lock()
-
-	if lock_timer >= lock_time:
-		lock_timer = 0.0
+	# Lock on (flares break it), then fire and reload.
+	if update_lock(heli, delta, lock_time):
 		reload_timer = reload_time
 		fire_at(heli)
 
@@ -94,6 +88,7 @@ func fire_at(heli: Node3D) -> void:
 	missile.turn_rate = missile_turn_rate
 	missile.lifetime = missile_lifetime
 	missile.damage = missile_damage
+	missile.source_name = "SAM TRUCK"
 	missile.explosion_scene = missile_explosion
 	missile.ground_y = ride_height
 	MissionContext.spawn_parent(self).add_child(missile)

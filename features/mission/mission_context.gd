@@ -35,6 +35,9 @@ var services: GameServices
 var state: MissionState
 
 var _rig_id: String = ""
+## Test range: no waves, no payout or records, and a lost helicopter or rig
+## just asks for a reset (request_retry).
+var sandbox: bool = false
 ## Started from the editor (F6) rather than by the root context.
 var _standalone: bool = false
 var _hit_stop_active: bool = false
@@ -42,9 +45,11 @@ var _hit_stop_active: bool = false
 
 ## Called by the root context before the mission enters the tree.
 ## `rig_id` is the rig fought over, or "" for a free-play defence.
-func bind(game_services: GameServices, rig_id: String) -> void:
+## `sandbox_mode` is for the test range (see `sandbox`).
+func bind(game_services: GameServices, rig_id: String, sandbox_mode: bool = false) -> void:
 	services = game_services
 	_rig_id = rig_id
+	sandbox = sandbox_mode
 
 
 func _ready() -> void:
@@ -78,9 +83,15 @@ func setup() -> void:
 	var hull_bonus := campaign.hull_bonus(_rig_id) if state.is_campaign() and not state.is_assault else 0.0
 	rig.initialize(self, hull_bonus)
 
-	generator.start(self,
-			null if _standalone else services.difficulty(),
-			null if _standalone else services.settings)
+	if sandbox:
+		# The test range spawns enemies by hand; the rig can't be lost.
+		generator.mission = self
+		rig.max_health = 1000000.0
+		rig.health = rig.max_health
+	else:
+		generator.start(self,
+				null if _standalone else services.difficulty(),
+				null if _standalone else services.settings)
 
 	hud.initialize(self)
 	guns.kill_registered.connect(hud.register_kill)
@@ -162,6 +173,9 @@ func game_over(reason: String) -> void:
 	if state.is_over:
 		return
 	state.is_over = true
+	if sandbox:
+		request_retry.emit.call_deferred()
+		return
 
 	var beaten := services.profile.record_run(state.score, state.wave)
 	_pay_out(false)

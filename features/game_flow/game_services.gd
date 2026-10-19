@@ -14,6 +14,8 @@ var settings: GameSettings
 var loadout: Loadout
 var campaign: Campaign
 var _save_service := SaveService.new()
+## False for the test range's throwaway copy: save() does nothing.
+var saving_enabled: bool = true
 
 
 ## Builds the services from `game_config` and loads the save on disk.
@@ -31,6 +33,32 @@ static func create(game_config: GameConfig) -> GameServices:
 	return services
 
 
+## A throwaway copy for the test range: the same data and settings, but a
+## profile that owns every helicopter and plenty of every weapon, and that
+## is never saved. Changes there never reach the real profile.
+static func create_sandbox(from: GameServices) -> GameServices:
+	var services := GameServices.new()
+	services.config = from.config
+	services.settings = from.settings
+	services.saving_enabled = false
+
+	var real := from.profile
+	var profile := PlayerProfile.new()
+	profile.money = 999999
+	profile.selected_heli = real.selected_heli
+	profile.upgrades = real.upgrades.duplicate(true)
+	profile.loadouts = real.loadouts.duplicate(true)
+	profile.owned_rigs.assign(real.owned_rigs)
+	for heli in from.config.loadout_catalog.helicopters:
+		profile.owned_helis.append(heli.id)
+	for weapon in from.config.loadout_catalog.weapons:
+		profile.owned_weapons[weapon.id] = 99
+	services.profile = profile
+	services.loadout = Loadout.new(from.config.loadout_catalog, profile)
+	services.campaign = Campaign.new(from.config.campaign_catalog, profile)
+	return services
+
+
 ## For contexts started directly from the editor, without the root context.
 static func create_default() -> GameServices:
 	return create(load(GameConfig.DEFAULT_PATH))
@@ -38,6 +66,8 @@ static func create_default() -> GameServices:
 
 ## Writes the profile and settings to disk.
 func save() -> void:
+	if not saving_enabled:
+		return
 	_save_service.save(profile, settings)
 
 

@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://features/hangar/hangar.tscn" id="4_hangar"]
 [ext_resource type="PackedScene" path="res://features/map/map.tscn" id="5_map"]
 [ext_resource type="PackedScene" path="res://features/mission/mission.tscn" id="6_mission"]
+[ext_resource type="PackedScene" path="res://features/test_range/test_range.tscn" id="7_test"]
 
 [node name="Root" type="Node"]
 script = ExtResource("1_root")
@@ -14,3 +15,4 @@ menu_scene = ExtResource("3_menu")
 hangar_scene = ExtResource("4_hangar")
 map_scene = ExtResource("5_map")
 mission_scene = ExtResource("6_mission")
+test_range_scene = ExtResource("7_test")

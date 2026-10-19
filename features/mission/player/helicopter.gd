@@ -9,6 +9,9 @@ extends Node3D
 # airframe and the weapons mounted on its hardpoints, so nothing here reads
 # saved data directly.
 
+# Every hit: how much and who dealt it (e.g. "STINGER"), for stats.
+signal damage_taken(amount: float, source: String)
+
 @export var camera: Camera3D
 @export var speed: float = 24.0
 # How quickly the helicopter reaches the requested speed.
@@ -31,6 +34,20 @@ extends Node3D
 @export var explosion_scene: PackedScene
 # Seconds between being shot down and the round restarting.
 @export var restart_delay: float = 2.0
+# Test range cheats: hits still count but do no harm, and flares recharge
+# instantly.
+var invulnerable: bool = false
+var infinite_flares: bool = false
+
+@export_group("Flares")
+# Flares are unlimited but recharge: F or Space drops a spread, then they
+# take this many seconds to be ready again. The loadout sets it from the
+# airframe and its "Flare rate" upgrade.
+@export var flare_cooldown: float = 8.0
+# After a drop, nothing can lock on for this long.
+@export var flare_protection: float = 1.8
+
+const Flare := preload("res://features/mission/player/flare.gd")
 
 var velocity: Vector3 = Vector3.ZERO
 var time: float = 0.0
@@ -42,6 +59,8 @@ var lock_warning_timer: float = 0.0
 var out_of_bounds: bool = false
 # 0 -> 1 while lifting off the rig's pad at the start of a defence.
 var takeoff: float = 1.0
+var flare_cooldown_left: float = 0.0
+var flare_protection_left: float = 0.0
 
 var body: Node3D
 var main_rotor: Node3D
@@ -53,6 +72,7 @@ var bomb_bay: Marker3D
 
 var health_bar: ProgressBar
 var warning_label: Label
+var flare_label: Label
 var hit_flash: ColorRect
 
 var rotor_sound: AudioStreamPlayer
@@ -74,11 +94,14 @@ func initialize(mission_context: MissionContext, airframe: HelicopterData, weapo
 	place_for_mission()
 
 
-func take_damage(amount: float) -> void:
+# `source` names who fired, for the test range's damage stats.
+func take_damage(amount: float, source: String = "") -> void:
 	if dead:
 		return
 
-	health = maxf(health - amount, 0.0)
+	damage_taken.emit(amount, source)
+	if not invulnerable:
+		health = maxf(health - amount, 0.0)
 	health_bar.value = health
 	# Small-arms hits only tint the screen a little; missiles flash it red.
 	hit_flash.color.a = maxf(hit_flash.color.a, clampf(0.06 + amount / 55.0, 0.06, 0.45))
@@ -93,6 +116,41 @@ func take_damage(amount: float) -> void:
 # Called every frame by an AA launcher that is locking on.
 func warn_lock() -> void:
 	lock_warning_timer = 0.2
+
+
+# False for a moment after dropping flares: lock-on weapons (SAMs, Stingers,
+# radar flak) must break their lock and start over.
+func can_be_locked() -> bool:
+	return not dead and flare_protection_left <= 0.0
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Physical keys, so this works on any keyboard layout.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_F or event.physical_keycode == KEY_SPACE:
+			deploy_flares()
+
+
+# Drops a spread of decoys. Missiles already homing on the helicopter
+# switch to one of them, and new locks are blocked for flare_protection.
+func deploy_flares() -> void:
+	if dead or flare_cooldown_left > 0.0:
+		return
+	flare_cooldown_left = 0.0 if infinite_flares else flare_cooldown
+	flare_protection_left = flare_protection
+
+	var decoys: Array = []
+	for i in 4:
+		var flare := Flare.new()
+		MissionContext.spawn_parent(self).add_child(flare)
+		var throw := Vector3(randf_range(-7.0, 7.0), randf_range(0.5, 3.0), randf_range(-7.0, 7.0))
+		flare.launch(global_position + Vector3.DOWN * 1.2, velocity * 0.4 + throw)
+		decoys.append(flare)
+
+	for missile in get_tree().get_nodes_in_group("aa_missiles"):
+		if missile.get("target") == self:
+			missile.target = decoys.pick_random()
+	Sfx.play_3d("flare", global_position)
 
 
 func shot_down() -> void:
@@ -231,6 +289,11 @@ func _process(delta: float) -> void:
 func update_hud(delta: float) -> void:
 	hit_flash.color.a = maxf(hit_flash.color.a - delta * 1.5, 0.0)
 	lock_warning_timer = maxf(lock_warning_timer - delta, 0.0)
+	flare_cooldown_left = maxf(flare_cooldown_left - delta, 0.0)
+	flare_protection_left = maxf(flare_protection_left - delta, 0.0)
+	var flares_ready := flare_cooldown_left <= 0.0
+	flare_label.text = "FLARES READY   [F]" if flares_ready else "FLARES  %.1fs" % flare_cooldown_left
+	flare_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5) if flares_ready else Color(0.6, 0.6, 0.6))
 
 	var incoming := false
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
@@ -297,7 +360,7 @@ func build_hud() -> void:
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	box.offset_left = -160
 	box.offset_right = 160
-	box.offset_top = -70
+	box.offset_top = -96
 	box.offset_bottom = -24
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(box)
@@ -321,13 +384,21 @@ func build_hud() -> void:
 	health_bar.add_theme_stylebox_override("fill", fill)
 	box.add_child(health_bar)
 
+	# Flares left, under the hull bar.
+	flare_label = Label.new()
+	flare_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flare_label.add_theme_font_size_override("font_size", UiStyle.px(16))
+	flare_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	flare_label.add_theme_constant_override("outline_size", 4)
+	box.add_child(flare_label)
+
 	# Lock / missile warning above the hull bar.
 	warning_label = Label.new()
 	warning_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	warning_label.offset_left = -200
 	warning_label.offset_right = 200
-	warning_label.offset_top = -120
-	warning_label.offset_bottom = -80
+	warning_label.offset_top = -142
+	warning_label.offset_bottom = -102
 	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	warning_label.add_theme_font_size_override("font_size", UiStyle.px(30))
 	warning_label.visible = false

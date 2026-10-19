@@ -6,3 +6,6 @@
 script = ExtResource("1_4kqq0")
 label = "Combined arms"
 tank_weight = 0.12
+stinger_weight = 0.08
+shilka_weight = 0.06
+ripple_weight = 0.04

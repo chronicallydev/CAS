@@ -11,7 +11,8 @@ Root (features/game_flow/root.tscn, RootContext)
     ├── MenuContext     features/menu/      main menu, options
     ├── HangarContext   features/hangar/    buy helicopters and upgrades
     ├── MapContext      features/map/       campaign map, rig upgrades
-    └── MissionContext  features/mission/   the battle
+    ├── MissionContext  features/mission/   the battle
+    └── TestRangeContext features/test_range/ sandbox: spawn any unit, try any loadout
 ```
 
 Every context follows the same rules:
@@ -75,6 +76,7 @@ features/
   mission/     mission context and state, plus:
     camera/ player/ weapons/ enemies/ (forts/ projectiles/) effects/
     waves/ rig/ environment/ hud/ vfx/
+  test_range/  test range context and its side panel
 shared/        used by several contexts: audio, pixelart, ui style,
                prop builder, helicopter model, 3D health bar
 assets/        fonts, ui textures, audio files
@@ -102,3 +104,38 @@ drawn.
   first type fires with LMB and the second with RMB. Each extra copy adds
   firepower: guns get more fire rate, every rocket pod fires its own salvo,
   and every Javelin rail or FAB rack reloads on its own.
+
+## Anti-air and flares
+
+Lock-on enemies share `EnemyBase.update_lock()`: it counts up `lock_timer`
+(which makes the HUD's edge arrow pulse), warns the player, and gives up
+while `Helicopter.can_be_locked()` is false. Dropping flares (F / Space)
+makes that false for a moment and retargets every missile already homing
+on the helicopter to a decoy. Flares are unlimited but recharge: each
+airframe has its own `HelicopterData.flare_cooldown` (Little Bird 6 s,
+Cobra 8 s, Hind 11 s), shortened by the "Flare rate" upgrade.
+
+| Enemy | Where | Threat | Answer |
+|---|---|---|---|
+| SAM truck (`aa_launcher`) | waves | single homing missile | turn hard, flares |
+| Stinger (`stinger`) | waves, in infantry crowds | fast lock, small agile missile | sweep crowds, flares |
+| Shilka (`shilka`) | waves | radar lock, then a long leading flak stream; minigun-proof | heavy weapons, keep moving, flares cut a burst |
+| Ripple launcher (`ripple_launcher`) | waves | locks, then fires 6 slow, weakly homing missiles in a fan | fly through a gap, flares |
+| Flak gun (`forts/flak_gun`) | assault forts | leading flak bursts | keep moving |
+| SAM site (`forts/sam_radar` + `sam_launcher`) | assault forts (`RigData.sam_sites`) | locks from off-screen, 2-missile salvos | kill the radar first, flares |
+
+How often each wave enemy shows up comes from the rig's `GarrisonData`
+weights.
+
+## Test range
+
+`TestRangeContext` (main menu → TEST RANGE) runs a real `mission.tscn` in
+sandbox mode (`MissionContext.sandbox`). There are no waves, no payout and
+no records, and losing the helicopter just resets the range. It works on
+`GameServices.create_sandbox()`, a copy that owns every helicopter and
+weapon and never saves, so the real profile is never touched. The side panel
+(`TestRangePanel`) spawns any unit at the cursor (middle-click or G), picks
+the airframe, loadout and upgrade levels (APPLY rebuilds), toggles god mode
+and instant flares/no reloads, and shows live stats: damage taken per source
+(`Helicopter.damage_taken`), damage dealt and DPS (`GunController.damage_dealt`),
+and the hovered enemy's health, armour and lock state.

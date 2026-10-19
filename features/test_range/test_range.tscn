@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/test_range/test_range_context.gd" id="1_ctx"]
+[ext_resource type="Script" path="res://features/test_range/test_range_panel.gd" id="2_panel"]
+[ext_resource type="PackedScene" path="res://features/mission/mission.tscn" id="3_mission"]
+
+[node name="TestRange" type="Node" node_paths=PackedStringArray("panel")]
+script = ExtResource("1_ctx")
+mission_scene = ExtResource("3_mission")
+panel = NodePath("Panel")
+
+[node name="Panel" type="CanvasLayer" parent="."]
+script = ExtResource("2_panel")

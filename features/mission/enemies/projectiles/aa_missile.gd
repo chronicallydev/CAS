@@ -16,6 +16,10 @@ var proximity: float = 2.5
 var damage: float = 25.0
 var explosion_scene: PackedScene
 var ground_y: float = -0.4
+# Model size: Stinger missiles are small, SAM-site missiles big.
+var size: float = 1.0
+# Who fired it, for damage stats (e.g. "STINGER").
+var source_name: String = "MISSILE"
 
 # Unguided boost phase right after launch.
 var boost_time: float = 0.35
@@ -27,6 +31,10 @@ var trail: CPUParticles3D
 func _ready() -> void:
 	add_to_group("aa_missiles")
 	build_visuals()
+	for child in get_children():
+		if child != trail and child is Node3D:
+			child.scale *= size
+			child.position *= size
 
 
 # Call after adding to the tree.
@@ -56,7 +64,7 @@ func _physics_process(delta: float) -> void:
 
 	if has_target and global_position.distance_to(target.global_position) <= proximity:
 		if target.has_method("take_damage"):
-			target.take_damage(damage)
+			target.take_damage(damage, source_name)
 		detonate()
 	elif age >= lifetime or global_position.y <= ground_y:
 		detonate()

@@ -25,6 +25,8 @@ extends Resource
 ## Forts dug in around the rig; all must be destroyed to capture it.
 @export var bunkers: int = 0
 @export var flak_guns: int = 0
+## Radar SAM sites (one radar feeding two launchers), also forts.
+@export var sam_sites: int = 0
 
 @export_group("Economy")
 ## Money paid after every mission while the rig is owned (before upgrades).

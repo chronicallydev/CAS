@@ -351,7 +351,11 @@ func build_right_panel() -> void:
 
 		# One bar per airframe upgrade, showing this airframe's stat.
 		for def in loadout.catalog.airframe_upgrades:
-			column.add_child(stat_row(def.label, loadout.heli_stat(heli, def), def.bar_max, def.id))
+			var value := loadout.heli_stat(heli, def)
+			# Recharge times (smaller is better) show as uses per minute.
+			if def.mode == UpgradeData.Mode.SPEED_UP:
+				value = 60.0 / maxf(value, 0.01)
+			column.add_child(stat_row(def.label, value, def.bar_max, def.id))
 
 		column.add_child(heli_action_button())
 	else:

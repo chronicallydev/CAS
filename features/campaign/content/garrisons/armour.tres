@@ -8,3 +8,6 @@ label = "Armour column"
 infantry_weight = 0.35
 tank_weight = 0.35
 aa_weight = 0.05
+stinger_weight = 0.04
+shilka_weight = 0.15
+ripple_weight = 0.03

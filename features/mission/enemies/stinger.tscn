@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/stinger.gd" id="1_stinger"]
+[ext_resource type="PackedScene" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+
+[node name="Stinger" type="Node3D"]
+script = ExtResource("1_stinger")
+missile_explosion = ExtResource("2_boom")

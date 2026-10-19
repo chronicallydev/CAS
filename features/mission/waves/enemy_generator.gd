@@ -38,6 +38,24 @@ extends Node3D
 @export_range(0.0, 10.0, 0.05) var aa_weight: float = 0.08
 @export_range(0, 100, 1) var aa_min_level: int = 1
 
+# Infantry with shoulder-fired SAMs.
+@export var stinger_enabled: bool = true
+@export var stinger_scene: PackedScene
+@export_range(0.0, 10.0, 0.05) var stinger_weight: float = 0.06
+@export_range(0, 100, 1) var stinger_min_level: int = 2
+
+# Radar-guided flak tanks.
+@export var shilka_enabled: bool = true
+@export var shilka_scene: PackedScene
+@export_range(0.0, 10.0, 0.05) var shilka_weight: float = 0.04
+@export_range(0, 100, 1) var shilka_min_level: int = 4
+
+# Trucks that ripple-fire a fan of slow homing missiles.
+@export var ripple_enabled: bool = true
+@export var ripple_scene: PackedScene
+@export_range(0.0, 10.0, 0.05) var ripple_weight: float = 0.03
+@export_range(0, 100, 1) var ripple_min_level: int = 3
+
 
 @export_group("Spawn Settings")
 # Starting delay between spawn bursts.
@@ -106,6 +124,8 @@ extends Node3D
 
 const Bunker := preload("res://features/mission/enemies/forts/bunker.gd")
 const FlakGun := preload("res://features/mission/enemies/forts/flak_gun.gd")
+const SamRadar := preload("res://features/mission/enemies/forts/sam_radar.gd")
+const SamLauncher := preload("res://features/mission/enemies/forts/sam_launcher.gd")
 
 # Assault missions: waves to clear to win. 0 = endless.
 var target_waves: int = 0
@@ -210,6 +230,10 @@ func apply_menu_settings(settings: GameSettings) -> void:
 	car_enabled = settings.car_enabled
 	tank_enabled = settings.tank_enabled
 	aa_enabled = settings.aa_enabled
+	# The new AA types follow the AA switch.
+	stinger_enabled = settings.aa_enabled
+	shilka_enabled = settings.aa_enabled
+	ripple_enabled = settings.aa_enabled
 
 	# Without infantry, let vehicles appear from the start instead of
 	# leaving the map empty until they unlock.
@@ -217,6 +241,9 @@ func apply_menu_settings(settings: GameSettings) -> void:
 		car_min_level = 0
 		tank_min_level = 0
 		aa_min_level = 0
+		stinger_min_level = 0
+		shilka_min_level = 0
+		ripple_min_level = 0
 
 
 # A campaign mission sets the starting level and enemy mix from its rig.
@@ -229,14 +256,23 @@ func apply_mission(rig: RigData) -> void:
 	car_weight = garrison.car_weight
 	tank_weight = garrison.tank_weight
 	aa_weight = garrison.aa_weight
+	stinger_weight = garrison.stinger_weight
+	shilka_weight = garrison.shilka_weight
+	ripple_weight = garrison.ripple_weight
 	infantry_enabled = infantry_weight > 0.0
 	car_enabled = car_weight > 0.0
 	tank_enabled = tank_weight > 0.0
 	aa_enabled = aa_weight > 0.0
+	stinger_enabled = stinger_weight > 0.0
+	shilka_enabled = shilka_weight > 0.0
+	ripple_enabled = ripple_weight > 0.0
 	# The garrison is all there from the first wave.
 	car_min_level = 0
 	tank_min_level = 0
 	aa_min_level = 0
+	stinger_min_level = 0
+	shilka_min_level = 0
+	ripple_min_level = 0
 	target_waves = rig.waves if mission.is_assault() else 0
 	enemy_sides = mission.services.campaign.enemy_sides(rig.id)
 	if rig.biome == "terminal":
@@ -357,7 +393,8 @@ func clear_wave() -> void:
 
 # --- Assault forts -------------------------------------------------------
 
-# Bunkers and flak guns in a ring around the enemy rig.
+# Bunkers and flak guns in a ring around the enemy rig, and SAM sites
+# further out.
 func spawn_forts() -> void:
 	var rig := mission.state.rig
 	var counts: Array = [rig.bunkers, rig.flak_guns]
@@ -378,6 +415,32 @@ func spawn_forts() -> void:
 		fort.position = Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
 		fort.rotation.y = -angle + PI / 2.0
 		fort.tree_exiting.connect(on_fort_exiting.bind(fort))
+
+	# SAM sites sit between the forts, a little further out.
+	for i in rig.sam_sites:
+		var angle := start + TAU * (i + 0.5) / maxi(rig.sam_sites, 1) + randf_range(-0.3, 0.3)
+		spawn_sam_site(Vector3(cos(angle), 0.0, sin(angle)) * randf_range(32.0, 40.0))
+
+
+# One radar with a launcher on each side, all forts. The launchers only
+# work while their radar lives.
+func spawn_sam_site(centre: Vector3) -> void:
+	var across := Vector3(-centre.z, 0.0, centre.x).normalized()
+	var radar: Node3D = add_fort(SamRadar.new(), centre)
+	for side in [-1.0, 1.0]:
+		var launcher: Node3D = SamLauncher.new()
+		launcher.radar = radar
+		add_fort(launcher, centre + across * 7.0 * side + centre.normalized() * 2.0)
+
+
+# Adds a fort at `at`, facing away from the rig, counted for the objective.
+func add_fort(fort: Node3D, at: Vector3) -> Node3D:
+	apply_modifiers(fort)
+	add_child(fort)
+	fort.position = at
+	fort.rotation.y = atan2(at.x, at.z)
+	fort.tree_exiting.connect(on_fort_exiting.bind(fort))
+	return fort
 
 
 func forts_left() -> int:
@@ -507,6 +570,9 @@ func pick_enemy_scene() -> PackedScene:
 		[car_enabled, car_scene, car_weight, car_min_level],
 		[tank_enabled, tank_scene, tank_weight, tank_min_level],
 		[aa_enabled, aa_scene, aa_weight, aa_min_level],
+		[stinger_enabled, stinger_scene, stinger_weight, stinger_min_level],
+		[shilka_enabled, shilka_scene, shilka_weight, shilka_min_level],
+		[ripple_enabled, ripple_scene, ripple_weight, ripple_min_level],
 	]:
 		if entry[0] and entry[1] != null and entry[2] > 0.0 and level >= entry[3]:
 			options.append(entry)

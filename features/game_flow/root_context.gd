@@ -5,7 +5,8 @@ extends Node
 ##
 ## It owns the long-lived services (GameServices: profile, settings, save,
 ## loadout and campaign rules) and shows exactly one child context at a
-## time: the main menu, the hangar, the campaign map or a mission.
+## time: the main menu, the hangar, the campaign map, a mission or the test
+## range.
 ##
 ## Contexts never switch screens themselves. They emit request signals and
 ## the root decides what to open next, so each context only knows about its
@@ -23,6 +24,7 @@ extends Node
 @export var hangar_scene: PackedScene
 @export var map_scene: PackedScene
 @export var mission_scene: PackedScene
+@export var test_range_scene: PackedScene
 
 var _services: GameServices
 var _current: Node
@@ -45,6 +47,7 @@ func open_menu() -> void:
 	_show(menu)
 	menu.request_map.connect(open_map)
 	menu.request_hangar.connect(open_hangar)
+	menu.request_test_range.connect(open_test_range)
 	menu.request_quit.connect(get_tree().quit)
 	menu.settings_changed.connect(_on_settings_changed)
 
@@ -77,6 +80,15 @@ func open_mission(rig_id: String) -> void:
 	mission.request_map.connect(open_map)
 	mission.request_hangar.connect(open_hangar)
 	mission.request_retry.connect(open_mission.bind(rig_id))
+
+
+## The sandbox for trying units. It works on a throwaway copy of the
+## services, so nothing done there is saved.
+func open_test_range() -> void:
+	var test_range := _instantiate(test_range_scene) as TestRangeContext
+	test_range.bind(_services)
+	_show(test_range)
+	test_range.request_menu.connect(open_menu)
 
 
 # --- Helpers -----------------------------------------------------------------

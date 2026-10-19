@@ -41,6 +41,10 @@ var last_hit_light: bool = false
 # The mission this enemy fights in (null if run outside one).
 var mission: MissionContext
 
+# Lock-on weapons (SAMs, Stingers, radar flak): seconds spent locking on to
+# the helicopter. While above zero the HUD's edge arrow pulses red.
+var lock_timer: float = 0.0
+
 
 func _ready() -> void:
 	mission = MissionContext.of(self)
@@ -125,7 +129,34 @@ func hit_objective(at: Vector3, amount: float, hit_radius: float = 3.0) -> void:
 		return
 	if is_assault() and target.global_position.distance_to(at) > hit_radius:
 		return
-	target.take_damage(amount)
+	target.take_damage(amount, display_name if display_name != "" else "INFANTRY")
+
+
+# The player's helicopter, if it's alive (AA always targets it).
+func helicopter() -> Helicopter:
+	if mission == null or mission.helicopter == null or mission.helicopter.dead:
+		return null
+	return mission.helicopter
+
+
+# Advances a lock on the helicopter by `delta`. Returns true once
+# `lock_time` is reached, and starts over. Warns the player while locking;
+# flares (Helicopter.can_be_locked) break the lock.
+func update_lock(heli: Helicopter, delta: float, lock_time: float) -> bool:
+	if heli == null or not heli.can_be_locked():
+		lock_timer = 0.0
+		return false
+	lock_timer += delta
+	heli.warn_lock()
+	if lock_timer >= lock_time:
+		lock_timer = 0.0
+		return true
+	return false
+
+
+# Horizontal distance to the helicopter.
+func distance_to_heli(heli: Node3D) -> float:
+	return Vector2(heli.global_position.x - global_position.x, heli.global_position.z - global_position.z).length()
 
 
 # Direction on the ground plane from this enemy to its objective.

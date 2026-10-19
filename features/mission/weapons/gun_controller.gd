@@ -16,6 +16,8 @@ extends Node3D
 
 # A weapon killed an enemy: points scored, where, and its display name.
 signal kill_registered(points: int, world_position: Vector3, label: String)
+# Damage actually done to an enemy (after armour), for the test range's DPS.
+signal damage_dealt(amount: float)
 
 enum Weapon { CANNON, MINIGUN, JAVELIN, ROCKETS, FAB }
 const WEAPON_NAMES := ["CANNON", "MINIGUN", "JAVELIN", "ROCKETS", "FAB-500"]
@@ -153,6 +155,8 @@ var fab_cooldowns: Array[float] = []
 var bomb_marker: Node3D
 var weapon_label: Label
 var mission: MissionContext
+# Test range cheat: no reloads, no minigun heat.
+var infinite_ammo: bool = false
 
 @onready var default_cursor_size = cursor.scale
 
@@ -161,6 +165,8 @@ func _ready() -> void:
 	# Weapon upgrades bought in the hangar are applied to the exported
 	# values by the mission context (Loadout.apply_to_guns).
 	mission = MissionContext.of(self)
+	# The reticle follows the mouse; it must never swallow clicks.
+	cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Equipped weapons, bottom right.
 	weapon_label = Label.new()
@@ -232,6 +238,16 @@ func is_firing() -> bool:
 
 func _process(delta: float) -> void:
 	kill_count.text = str(kills)
+	if infinite_ammo:
+		javelin_cooldowns.fill(0.0)
+		fab_cooldowns.fill(0.0)
+		rocket_reload_timer = 0.0
+		minigun_heat = 0.0
+		minigun_overheated = false
+	# A button released over UI never reaches _unhandled_input; let go here.
+	for slot in equipped.size():
+		if trigger.get(equipped[slot], false) and not Input.is_mouse_button_pressed(SLOT_BUTTONS[slot]):
+			trigger[equipped[slot]] = false
 	for i in javelin_cooldowns.size():
 		javelin_cooldowns[i] = maxf(javelin_cooldowns[i] - delta, 0.0)
 	for i in fab_cooldowns.size():
@@ -302,7 +318,8 @@ func update_cursor(delta: float) -> void:
 	cursor.global_position = mouse_pos - cursor_size * 0.5 + shake_offset
 
 
-func _input(event: InputEvent) -> void:
+# Unhandled, so clicks on UI (e.g. the test range panel) don't fire.
+func _unhandled_input(event: InputEvent) -> void:
 	if not event is InputEventMouseButton:
 		return
 	var slot := SLOT_BUTTONS.find(event.button_index)
@@ -811,7 +828,11 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 			enemy.set_last_hit(from, force, light_weapon)
 
 		if enemy.has_method("take_damage"):
-			if enemy.take_damage(hit_damage, light_weapon):
+			var health_before: float = enemy.get("health") if enemy.get("health") != null else 0.0
+			var killed_now: bool = enemy.take_damage(hit_damage, light_weapon)
+			if enemy.get("health") != null:
+				damage_dealt.emit(health_before - maxf(enemy.health, 0.0))
+			if killed_now:
 				register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
 				killed += 1
 			else:

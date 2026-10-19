@@ -17,3 +17,4 @@ biome = "terminal"
 bunkers = 3
 flak_guns = 2
 income = 900
+sam_sites = 1

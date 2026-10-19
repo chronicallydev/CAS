@@ -255,7 +255,9 @@ func _types_with(ids: Array, weapon_id: String) -> int:
 func apply_to_helicopter(helicopter: Object) -> void:
 	var heli_data := selected_heli()
 	for def in catalog.airframe_upgrades:
-		helicopter.set(def.target_properties[0], heli_stat(heli_data, def))
+		var property := def.target_properties[0]
+		var value := heli_stat(heli_data, def)
+		helicopter.set(property, int(value) if helicopter.get(property) is int else value)
 
 
 ## Applies every weapon upgrade to the gun controller's exported values.

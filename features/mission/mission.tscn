@@ -17,6 +17,9 @@
 [ext_resource type="Script" path="res://features/mission/hud/game_hud.gd" id="15_hud"]
 [ext_resource type="Script" path="res://features/mission/mission_context.gd" id="16_ctx"]
 [ext_resource type="Resource" path="res://features/mission/waves/difficulty/normal.tres" id="17_diff"]
+[ext_resource type="PackedScene" path="res://features/mission/enemies/stinger.tscn" id="18_stinger"]
+[ext_resource type="PackedScene" path="res://features/mission/enemies/shilka.tscn" id="19_shilka"]
+[ext_resource type="PackedScene" path="res://features/mission/enemies/ripple_launcher.tscn" id="20_ripple"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(4000, 1, 4000)
@@ -125,6 +128,9 @@ car_scene = ExtResource("9_car")
 tank_enabled = false
 tank_scene = ExtResource("10_tank")
 aa_scene = ExtResource("14_aa")
+stinger_scene = ExtResource("18_stinger")
+shilka_scene = ExtResource("19_shilka")
+ripple_scene = ExtResource("20_ripple")
 spawn_interval = 5.2
 max_nodes = 10
 difficulty = ExtResource("17_diff")

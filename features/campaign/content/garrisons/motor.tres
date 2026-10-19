@@ -9,3 +9,6 @@ infantry_weight = 0.4
 car_weight = 0.6
 tank_weight = 0.05
 aa_weight = 0.03
+stinger_weight = 0.05
+shilka_weight = 0.03
+ripple_weight = 0.03

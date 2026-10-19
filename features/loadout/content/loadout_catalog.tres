@@ -51,8 +51,19 @@ target_properties = PackedStringArray("turn_speed")
 bar_base = 0.0
 bar_max = 11.0
 
+[sub_resource type="Resource" id="Resource_flares"]
+script = ExtResource("1_2nkp8")
+id = "flares"
+label = "Flare rate"
+mode = 2
+per_level = 0.12
+base_cost = 450
+target_properties = PackedStringArray("flare_cooldown")
+bar_base = 0.0
+bar_max = 16.0
+
 [resource]
 script = ExtResource("6_f4aaf")
 helicopters = Array[ExtResource("2_6qagn")]([ExtResource("3_on0g0"), ExtResource("4_5prn8"), ExtResource("5_da3j2")])
 weapons = Array[ExtResource("7_mab37")]([ExtResource("8_thchi"), ExtResource("9_rfyjw"), ExtResource("10_epcjp"), ExtResource("11_oq617"), ExtResource("12_ynd3n")])
-airframe_upgrades = Array[ExtResource("1_2nkp8")]([SubResource("Resource_exk3s"), SubResource("Resource_xgtjn"), SubResource("Resource_ade6k"), SubResource("Resource_fw3xu")])
+airframe_upgrades = Array[ExtResource("1_2nkp8")]([SubResource("Resource_exk3s"), SubResource("Resource_xgtjn"), SubResource("Resource_ade6k"), SubResource("Resource_fw3xu"), SubResource("Resource_flares")])

@@ -15,9 +15,15 @@ const COLORS := {
 	"SAM": Color(0.95, 0.35, 0.85),
 	"BUNKER": Color(0.75, 0.75, 0.72),
 	"FLAK": Color(1.0, 0.6, 0.45),
+	"STINGER": Color(0.95, 0.35, 0.85),
+	"SHILKA": Color(1.0, 0.45, 0.6),
+	"RIPPLE": Color(0.95, 0.5, 0.95),
+	"RADAR": Color(0.55, 0.85, 1.0),
+	"LAUNCHER": Color(0.95, 0.35, 0.85),
 	"BOSS": Color(1.0, 0.2, 0.15),
 }
-const SIZES := {"": 8.0, "CAR": 11.0, "TANK": 13.0, "SAM": 13.0, "BUNKER": 15.0, "FLAK": 15.0, "BOSS": 20.0}
+const SIZES := {"": 8.0, "CAR": 11.0, "TANK": 13.0, "SAM": 13.0, "BUNKER": 15.0, "FLAK": 15.0, "BOSS": 20.0,
+		"STINGER": 10.0, "SHILKA": 14.0, "RIPPLE": 13.0, "RADAR": 16.0, "LAUNCHER": 15.0}
 
 const RIG_COLOR := Color(0.45, 0.75, 1.0)
 const DANGER := Color(1.0, 0.2, 0.15)
@@ -81,7 +87,7 @@ func _draw() -> void:
 		var color: Color = COLORS.get(kind, COLORS[""])
 		var size: float = SIZES.get(kind, 8.0)
 
-		# A SAM that is locking on pulses red.
+		# Anything locking on (SAMs, Stingers, Shilkas) pulses red.
 		var lock = enemy.get("lock_timer")
 		if lock != null and lock > 0.0:
 			var pulse := 0.5 + 0.5 * sin(time * 18.0)

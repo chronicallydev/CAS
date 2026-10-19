@@ -2,7 +2,7 @@ class_name MainMenu
 extends Control
 
 # Main menu screen: records, difficulty and graphics options, and buttons
-# for the campaign map, the hangar and quitting. The UI is built in code.
+# for the campaign map, the hangar, the test range and quitting. The UI is built in code.
 #
 # This is only the view. The menu context passes in the data to show
 # (initialize) and reacts to the *_pressed signals; write_settings() copies
@@ -10,6 +10,7 @@ extends Control
 
 signal play_pressed
 signal hangar_pressed
+signal test_range_pressed
 signal quit_pressed
 
 const ACCENT := Color(1.0, 0.72, 0.25)
@@ -133,8 +134,17 @@ func build_layout() -> void:
 	quit_button.pressed.connect(quit_pressed.emit)
 	row.add_child(quit_button)
 
+	# Sandbox for trying every enemy and weapon; never saves.
+	var test_button := make_button("TEST RANGE", false)
+	test_button.custom_minimum_size = Vector2(0, 40)
+	test_button.add_theme_font_size_override("font_size", UiStyle.px(18))
+	test_button.pressed.connect(func() -> void:
+		Sfx.play_2d("ui_click")
+		test_range_pressed.emit())
+	column.add_child(test_button)
+
 	column.add_child(make_spacer(2))
-	column.add_child(make_label("WASD fly   |   Mouse aim   |   LMB / RMB fire weapons   |   Esc menu", 16, MUTED))
+	column.add_child(make_label("WASD fly   |   Mouse aim   |   LMB / RMB fire   |   F flares   |   Esc menu", 16, MUTED))
 
 
 func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:

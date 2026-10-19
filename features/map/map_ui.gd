@@ -347,6 +347,8 @@ func build_info() -> void:
 		info.add_child(table_row("Clear the garrison", ["%d waves" % rig.waves, "$%s" % UiStyle.format_money(campaign.capture_bonus(selected))]))
 		info.add_child(table_row("Destroy bunkers", [str(rig.bunkers), "Required"]))
 		info.add_child(table_row("Destroy flak guns", [str(rig.flak_guns), "Required"]))
+		if rig.sam_sites > 0:
+			info.add_child(table_row("Destroy SAM sites", [str(rig.sam_sites), "Radar first"]))
 		info.add_child(table_row("Kill the commander", ["Final", "Capture"]))
 
 	info.add_child(section("REWARD"))

@@ -2,13 +2,14 @@ class_name MenuContext
 extends Node
 
 ## The main menu. Shows records and options (MainMenu) and asks the root
-## context to open the map or the hangar, or to quit.
+## context to open the map, the hangar or the test range, or to quit.
 ##
 ## Options picked here are written into GameSettings before leaving; the
 ## root applies and saves them when settings_changed is emitted.
 
 signal request_map
 signal request_hangar
+signal request_test_range
 signal request_quit
 signal settings_changed
 
@@ -30,6 +31,7 @@ func _ready() -> void:
 	main_menu.initialize(services.profile, services.campaign, services.settings, services.config.difficulty_presets)
 	main_menu.play_pressed.connect(_leave.bind(request_map))
 	main_menu.hangar_pressed.connect(_leave.bind(request_hangar))
+	main_menu.test_range_pressed.connect(_leave.bind(request_test_range))
 	main_menu.quit_pressed.connect(request_quit.emit)
 
 

@@ -51,7 +51,7 @@ func _physics_process(delta: float) -> void:
 		mission.game_over("The oil rig was destroyed")
 
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, _source: String = "") -> void:
 	on_damaged()
 	health = maxf(health - amount, 0.0)
 	health_bar_3d.update_health(health, max_health)

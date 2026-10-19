@@ -110,6 +110,10 @@ func _process(delta: float) -> void:
 	score_label.text = "SCORE  %s" % UiStyle.format_money(int(shown_score))
 	if gun != null:
 		score_label.text += "     KILLS  %d" % gun.kills
+	if mission.sandbox:
+		wave_label.text = "TEST RANGE"
+		status_label.text = "No waves: spawn enemies from the panel"
+		return
 	var started: bool = generator == null or state.wave > generator.starting_level
 	wave_label.text = "WAVE %d" % maxi(state.wave, 1) if state.wave > 0 and started else "GET READY"
 	if is_assault():

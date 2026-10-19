@@ -17,3 +17,4 @@ biome = "oilfield"
 bunkers = 4
 flak_guns = 4
 income = 1300
+sam_sites = 2
