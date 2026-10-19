@@ -47,6 +47,7 @@ acceleration = 3.4
 max_health = 170.0
 turn_speed = 4.5
 flare_cooldown = 11.0
+dash_cooldown = 4.0
 hardpoints = Array[ExtResource("1_pcruc")]([SubResource("Resource_41xjp"), SubResource("Resource_ktcfa"), SubResource("Resource_f67dn"), SubResource("Resource_gafoa"), SubResource("Resource_n8knm"), SubResource("Resource_s1p42")])
 default_loadout = PackedStringArray("cannon", "rockets", "", "rockets", "", "")
 allowed_weapons = PackedStringArray("cannon", "minigun", "javelin", "rockets", "fab")

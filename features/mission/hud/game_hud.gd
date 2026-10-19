@@ -488,12 +488,14 @@ func add_end_spacer(column: VBoxContainer, height: float) -> void:
 	column.add_child(spacer)
 
 
-# Where the money came from: kills, rig income and a capture bonus.
+# Where the money came from: kills, pickups, rig income and a capture bonus.
 func add_payout(column: VBoxContainer) -> void:
 	var payout := state.payout
 	var green := Color(0.5, 0.9, 0.55)
-	if payout.get("income", 0) > 0 or payout.get("capture", 0) > 0:
+	if payout.get("income", 0) > 0 or payout.get("capture", 0) > 0 or payout.get("pickups", 0) > 0:
 		column.add_child(make_label("Kills  $%s" % UiStyle.format_money(payout["kills"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		if payout.get("pickups", 0) > 0:
+			column.add_child(make_label("Pickups  $%s" % UiStyle.format_money(payout["pickups"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 		column.add_child(make_label("Rig income  $%s" % UiStyle.format_money(payout["income"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 		if payout["capture"] > 0:
 			column.add_child(make_label("Capture bonus  $%s" % UiStyle.format_money(payout["capture"]), 18, MUTED, HORIZONTAL_ALIGNMENT_CENTER))

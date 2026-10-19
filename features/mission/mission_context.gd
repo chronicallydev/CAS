@@ -30,6 +30,8 @@ signal request_retry
 @export var rig: MissionRig
 @export var environment: DesertEnvironment
 @export var hud: GameHud
+## Drops pickups (cash, recharge, frenzy) where enemies die.
+@export var pickups: PickupDropper
 
 var services: GameServices
 var state: MissionState
@@ -95,6 +97,7 @@ func setup() -> void:
 
 	hud.initialize(self)
 	guns.kill_registered.connect(hud.register_kill)
+	guns.kill_registered.connect(pickups.on_kill)
 	hud.retry_pressed.connect(request_retry.emit)
 	hud.map_pressed.connect(request_map.emit)
 	hud.hangar_pressed.connect(request_hangar.emit)
@@ -165,6 +168,24 @@ func add_score(points: int) -> void:
 	state.add_score(points)
 
 
+## A pickup was flown over (see pickup.gd). `value` is money for cash.
+func collect_pickup(kind: int, value: int, at: Vector3) -> void:
+	var kinds = PickupDropper.Pickup.Kind
+	if kind == kinds.CASH:
+		state.pickup_cash += value
+		hud.spawn_popup("+$%d" % value, at, Color(0.45, 0.95, 0.45))
+		Sfx.play_2d("kill_tick")
+	elif kind == kinds.RECHARGE:
+		helicopter.flare_cooldown_left = 0.0
+		helicopter.dash_cooldown_left = 0.0
+		hud.spawn_popup("FLARES + DASH READY", at, Color(0.45, 0.8, 1.0))
+		Sfx.play_2d("combo")
+	else:
+		guns.start_frenzy(6.0)
+		hud.spawn_popup("FRENZY!", at, Color(1.0, 0.45, 0.25), true)
+		Sfx.play_2d("combo")
+
+
 # --- Ending the mission -------------------------------------------------------
 
 ## Ends the run in defeat: records bests, pays out and shows the end
@@ -194,15 +215,15 @@ func mission_won() -> void:
 	hud.show_victory(state.rig.display_name)
 
 
-## The score is paid out as money, plus income from every owned rig (win or
-## lose) and a bonus for a capture.
+## The score is paid out as money, plus cash pickups, income from every
+## owned rig (win or lose) and a bonus for a capture.
 func _pay_out(captured: bool) -> void:
-	state.payout = {"kills": state.score, "income": 0, "capture": 0}
+	state.payout = {"kills": state.score, "pickups": state.pickup_cash, "income": 0, "capture": 0}
 	if state.is_campaign():
 		if captured:
 			state.payout["capture"] = services.campaign.capture(state.rig.id)
 		state.payout["income"] = services.campaign.total_income()
 
-	state.earned = state.payout["kills"] + state.payout["income"] + state.payout["capture"]
+	state.earned = state.payout["kills"] + state.payout["pickups"] + state.payout["income"] + state.payout["capture"]
 	services.profile.earn(state.earned)
 	services.save()

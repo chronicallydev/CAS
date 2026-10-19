@@ -23,7 +23,7 @@ signal damage_taken(amount: float, source: String)
 @export var bounds: float = 90.0
 @export var bounds_overshoot: float = 20.0
 # How far out an assault starts, flying in from friendly territory.
-@export var ingress_distance: float = 140.0
+@export var ingress_distance: float = 90.0
 @export var turn_speed: float = 6.0
 @export var max_tilt_degrees: float = 16.0
 # Height of the ground plane used for mouse aiming.
@@ -34,8 +34,8 @@ signal damage_taken(amount: float, source: String)
 @export var explosion_scene: PackedScene
 # Seconds between being shot down and the round restarting.
 @export var restart_delay: float = 2.0
-# Test range cheats: hits still count but do no harm, and flares recharge
-# instantly.
+# Test range cheats: hits still count but do no harm, and flares and the
+# dash recharge instantly.
 var invulnerable: bool = false
 var infinite_flares: bool = false
 
@@ -46,6 +46,33 @@ var infinite_flares: bool = false
 @export var flare_cooldown: float = 8.0
 # After a drop, nothing can lock on for this long.
 @export var flare_protection: float = 1.8
+
+@export_group("Low flight")
+# Hold Ctrl to drop to this altitude. Low, the helicopter rams anything it
+# flies over, its weapons are more accurate, and it hides from radar (SAM
+# trucks, SAM sites and ripple launchers can't lock), but small arms, flak,
+# Stingers and Shilkas hit it harder.
+@export var low_altitude: float = 4.5
+# How fast the helicopter drops and climbs (0..1 blend per second).
+@export var dive_rate: float = 2.2
+@export var ram_radius: float = 3.5
+# Damage to everything rammed (infantry die outright)...
+@export var ram_damage: float = 8.0
+# ...and to the helicopter's hull per vehicle or fort hit.
+@export var ram_self_damage: float = 3.0
+@export var ram_interval: float = 0.3
+@export var low_damage_multiplier: float = 1.5
+
+@export_group("Dash")
+# Shift: a quick burst in the steering direction, then a cooldown. The
+# loadout sets the cooldown from the airframe.
+@export var dash_distance: float = 12.0
+@export var dash_time: float = 0.18
+@export var dash_cooldown: float = 3.0
+
+# Damage sources that hit harder while flying low: everything but radar
+# SAMs (which can't lock on low anyway) and the helicopter's own rams.
+const LOW_SAFE_SOURCES := ["", "RAM", "SAM TRUCK", "SAM SITE", "RIPPLE"]
 
 const Flare := preload("res://features/mission/player/flare.gd")
 
@@ -61,6 +88,12 @@ var out_of_bounds: bool = false
 var takeoff: float = 1.0
 var flare_cooldown_left: float = 0.0
 var flare_protection_left: float = 0.0
+# 0 = cruising altitude, 1 = flying low.
+var low_blend: float = 0.0
+var ram_timer: float = 0.0
+var dash_cooldown_left: float = 0.0
+var dash_time_left: float = 0.0
+var dash_velocity: Vector3 = Vector3.ZERO
 
 var body: Node3D
 var main_rotor: Node3D
@@ -99,6 +132,8 @@ func take_damage(amount: float, source: String = "") -> void:
 	if dead:
 		return
 
+	if is_low() and not LOW_SAFE_SOURCES.has(source):
+		amount *= low_damage_multiplier
 	damage_taken.emit(amount, source)
 	if not invulnerable:
 		health = maxf(health - amount, 0.0)
@@ -124,11 +159,18 @@ func can_be_locked() -> bool:
 	return not dead and flare_protection_left <= 0.0
 
 
+# Flying low (Ctrl held and the drop mostly done).
+func is_low() -> bool:
+	return low_blend > 0.75
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Physical keys, so this works on any keyboard layout.
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_F or event.physical_keycode == KEY_SPACE:
 			deploy_flares()
+		elif event.physical_keycode == KEY_SHIFT:
+			dash()
 
 
 # Drops a spread of decoys. Missiles already homing on the helicopter
@@ -236,11 +278,25 @@ func _physics_process(delta: float) -> void:
 	velocity = velocity.lerp(desired, 1.0 - exp(-acceleration * delta))
 
 	position += velocity * delta
+	# A dash adds a short burst on top of normal flight.
+	if dash_time_left > 0.0:
+		dash_time_left -= delta
+		position += dash_velocity * delta
 	keep_in_bounds(delta)
 
-	# Lift off the pad, then hold altitude with a gentle bob.
+	# Lift off the pad, then hold altitude (or drop low while Ctrl is held)
+	# with a gentle bob.
 	takeoff = minf(takeoff + delta / 2.5, 1.0)
-	position.y = lerpf(2.5, altitude, smoothstep(0.0, 1.0, takeoff)) + sin(time * 1.7) * 0.25
+	var want_low := Input.is_physical_key_pressed(KEY_CTRL) and takeoff >= 1.0
+	low_blend = move_toward(low_blend, 1.0 if want_low else 0.0, dive_rate * delta)
+	var cruise := lerpf(altitude, low_altitude, smoothstep(0.0, 1.0, low_blend))
+	position.y = lerpf(2.5, cruise, smoothstep(0.0, 1.0, takeoff)) + sin(time * 1.7) * 0.25
+
+	if is_low():
+		ram_timer -= delta
+		if ram_timer <= 0.0:
+			ram_timer = ram_interval
+			ram()
 
 	# Turn the nose toward the cursor.
 	var aim: Variant = get_mouse_ground_point()
@@ -256,6 +312,50 @@ func _physics_process(delta: float) -> void:
 	var tilt := deg_to_rad(max_tilt_degrees)
 	body.rotation.x = lerpf(body.rotation.x, tilt * local_velocity.z / speed, 1.0 - exp(-5.0 * delta))
 	body.rotation.z = lerpf(body.rotation.z, -tilt * local_velocity.x / speed, 1.0 - exp(-5.0 * delta))
+
+
+# Flying low smashes whatever is underneath: infantry die, vehicles and
+# forts take ram_damage, and each vehicle or fort costs some hull. Kills
+# score and drop pickups like any other (it goes through the guns).
+func ram() -> void:
+	var ground := Vector3(global_position.x, 0.0, global_position.z)
+	var hit_any := false
+	var heavy := 0
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or enemy.is_queued_for_deletion():
+			continue
+		var offset := enemy.global_position - ground
+		if Vector2(offset.x, offset.z).length() > ram_radius:
+			continue
+		hit_any = true
+		if enemy.get("max_health") != null and enemy.max_health > 2.0:
+			heavy += 1
+	if not hit_any:
+		return
+	mission.guns.damage_enemies(ground, ram_radius, ram_damage)
+	Sfx.play_3d("body_thud", ground, 4.0, 0.8)
+	if heavy > 0:
+		Sfx.play_3d("heli_hit", ground)
+		take_damage(ram_self_damage * heavy, "RAM")
+	mission.shake(0.25 + 0.1 * heavy)
+
+
+# A quick burst in the steering direction (or straight ahead), then a
+# cooldown.
+func dash() -> void:
+	if dead or dash_cooldown_left > 0.0:
+		return
+	var direction := get_input_direction()
+	if direction == Vector3.ZERO:
+		direction = -global_transform.basis.z
+		direction.y = 0.0
+		direction = direction.normalized()
+	dash_velocity = direction * dash_distance / maxf(dash_time, 0.01)
+	dash_time_left = dash_time
+	dash_cooldown_left = 0.0 if infinite_flares else dash_cooldown
+	velocity += direction * speed * 0.4
+	Sfx.play_3d("missile_launch", global_position, -6.0, 1.7)
 
 
 # Soft edge of the area of operations: push back past it, harder the
@@ -291,9 +391,12 @@ func update_hud(delta: float) -> void:
 	lock_warning_timer = maxf(lock_warning_timer - delta, 0.0)
 	flare_cooldown_left = maxf(flare_cooldown_left - delta, 0.0)
 	flare_protection_left = maxf(flare_protection_left - delta, 0.0)
-	var flares_ready := flare_cooldown_left <= 0.0
-	flare_label.text = "FLARES READY   [F]" if flares_ready else "FLARES  %.1fs" % flare_cooldown_left
-	flare_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5) if flares_ready else Color(0.6, 0.6, 0.6))
+	dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
+	var flares := "FLARES [F]" if flare_cooldown_left <= 0.0 else "FLARES %.1fs" % flare_cooldown_left
+	var dash_text := "DASH [SHIFT]" if dash_cooldown_left <= 0.0 else "DASH %.1fs" % dash_cooldown_left
+	var altitude_text := "LOW: RAMMING, RADAR-HIDDEN" if is_low() else "LOW [CTRL]"
+	flare_label.text = "%s     %s     %s" % [flares, dash_text, altitude_text]
+	flare_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.35) if is_low() else Color(1.0, 0.85, 0.5))
 
 	var incoming := false
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
@@ -358,8 +461,8 @@ func build_hud() -> void:
 	# Hull bar at the bottom centre.
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	box.offset_left = -160
-	box.offset_right = 160
+	box.offset_left = -260
+	box.offset_right = 260
 	box.offset_top = -96
 	box.offset_bottom = -24
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -376,6 +479,7 @@ func build_hud() -> void:
 	health_bar.value = health
 	health_bar.show_percentage = false
 	health_bar.custom_minimum_size = Vector2(320, 14)
+	health_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.1, 0.1, 0.1, 0.7)
 	var fill := StyleBoxFlat.new()

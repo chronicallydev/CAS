@@ -2,7 +2,8 @@ extends EnemyBase
 
 # Fast car: drives in to an orbit around the base, then circles it while
 # slowly spiralling inward until it rams the base. Its roof gun fires
-# bursts at the base while it circles.
+# bursts at the base while it circles, or at the helicopter if it comes
+# within reach.
 
 const Tracer := preload("res://features/mission/enemies/projectiles/tank_shell.gd")
 
@@ -77,7 +78,10 @@ func _physics_process(delta: float) -> void:
 
 
 func update_gun(delta: float) -> void:
-	var base := objective()
+	# The rig, unless the helicopter comes within reach of the roof gun.
+	var base: Node3D = defence_target(30.0)
+	if base == null:
+		base = objective()
 
 	if base == null:
 		return
@@ -111,11 +115,11 @@ func fire_at(base: Node3D) -> void:
 	tracer.radius = 0.3
 	tracer.color = Color(1.0, 0.75, 0.2)
 	MissionContext.spawn_parent(self).add_child(tracer)
-	tracer.setup(from, target, shot_flight_time, 0.3, shot_hit)
+	tracer.setup(from, target, shot_flight_time, 0.3, shot_hit.bind(base))
 	Sfx.play_3d("car_gun", from)
 
 
-func shot_hit(position: Vector3) -> void:
+func shot_hit(position: Vector3, target: Node3D = null) -> void:
 	if hit_effect != null and is_inside_tree():
 		var effect := hit_effect.instantiate() as Node3D
 		if effect != null:
@@ -123,4 +127,4 @@ func shot_hit(position: Vector3) -> void:
 			effect.global_position = position
 			effect.scale = Vector3.ONE * 0.15
 
-	hit_objective(position, shot_damage)
+	hit_objective(position, shot_damage, 3.0, target)

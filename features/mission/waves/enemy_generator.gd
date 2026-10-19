@@ -42,19 +42,19 @@ extends Node3D
 @export var stinger_enabled: bool = true
 @export var stinger_scene: PackedScene
 @export_range(0.0, 10.0, 0.05) var stinger_weight: float = 0.06
-@export_range(0, 100, 1) var stinger_min_level: int = 2
+@export_range(0, 100, 1) var stinger_min_level: int = 1
 
 # Radar-guided flak tanks.
 @export var shilka_enabled: bool = true
 @export var shilka_scene: PackedScene
 @export_range(0.0, 10.0, 0.05) var shilka_weight: float = 0.04
-@export_range(0, 100, 1) var shilka_min_level: int = 4
+@export_range(0, 100, 1) var shilka_min_level: int = 3
 
 # Trucks that ripple-fire a fan of slow homing missiles.
 @export var ripple_enabled: bool = true
 @export var ripple_scene: PackedScene
 @export_range(0.0, 10.0, 0.05) var ripple_weight: float = 0.03
-@export_range(0, 100, 1) var ripple_min_level: int = 3
+@export_range(0, 100, 1) var ripple_min_level: int = 2
 
 
 @export_group("Spawn Settings")
@@ -108,15 +108,19 @@ extends Node3D
 @export_group("Waves")
 # Waves of enemies with breaks in between. Off = the old endless ramp.
 @export var wave_mode: bool = true
-@export_range(1, 100, 1) var first_wave_enemies: int = 6
+@export_range(1, 100, 1) var first_wave_enemies: int = 9
 # Extra enemies each wave (scaled by the progression multiplier).
-@export_range(0.0, 20.0, 0.5) var enemies_per_wave: float = 3.0
+@export_range(0.0, 20.0, 0.5) var enemies_per_wave: float = 4.0
 # Seconds between spawns in wave 1; shrinks a little every wave.
-@export_range(0.1, 10.0, 0.05) var wave_spawn_interval: float = 1.4
+@export_range(0.1, 10.0, 0.05) var wave_spawn_interval: float = 1.1
 # Break between waves, in seconds.
-@export_range(0.0, 60.0, 0.5) var breather_time: float = 6.0
+@export_range(0.0, 60.0, 0.5) var breather_time: float = 3.5
 # Most enemies allowed on the map at once during a wave.
-@export_range(1, 200, 1) var wave_max_alive: int = 30
+@export_range(1, 200, 1) var wave_max_alive: int = 36
+# The next wave starts once a wave's spawns are out and no more than this
+# share of it is still alive (the last few stragglers overlap with it).
+# An assault's final wave still has to be wiped out.
+@export_range(0.0, 1.0, 0.05) var overlap_fraction: float = 0.25
 @export_range(0, 50, 1) var boss_every: int = 5
 @export_range(1.0, 20.0, 0.5) var boss_health_multiplier: float = 5.0
 # Bonus points for clearing a wave, multiplied by the wave number.
@@ -138,7 +142,7 @@ var enemy_sides: Array = [Vector2(0, -1), Vector2(1, 0), Vector2(0, 1), Vector2(
 var wave_side: Vector2 = Vector2(0, -1)
 # Assaults: waves hold off until the helicopter flies within contact_range.
 var awaiting_contact: bool = false
-var contact_range: float = 70.0
+var contact_range: float = 50.0
 # Spawns stay west of this x (the terminal's sea is to the east).
 var sea_x: float = INF
 
@@ -162,6 +166,8 @@ var break_left: float = 0.0
 var wave_queue: Array = []
 var wave_spawn_timer: float = 0.0
 var wave_had_enemies: bool = false
+# Enemies queued for the current wave when it began (for overlap).
+var wave_size: int = 0
 
 var mission: MissionContext
 
@@ -212,7 +218,9 @@ func start(mission_context: MissionContext, preset: DifficultyPreset, settings: 
 		# Assaults wait for the helicopter to arrive; a defence gives a
 		# moment to lift off before the first column turns up.
 		awaiting_contact = target_waves > 0
-		break_left = 8.0 if mission.state.is_campaign() else 3.0
+		if awaiting_contact:
+			spawn_ingress_patrol()
+		break_left = 4.0 if mission.state.is_campaign() else 2.5
 		return
 
 	difficulty_time = float(starting_level) * maxf(difficulty_ramp_seconds, 1.0)
@@ -332,7 +340,7 @@ func process_waves(delta: float) -> void:
 		var heli := mission.helicopter
 		if heli != null and Vector2(heli.global_position.x, heli.global_position.z).length() <= contact_range:
 			awaiting_contact = false
-			break_left = 2.5
+			break_left = 1.5
 			contact_made.emit()
 		return
 
@@ -348,8 +356,15 @@ func process_waves(delta: float) -> void:
 		var spawned := spawn_group()
 		wave_spawn_timer = get_wave_spawn_interval() * maxi(spawned, 1)
 
-	if wave_queue.is_empty() and alive_count() == 0:
+	if wave_queue.is_empty() and alive_count() <= stragglers_allowed():
 		clear_wave()
+
+
+# How many of the current wave may still be alive when the next one starts.
+func stragglers_allowed() -> int:
+	if is_final_wave(wave):
+		return 0
+	return maxi(1, int(wave_size * overlap_fraction))
 
 
 func begin_wave(number: int) -> void:
@@ -374,6 +389,7 @@ func begin_wave(number: int) -> void:
 		wave_queue.insert(mini(2, wave_queue.size()), "boss")
 
 	wave_had_enemies = not wave_queue.is_empty()
+	wave_size = wave_queue.size()
 	wave_started.emit(number, is_boss)
 
 
@@ -392,6 +408,22 @@ func clear_wave() -> void:
 
 
 # --- Assault forts -------------------------------------------------------
+
+# Assaults: a patrol waiting on the approach, so the flight in has
+# something to fight.
+func spawn_ingress_patrol() -> void:
+	var side: Vector2 = mission.services.campaign.approach_side(mission.state.rig.id)
+	var along := Vector3(side.x, 0.0, side.y)
+	var across := Vector3(-side.y, 0.0, side.x)
+	var centre := along * (contact_range + 15.0) + Vector3(0.0, vertical_offset, 0.0)
+	var squad: Array = [car_scene, car_scene]
+	for i in 4:
+		squad.append(node_scene)
+	if stinger_enabled:
+		squad.append(stinger_scene)
+	for scene in squad:
+		spawn_enemy(scene, centre + across * randf_range(-14.0, 14.0) + along * randf_range(-6.0, 6.0))
+
 
 # Bunkers and flak guns in a ring around the enemy rig, and SAM sites
 # further out.

@@ -121,13 +121,15 @@ func objective_distance() -> float:
 	return Vector2(global_position.x - target.x, global_position.z - target.z).length()
 
 
-# Deal damage to the objective. Shots at the helicopter only count if they
-# land close to where it is now, so it can dodge by moving.
-func hit_objective(at: Vector3, amount: float, hit_radius: float = 3.0) -> void:
-	var target := objective()
-	if target == null or not target.has_method("take_damage"):
+# Deal damage to `target` (default: the objective). Shots at the helicopter
+# only count if they land close to where it is now, so it can dodge by
+# moving.
+func hit_objective(at: Vector3, amount: float, hit_radius: float = 3.0, target: Node3D = null) -> void:
+	if target == null:
+		target = objective()
+	if target == null or not is_instance_valid(target) or not target.has_method("take_damage"):
 		return
-	if is_assault() and target.global_position.distance_to(at) > hit_radius:
+	if target is Helicopter and target.global_position.distance_to(at) > hit_radius:
 		return
 	target.take_damage(amount, display_name if display_name != "" else "INFANTRY")
 
@@ -141,9 +143,10 @@ func helicopter() -> Helicopter:
 
 # Advances a lock on the helicopter by `delta`. Returns true once
 # `lock_time` is reached, and starts over. Warns the player while locking;
-# flares (Helicopter.can_be_locked) break the lock.
-func update_lock(heli: Helicopter, delta: float, lock_time: float) -> bool:
-	if heli == null or not heli.can_be_locked():
+# flares (Helicopter.can_be_locked) break the lock, and radar-guided weapons
+# lose a helicopter flying low (ground clutter).
+func update_lock(heli: Helicopter, delta: float, lock_time: float, radar_guided: bool = false) -> bool:
+	if heli == null or not heli.can_be_locked() or (radar_guided and heli.is_low()):
 		lock_timer = 0.0
 		return false
 	lock_timer += delta
@@ -152,6 +155,18 @@ func update_lock(heli: Helicopter, delta: float, lock_time: float) -> bool:
 		lock_timer = 0.0
 		return true
 	return false
+
+
+# Defending, gunners also turn on the helicopter when it comes within
+# `reach` (horizontal). Null in assaults (they always hunt it there) or
+# when it's out of reach.
+func defence_target(reach: float) -> Helicopter:
+	if is_assault():
+		return null
+	var heli := helicopter()
+	if heli == null or distance_to_heli(heli) > reach:
+		return null
+	return heli
 
 
 # Horizontal distance to the helicopter.

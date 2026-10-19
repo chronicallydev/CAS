@@ -139,3 +139,22 @@ the airframe, loadout and upgrade levels (APPLY rebuilds), toggles god mode
 and instant flares/no reloads, and shows live stats: damage taken per source
 (`Helicopter.damage_taken`), damage dealt and DPS (`GunController.damage_dealt`),
 and the hovered enemy's health, armour and lock state.
+
+## Piloting, pickups and pacing
+
+- **Low flight (hold Ctrl)**: the helicopter drops to `low_altitude`. Low,
+  it rams whatever it flies over (`Helicopter.ram()`: infantry die, vehicles
+  and forts take damage and cost some hull), its weapons spread less
+  (`GunController.spread_scale()`), and radar-guided lockers (SAM truck,
+  SAM site, ripple launcher) can't lock it (`update_lock(..., radar_guided)`).
+  In exchange, small arms, flak, Stingers and Shilkas deal 1.5x damage.
+- **Dash (Shift)**: a ~12 m burst with a per-airframe cooldown
+  (`HelicopterData.dash_cooldown`).
+- **Pickups** (`mission/pickups/`): `PickupDropper` rolls on every kill and
+  drops cash (added to the payout), a flare + dash recharge, or weapon
+  frenzy (double fire rate, no reloads). Fly over them to collect.
+- **Pacing**: waves overlap (the next starts when the current one's spawns
+  are out and at most `overlap_fraction` of it is alive), breaks are short,
+  waves are bigger, AA arrives earlier, assaults fly in only 90 m past a
+  patrol, and in defences infantry and car gunners shoot the helicopter
+  when it comes close (`EnemyBase.defence_target()`).

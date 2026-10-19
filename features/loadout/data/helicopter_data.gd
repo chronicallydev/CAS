@@ -20,6 +20,8 @@ extends Resource
 @export var turn_speed: float = 6.0
 ## Seconds for the decoy flares to recharge after a drop.
 @export var flare_cooldown: float = 8.0
+## Seconds before the dash (Shift) can be used again.
+@export var dash_cooldown: float = 3.0
 
 @export_group("Weapons")
 ## Ids of the weapons this airframe can use (see WeaponData.id).

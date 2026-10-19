@@ -18,7 +18,9 @@ var is_over: bool = false
 
 ## Money earned when the mission ended, and where it came from.
 var earned: int = 0
-var payout: Dictionary = {"kills": 0, "income": 0, "capture": 0}
+var payout: Dictionary = {"kills": 0, "pickups": 0, "income": 0, "capture": 0}
+## Money from cash pickups collected this mission.
+var pickup_cash: int = 0
 
 
 func _init(mission_rig: RigData = null, assault: bool = false) -> void:

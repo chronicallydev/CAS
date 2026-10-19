@@ -157,6 +157,8 @@ var weapon_label: Label
 var mission: MissionContext
 # Test range cheat: no reloads, no minigun heat.
 var infinite_ammo: bool = false
+# Frenzy pickup: seconds left of double fire rate and no reloads.
+var frenzy_left: float = 0.0
 
 @onready var default_cursor_size = cursor.scale
 
@@ -208,6 +210,11 @@ func equip(weapon_ids: Array[String], weapon_muzzles: Dictionary) -> void:
 	update_weapon_label()
 
 
+# Frenzy pickup: double fire rate and no reloads for `seconds`.
+func start_frenzy(seconds: float) -> void:
+	frenzy_left = maxf(frenzy_left, seconds)
+
+
 func is_equipped(weapon: Weapon) -> bool:
 	return equipped.has(weapon)
 
@@ -238,7 +245,8 @@ func is_firing() -> bool:
 
 func _process(delta: float) -> void:
 	kill_count.text = str(kills)
-	if infinite_ammo:
+	frenzy_left = maxf(frenzy_left - delta, 0.0)
+	if infinite_ammo or frenzy_left > 0.0:
 		javelin_cooldowns.fill(0.0)
 		fab_cooldowns.fill(0.0)
 		rocket_reload_timer = 0.0
@@ -274,7 +282,8 @@ func _process(delta: float) -> void:
 
 
 func fire_gun(weapon: Weapon, gun_rpm: float, delta: float) -> void:
-	var interval: float = 60.0 / maxf(gun_rpm * copies(weapon), 1.0)
+	var frenzy := 2.0 if frenzy_left > 0.0 else 1.0
+	var interval: float = 60.0 / maxf(gun_rpm * copies(weapon) * frenzy, 1.0)
 	fire_timers[weapon] -= delta
 	while fire_timers[weapon] <= 0.0:
 		if weapon == Weapon.CANNON:
@@ -363,7 +372,10 @@ func update_weapon_label() -> void:
 		elif weapon == Weapon.MINIGUN and minigun_overheated:
 			text += " OVERHEAT"
 		parts.append("%s %s" % [SLOT_NAMES[slot], text])
-	weapon_label.text = "     ".join(parts) if not parts.is_empty() else "NO WEAPONS"
+	var text := "     ".join(parts) if not parts.is_empty() else "NO WEAPONS"
+	if frenzy_left > 0.0:
+		text = "FRENZY %.1fs     %s" % [frenzy_left, text]
+	weapon_label.text = text
 
 
 # Seconds until `weapon` can fire again (0 when ready). With several
@@ -420,6 +432,11 @@ func play_shot_sound(mix: String, pitch_min: float, pitch_max: float, from: Vect
 		shoot_sound.play()
 
 
+# Flying low tightens every weapon's spread.
+func spread_scale() -> float:
+	return 0.6 if shooter != null and shooter.has_method("is_low") and shooter.is_low() else 1.0
+
+
 func random_spread(spread: float) -> Vector3:
 	var angle := randf() * TAU
 	var radius := sqrt(randf()) * spread
@@ -440,7 +457,7 @@ func fire_round() -> void:
 		return
 
 	var from := take_muzzle(Weapon.CANNON)
-	var target: Vector3 = hit + random_spread(impact_spread)
+	var target: Vector3 = hit + random_spread(impact_spread * spread_scale())
 	var delay := impact_delay
 
 	if shooter != null:
@@ -458,7 +475,7 @@ func fire_minigun_round() -> void:
 		return
 
 	# Rounds scatter around the reticle, wider the hotter the barrels get.
-	var spread := minigun_spread + minigun_bloom * minigun_heat
+	var spread := (minigun_spread + minigun_bloom * minigun_heat) * spread_scale()
 	var from := take_muzzle(Weapon.MINIGUN)
 
 	play_shot_sound("gun_minigun", 1.4, 1.7, from)
@@ -606,7 +623,7 @@ func fire_rocket() -> void:
 		return
 
 	var from := take_muzzle(Weapon.ROCKETS)
-	var target: Vector3 = hit + random_spread(rockets_spread)
+	var target: Vector3 = hit + random_spread(rockets_spread * spread_scale())
 	var rocket := Rocket.new()
 	MissionContext.spawn_parent(self).add_child(rocket)
 	rocket.launch(from, target, rockets_speed, rocket_impact)

@@ -254,6 +254,7 @@ func _types_with(ids: Array, weapon_id: String) -> int:
 ## Copies the selected airframe's stats, with upgrades, onto the helicopter.
 func apply_to_helicopter(helicopter: Object) -> void:
 	var heli_data := selected_heli()
+	helicopter.set("dash_cooldown", heli_data.dash_cooldown)
 	for def in catalog.airframe_upgrades:
 		var property := def.target_properties[0]
 		var value := heli_stat(heli_data, def)

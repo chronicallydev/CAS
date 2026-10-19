@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" path="res://features/mission/enemies/stinger.tscn" id="18_stinger"]
 [ext_resource type="PackedScene" path="res://features/mission/enemies/shilka.tscn" id="19_shilka"]
 [ext_resource type="PackedScene" path="res://features/mission/enemies/ripple_launcher.tscn" id="20_ripple"]
+[ext_resource type="Script" path="res://features/mission/pickups/pickup_dropper.gd" id="21_pickups"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(4000, 1, 4000)
@@ -71,7 +72,7 @@ adjustment_contrast = 1.12
 adjustment_saturation = 1.0
 fog_sky_affect = 0.3
 
-[node name="Mission" type="Node" node_paths=PackedStringArray("world", "camera_rig", "helicopter", "guns", "generator", "rig", "environment", "hud")]
+[node name="Mission" type="Node" node_paths=PackedStringArray("world", "camera_rig", "helicopter", "guns", "generator", "rig", "environment", "hud", "pickups")]
 process_mode = 3
 script = ExtResource("16_ctx")
 world = NodePath("World")
@@ -82,6 +83,7 @@ generator = NodePath("World/EnemyGenerator")
 rig = NodePath("World/Rig")
 environment = NodePath("World/EnvironmentalMesh/DesertEnvironment")
 hud = NodePath("GameHUD")
+pickups = NodePath("World/Pickups")
 
 [node name="World" type="Node3D" parent="."]
 process_mode = 1
@@ -157,6 +159,9 @@ shake_strength = 2.835
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="World/GunController" unique_id=2054740362]
 unit_size = 45.0
 stream = ExtResource("8_85g3d")
+
+[node name="Pickups" type="Node" parent="World"]
+script = ExtResource("21_pickups")
 
 [node name="CursorLayer" type="CanvasLayer" parent="World" unique_id=229169152]
 scale = Vector2(0.715, 0.715)

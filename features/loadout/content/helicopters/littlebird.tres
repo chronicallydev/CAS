@@ -25,6 +25,7 @@ acceleration = 7.0
 max_health = 65.0
 turn_speed = 8.5
 flare_cooldown = 6.0
+dash_cooldown = 2.5
 hardpoints = Array[ExtResource("1_0gkac")]([SubResource("Resource_6sfil"), SubResource("Resource_6t086")])
 default_loadout = PackedStringArray("rockets", "rockets")
 allowed_weapons = PackedStringArray("minigun", "rockets")

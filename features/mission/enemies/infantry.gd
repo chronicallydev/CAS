@@ -1,8 +1,9 @@
 extends EnemyBase
 
-# Infantry: a soldier with a rifle who walks straight at the base. In an
+# Infantry: a soldier with a rifle who walks straight at the base, stopping
+# to fire short bursts at the helicopter whenever it comes close. In an
 # assault there is no base to reach, so soldiers close in on the helicopter
-# and stop to fire short bursts up at it.
+# and stop to fire at it.
 # The model is built from primitives and animated in code: legs stride,
 # arms sway with the rifle and the body bobs with each step. Blasts nearby
 # make soldiers run from them and dive flat; death is in soldier_death.gd.
@@ -74,6 +75,13 @@ func _physics_process(delta: float) -> void:
 		face_direction(direction)
 		update_rifle(delta)
 		return
+	# Defending: stop and shoot at the helicopter when it comes close.
+	var heli := defence_target(fire_range + 6.0)
+	if heli != null:
+		var to_heli := heli.global_position - global_position
+		face_direction(Vector3(to_heli.x, 0.0, to_heli.z).normalized())
+		update_rifle(delta)
+		return
 	global_position += direction * speed * delta
 	face_direction(direction)
 
@@ -88,19 +96,21 @@ func update_rifle(delta: float) -> void:
 	burst_left -= 1
 	fire_timer = 0.14 if burst_left > 0 else burst_cooldown * randf_range(0.8, 1.3)
 
-	var heli := objective()
+	var heli: Node3D = objective() if is_assault() else defence_target(fire_range + 6.0)
+	if heli == null:
+		return
 	var from := rifle.global_position
 	var target := heli.global_position + Vector3(randf_range(-3.0, 3.0), randf_range(-1.0, 1.0), randf_range(-3.0, 3.0))
 	var tracer := Tracer.new()
 	tracer.radius = 0.12
 	tracer.color = Color(1.0, 0.9, 0.5)
 	MissionContext.spawn_parent(self).add_child(tracer)
-	tracer.setup(from, target, 0.3, 0.0, rifle_hit)
+	tracer.setup(from, target, 0.3, 0.0, rifle_hit.bind(heli))
 	Sfx.play_3d("car_gun", from)
 
 
-func rifle_hit(at: Vector3) -> void:
-	hit_objective(at, shot_damage, 2.5)
+func rifle_hit(at: Vector3, target: Node3D = null) -> void:
+	hit_objective(at, shot_damage, 2.5, target)
 
 
 func _process(delta: float) -> void:

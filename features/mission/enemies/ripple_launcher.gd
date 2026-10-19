@@ -98,7 +98,7 @@ func _physics_process(delta: float) -> void:
 		lock_timer = 0.0
 		return
 
-	if update_lock(heli, delta, lock_time):
+	if update_lock(heli, delta, lock_time, true):
 		salvo_left = salvo_size
 		salvo_timer = 0.0
 		reload_timer = reload_time
