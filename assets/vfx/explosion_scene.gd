@@ -26,7 +26,9 @@ func play_sound() -> void:
 
 	if size < 0.3:
 		return
-	if size < 0.65:
+	# Rockets (0.8) and missiles stay in the lighter tier so salvos don't
+	# stack six full booms and shakes; cannon shells and bigger get the full one.
+	if size < 0.9:
 		Sfx.play_3d("explosion_small", global_position)
 	else:
 		Sfx.play_3d("explosion", global_position)

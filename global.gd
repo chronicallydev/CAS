@@ -3,6 +3,9 @@ extends Node
 const MENU_SCENE := "res://scenes/menu/menu.tscn"
 const GAME_SCENE := "res://scenes/main.tscn"
 const SETTINGS_PATH := "user://settings.cfg"
+const HANGAR_SCENE := "res://scenes/hangar/hangar.tscn"
+# Money a new player starts with.
+const STARTING_MONEY := 1500
 
 # Settings chosen in the menu. use_menu_settings stays false until the menu
 # starts a game, so running main.tscn directly keeps the Inspector values.
@@ -22,6 +25,14 @@ var is_game_over: bool = false
 # Saved records.
 var best_score: int = 0
 var best_wave: int = 0
+
+# Hangar: money from runs, bought helicopters and upgrade levels.
+var money: int = STARTING_MONEY
+var owned_helis: Array = ["cobra"]
+var selected_heli: String = "cobra"
+var upgrades: Dictionary = {}
+# Money earned by the last finished run (shown on the game-over screen).
+var last_earned: int = 0
 
 
 func _ready() -> void:
@@ -46,6 +57,11 @@ func start_game() -> void:
 	save_settings()
 	get_tree().paused = false
 	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+func go_to_hangar() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file(HANGAR_SCENE)
 
 
 func go_to_menu() -> void:
@@ -97,6 +113,10 @@ func game_over(reason: String) -> void:
 	var new_best_wave := wave > best_wave
 	best_score = maxi(best_score, score)
 	best_wave = maxi(best_wave, wave)
+
+	# The run's score is paid out as money for the hangar.
+	last_earned = score
+	money += score
 	save_settings()
 
 	var hud := get_tree().get_first_node_in_group("game_hud")
@@ -119,6 +139,10 @@ func save_settings() -> void:
 	config.set_value("game", "starting_level", starting_level)
 	config.set_value("records", "best_score", best_score)
 	config.set_value("records", "best_wave", best_wave)
+	config.set_value("hangar", "money", money)
+	config.set_value("hangar", "owned_helis", owned_helis)
+	config.set_value("hangar", "selected_heli", selected_heli)
+	config.set_value("hangar", "upgrades", upgrades)
 	config.save(SETTINGS_PATH)
 
 
@@ -136,3 +160,7 @@ func load_settings() -> void:
 	starting_level = config.get_value("game", "starting_level", starting_level)
 	best_score = config.get_value("records", "best_score", best_score)
 	best_wave = config.get_value("records", "best_wave", best_wave)
+	money = config.get_value("hangar", "money", money)
+	owned_helis = config.get_value("hangar", "owned_helis", owned_helis)
+	selected_heli = config.get_value("hangar", "selected_heli", selected_heli)
+	upgrades = config.get_value("hangar", "upgrades", upgrades)

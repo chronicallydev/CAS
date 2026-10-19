@@ -121,12 +121,29 @@ func build_layout() -> void:
 	play_button.pressed.connect(func() -> void: Sfx.play_2d("ui_click"))
 	column.add_child(play_button)
 
+	# Hangar and Quit side by side to keep the menu compact.
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	column.add_child(row)
+
+	var hangar_button := make_button("HANGAR   $%s" % format_money(Global.money), false)
+	hangar_button.custom_minimum_size = Vector2(0, 48)
+	hangar_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hangar_button.size_flags_stretch_ratio = 2.0
+	hangar_button.pressed.connect(func() -> void:
+		Sfx.play_2d("ui_click")
+		save_to_global()
+		Global.go_to_hangar())
+	row.add_child(hangar_button)
+
 	var quit_button := make_button("QUIT", false)
+	quit_button.custom_minimum_size = Vector2(0, 48)
+	quit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	quit_button.pressed.connect(func() -> void: get_tree().quit())
-	column.add_child(quit_button)
+	row.add_child(quit_button)
 
 	column.add_child(make_spacer(2))
-	column.add_child(make_label("WASD fly   ·   Mouse aim   ·   LMB fire   ·   Q switch weapon   ·   Esc menu", 16, MUTED))
+	column.add_child(make_label("WASD fly   ·   Mouse aim   ·   LMB fire   ·   Q / 1-5 weapons   ·   Esc menu", 16, MUTED))
 
 
 func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:
@@ -229,11 +246,26 @@ func update_play_button() -> void:
 	warning_label.visible = not ok
 
 
-func on_play_pressed() -> void:
+# Copy the menu choices to Global (used by Play and before opening the hangar).
+func save_to_global() -> void:
 	Global.difficulty = difficulty_option.get_selected_id()
 	Global.starting_level = int(level_spin.value)
 	Global.infantry_enabled = infantry_check.button_pressed
 	Global.car_enabled = car_check.button_pressed
 	Global.tank_enabled = tank_check.button_pressed
 	Global.aa_enabled = aa_check.button_pressed
+	Global.save_settings()
+
+
+func on_play_pressed() -> void:
+	save_to_global()
 	Global.start_game()
+
+
+func format_money(value: int) -> String:
+	var text := str(value)
+	var out := ""
+	while text.length() > 3:
+		out = "," + text.right(3) + out
+		text = text.left(text.length() - 3)
+	return text + out

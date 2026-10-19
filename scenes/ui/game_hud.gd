@@ -357,6 +357,7 @@ func show_game_over(reason: String, new_best_score: bool, new_best_wave: bool) -
 
 	column.add_child(make_label("Wave reached:  %d" % Global.wave, 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
 	column.add_child(make_label("Score:  %s" % format_number(Global.score), 28, ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	column.add_child(make_label("+ $%s for the hangar" % format_number(Global.last_earned), 20, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
 
 	if new_best_score or new_best_wave:
 		column.add_child(make_label("NEW BEST!", 26, Color(0.5, 0.9, 0.55), HORIZONTAL_ALIGNMENT_CENTER))
@@ -370,6 +371,12 @@ func show_game_over(reason: String, new_best_score: bool, new_best_wave: bool) -
 	var retry := make_button("RETRY", true)
 	retry.pressed.connect(Global.retry)
 	column.add_child(retry)
+
+	var hangar := make_button("HANGAR", false)
+	hangar.pressed.connect(func() -> void:
+		Global.is_game_over = false
+		Global.go_to_hangar())
+	column.add_child(hangar)
 
 	var menu := make_button("MAIN MENU", false)
 	menu.pressed.connect(Global.go_to_menu)

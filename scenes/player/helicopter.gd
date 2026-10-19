@@ -1,10 +1,11 @@
 extends Node3D
 
 # Player helicopter: WASD / arrow keys fly it over the map at a fixed
-# altitude, and it turns to face the mouse cursor. The model is built from
-# primitives in code.
+# altitude, and it turns to face the mouse cursor. The airframe, its look
+# and its stats come from the hangar (see heli_model.gd and loadout.gd).
 
-const P := preload("res://scenes/environment/prop_builder.gd")
+const HeliModel := preload("res://scenes/player/heli_model.gd")
+const Loadout := preload("res://scenes/hangar/loadout.gd")
 
 @export var camera: Camera3D
 @export var speed: float = 24.0
@@ -35,6 +36,8 @@ var body: Node3D
 var main_rotor: Node3D
 var tail_rotor: Node3D
 var muzzle: Marker3D
+var pods: Array = []
+var bomb_bay: Marker3D
 
 var health_bar: ProgressBar
 var warning_label: Label
@@ -47,6 +50,8 @@ var inbound_sound: AudioStreamPlayer
 
 func _ready() -> void:
 	add_to_group("player")
+	# Airframe and upgrades bought in the hangar.
+	Loadout.apply_to_helicopter(self)
 	health = max_health
 	build_model()
 	build_hud()
@@ -95,6 +100,17 @@ func shot_down() -> void:
 
 func get_muzzle_position() -> Vector3:
 	return muzzle.global_position if muzzle != null else global_position
+
+
+# Front of rocket pod `index` (cycles through the pods), or the chin gun.
+func get_pod_position(index: int) -> Vector3:
+	if pods.is_empty():
+		return get_muzzle_position()
+	return pods[index % pods.size()].global_position
+
+
+func get_bomb_bay_position() -> Vector3:
+	return bomb_bay.global_position if bomb_bay != null else global_position + Vector3.DOWN * 1.5
 
 
 func get_input_direction() -> Vector3:
@@ -268,56 +284,10 @@ func build_hud() -> void:
 
 
 func build_model() -> void:
-	body = Node3D.new()
-	add_child(body)
-
-	var olive := P.material(Color(0.33, 0.37, 0.26), 0.6, 0.2)
-	var dark := P.material(Color(0.18, 0.19, 0.2), 0.5, 0.5)
-	var glass := P.material(Color(0.12, 0.2, 0.28), 0.1, 0.6)
-
-	# Fuselage and cockpit (nose points along -Z).
-	P.sphere(body, 1.0, Vector3(0, 0, 0), olive, Vector3(1.3, 1.15, 2.5))
-	P.sphere(body, 1.0, Vector3(0, 0.25, -1.6), glass, Vector3(0.95, 0.8, 1.1))
-
-	# Tail boom, fin and stabiliser.
-	P.beam(body, Vector3(0, 0.2, 1.8), Vector3(0, 0.55, 6.6), 0.4, olive)
-	P.box(body, Vector3(0.15, 1.5, 0.9), Vector3(0, 1.15, 6.6), olive, Vector3(-15, 0, 0))
-	P.box(body, Vector3(2.0, 0.1, 0.6), Vector3(0, 0.5, 5.8), olive)
-
-	# Tail rotor.
-	tail_rotor = Node3D.new()
-	tail_rotor.position = Vector3(0.25, 1.1, 6.8)
-	body.add_child(tail_rotor)
-	P.box(tail_rotor, Vector3(0.05, 1.8, 0.2), Vector3.ZERO, dark)
-	P.box(tail_rotor, Vector3(0.05, 0.2, 1.8), Vector3.ZERO, dark)
-
-	# Main rotor: mast, four blades and a faint blur disc.
-	P.cylinder(body, 0.15, 0.7, Vector3(0, 1.4, 0), dark)
-	main_rotor = Node3D.new()
-	main_rotor.position = Vector3(0, 1.8, 0)
-	body.add_child(main_rotor)
-	P.box(main_rotor, Vector3(9.5, 0.06, 0.4), Vector3.ZERO, dark)
-	P.box(main_rotor, Vector3(0.4, 0.06, 9.5), Vector3.ZERO, dark)
-
-	var blur := P.material(Color(0.2, 0.2, 0.2, 0.12), 1.0)
-	blur.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	var disc := P.cylinder(body, 4.75, 0.02, Vector3(0, 1.8, 0), blur, Vector3.ZERO, 32)
-	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
-	# Skids.
-	for x in [-0.95, 0.95]:
-		P.pipe(body, Vector3(x, -1.45, -1.8), Vector3(x, -1.45, 1.6), 0.08, dark)
-		P.beam(body, Vector3(x, -1.45, -0.9), Vector3(x * 0.6, -0.7, -0.9), 0.1, dark)
-		P.beam(body, Vector3(x, -1.45, 0.9), Vector3(x * 0.6, -0.7, 0.9), 0.1, dark)
-
-	# Stub wings with rocket pods.
-	P.box(body, Vector3(3.8, 0.12, 0.8), Vector3(0, -0.15, 0.2), olive)
-	for x in [-1.7, 1.7]:
-		P.cylinder(body, 0.22, 1.4, Vector3(x, -0.45, 0.1), dark, Vector3(90, 0, 0))
-
-	# Chin gun and the muzzle point weapons fire from.
-	P.sphere(body, 0.3, Vector3(0, -0.95, -1.9), dark)
-	P.cylinder(body, 0.07, 1.1, Vector3(0, -1.0, -2.45), dark, Vector3(90, 0, 0))
-	muzzle = Marker3D.new()
-	muzzle.position = Vector3(0, -1.0, -3.0)
-	body.add_child(muzzle)
+	var parts: Dictionary = HeliModel.build(self, Loadout.HELICOPTERS[Loadout.selected()]["style"])
+	body = parts["body"]
+	main_rotor = parts["main_rotor"]
+	tail_rotor = parts["tail_rotor"]
+	muzzle = parts["muzzle"]
+	pods = parts["pods"]
+	bomb_bay = parts["bomb_bay"]

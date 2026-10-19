@@ -6,6 +6,10 @@ extends Node3D
 
 @export var size: float = 1.0
 @export var lifetime: float = 5.0
+# Volume offset (dB) and screen shake of the blast; the defaults are the
+# Javelin's. Rockets use their own, lighter values.
+@export var volume_db: float = 4.0
+@export var shake: float = 0.5
 
 
 func _ready() -> void:
@@ -20,8 +24,8 @@ func _ready() -> void:
 	add_smoke(soft_texture)
 
 	# Louder and deeper than a normal explosion.
-	Sfx.play_3d("explosion", position, 4.0, 0.8)
-	Global.shake(0.5, position)
+	Sfx.play_3d("explosion", position, volume_db, 0.8)
+	Global.shake(shake, position)
 
 	await get_tree().create_timer(lifetime).timeout
 	queue_free()

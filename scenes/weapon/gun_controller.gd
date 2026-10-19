@@ -1,11 +1,14 @@
 extends Node3D
 
-enum Weapon { CANNON, MINIGUN, JAVELIN }
-const WEAPON_NAMES := ["CANNON", "MINIGUN", "JAVELIN"]
+enum Weapon { CANNON, MINIGUN, JAVELIN, ROCKETS, FAB }
+const WEAPON_NAMES := ["CANNON", "MINIGUN", "JAVELIN", "ROCKETS", "FAB-500"]
 
 const JavelinMissile := preload("res://scenes/weapon/javelin_missile.gd")
 const JavelinExplosion := preload("res://assets/vfx/javelin_explosion.gd")
 const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
+const Loadout := preload("res://scenes/hangar/loadout.gd")
+const Rocket := preload("res://scenes/weapon/rocket.gd")
+const Bomb := preload("res://scenes/weapon/bomb.gd")
 
 @export_group("References")
 @export var camera: Camera3D
@@ -70,6 +73,27 @@ const Tracer := preload("res://scenes/Enemies/tank_shell.gd")
 @export_range(0.0, 50.0, 0.5) var javelin_launch_drop: float = 3.0
 
 
+@export_group("Rockets")
+# One click fires a salvo of unguided rockets from the wing pods.
+@export_range(1, 30, 1) var rockets_salvo: int = 6
+@export_range(0.01, 1.0, 0.01) var rockets_interval: float = 0.08
+@export_range(0.1, 30.0, 0.1) var rockets_reload: float = 3.0
+@export_range(5.0, 300.0, 1.0) var rockets_speed: float = 60.0
+@export_range(0.0, 20.0, 0.1) var rockets_spread: float = 9.0
+@export_range(0.1, 100.0, 0.1) var rockets_damage: float = 6.0
+@export_range(0.1, 50.0, 0.1) var rockets_radius: float = 8.0
+
+
+@export_group("FAB Bomb")
+# A heavy free-fall bomb dropped from the belly. It keeps the helicopter's
+# speed, so you aim by flying, not with the cursor.
+@export_range(1.0, 500.0, 1.0) var fab_damage: float = 40.0
+@export_range(1.0, 60.0, 0.5) var fab_radius: float = 16.0
+@export_range(0.5, 60.0, 0.5) var fab_reload: float = 8.0
+@export_range(1.0, 50.0, 0.5) var fab_gravity: float = 12.0
+@export var ground_y: float = -0.4
+
+
 @export_group("Targeting")
 @export_flags_3d_physics var collision_mask: int = 1
 @export_range(10.0, 10000.0, 10.0) var ray_length: float = 5000.0
@@ -88,12 +112,23 @@ var minigun_overheated: bool = false
 var minigun_spin: float = 0.0
 var heat_bar: ColorRect
 var heat_fill: ColorRect
+# Rockets: shots left in the current salvo, time to the next, reload.
+var rockets_queued: int = 0
+var rocket_shot_timer: float = 0.0
+var rocket_reload_timer: float = 0.0
+var rocket_pod: int = 0
+var fab_cooldown: float = 0.0
+# Ground ring showing where a bomb would land.
+var bomb_marker: Node3D
 var weapon_label: Label
 
 @onready var default_cursor_size = cursor.scale
 
 
 func _ready() -> void:
+	# Weapon upgrades bought in the hangar.
+	Loadout.apply_to_guns(self)
+
 	# Weapon name, bottom right.
 	weapon_label = Label.new()
 	weapon_label.add_theme_font_size_override("font_size", 28)
@@ -117,6 +152,9 @@ func _process(delta: float) -> void:
 
 	kill_count.text = str(kills)
 	javelin_cooldown = maxf(javelin_cooldown - delta, 0.0)
+	fab_cooldown = maxf(fab_cooldown - delta, 0.0)
+	update_rockets(delta)
+	update_bomb_marker()
 	update_minigun(delta)
 	update_weapon_label()
 
@@ -129,8 +167,8 @@ func _process(delta: float) -> void:
 	if current_weapon == Weapon.MINIGUN:
 		cursor.scale *= 1.0 + minigun_heat * 0.45
 
-	# Tint the reticle red while the Javelin is reloading or the minigun is jammed.
-	if current_weapon == Weapon.JAVELIN and javelin_cooldown > 0.0:
+	# Tint the reticle red while reloading or while the minigun is jammed.
+	if get_reload_left() > 0.0:
 		cursor.modulate = Color(1.0, 0.4, 0.4)
 	elif current_weapon == Weapon.MINIGUN and minigun_overheated:
 		cursor.modulate = Color(1.0, 0.45, 0.25)
@@ -190,6 +228,11 @@ func _input(event: InputEvent) -> void:
 		if event.physical_keycode == KEY_Q:
 			switch_weapon()
 			return
+		# 1-5 pick a weapon directly.
+		var slot: int = event.physical_keycode - KEY_1
+		if slot >= 0 and slot < Weapon.size():
+			select_weapon(slot as Weapon)
+			return
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -205,12 +248,22 @@ func _input(event: InputEvent) -> void:
 
 					Weapon.JAVELIN:
 						launch_javelin()
+
+					Weapon.ROCKETS:
+						start_rocket_salvo()
+
+					Weapon.FAB:
+						drop_bomb()
 			else:
 				is_firing = false
 
 
 func switch_weapon() -> void:
-	current_weapon = ((current_weapon + 1) % Weapon.size()) as Weapon
+	select_weapon(((current_weapon + 1) % Weapon.size()) as Weapon)
+
+
+func select_weapon(weapon: Weapon) -> void:
+	current_weapon = weapon
 	is_firing = false
 	fire_timer = 0.0
 	update_weapon_label()
@@ -222,12 +275,25 @@ func update_weapon_label() -> void:
 
 	var text: String = WEAPON_NAMES[current_weapon]
 
-	if current_weapon == Weapon.JAVELIN and javelin_cooldown > 0.0:
-		text += "  (%.1f)" % javelin_cooldown
+	var reload := get_reload_left()
+	if reload > 0.0:
+		text += "  (%.1f)" % reload
 	elif current_weapon == Weapon.MINIGUN and minigun_overheated:
 		text += "  OVERHEAT"
 
-	weapon_label.text = "[Q] " + text
+	weapon_label.text = "[%d] %s" % [current_weapon + 1, text]
+
+
+# Seconds until the current weapon can fire again (0 when ready).
+func get_reload_left() -> float:
+	match current_weapon:
+		Weapon.JAVELIN:
+			return javelin_cooldown
+		Weapon.ROCKETS:
+			return rocket_reload_timer if rockets_queued == 0 else 0.0
+		Weapon.FAB:
+			return fab_cooldown
+	return 0.0
 
 
 func get_current_shake_strength() -> float:
@@ -414,6 +480,173 @@ func javelin_impact(impact_position: Vector3) -> void:
 	get_tree().current_scene.add_child(explosion)
 
 	damage_enemies(impact_position, javelin_radius, javelin_damage)
+
+
+# --- Rocket pods ---------------------------------------------------------
+
+func start_rocket_salvo() -> void:
+	if rockets_queued > 0 or rocket_reload_timer > 0.0:
+		return
+	rockets_queued = rockets_salvo
+	rocket_shot_timer = 0.0
+
+
+func update_rockets(delta: float) -> void:
+	if rockets_queued == 0:
+		rocket_reload_timer = maxf(rocket_reload_timer - delta, 0.0)
+		return
+
+	rocket_shot_timer -= delta
+	while rocket_shot_timer <= 0.0 and rockets_queued > 0:
+		fire_rocket()
+		rockets_queued -= 1
+		rocket_shot_timer += rockets_interval
+
+	if rockets_queued == 0:
+		rocket_reload_timer = rockets_reload
+
+
+# One rocket, alternating pods, aimed at wherever the cursor is now.
+func fire_rocket() -> void:
+	var hit: Variant = get_mouse_world_position()
+	if hit == null:
+		return
+
+	var from: Vector3 = camera.global_position
+	if shooter != null and shooter.has_method("get_pod_position"):
+		from = shooter.get_pod_position(rocket_pod)
+	rocket_pod += 1
+
+	var target: Vector3 = hit + random_spread(rockets_spread)
+	var rocket := Rocket.new()
+	get_tree().current_scene.add_child(rocket)
+	rocket.launch(from, target, rockets_speed, rocket_impact)
+	Sfx.play_3d("rocket_fire", from, 0.0, 1.6)
+
+
+# Each rocket hit is a big layered blast with its own boom and kick.
+func rocket_impact(at: Vector3) -> void:
+	var explosion := JavelinExplosion.new()
+	explosion.size = rockets_radius / 11.0
+	explosion.lifetime = 3.5
+	explosion.volume_db = 0.0
+	explosion.shake = 0.3
+	explosion.position = at
+	get_tree().current_scene.add_child(explosion)
+	damage_enemies(at, rockets_radius, rockets_damage)
+
+
+# --- FAB bomb ------------------------------------------------------------
+
+func get_bomb_drop() -> Dictionary:
+	var from := camera.global_position
+	var start_velocity := Vector3.ZERO
+	if shooter != null and shooter.has_method("get_bomb_bay_position"):
+		from = shooter.get_bomb_bay_position()
+		start_velocity = shooter.get("velocity") if shooter.get("velocity") != null else Vector3.ZERO
+	return {"from": from, "velocity": start_velocity}
+
+
+func drop_bomb() -> void:
+	if fab_cooldown > 0.0:
+		return
+
+	var drop := get_bomb_drop()
+	var bomb := Bomb.new()
+	bomb.velocity = drop["velocity"]
+	bomb.gravity = fab_gravity
+	bomb.ground_y = ground_y
+	bomb.on_hit = fab_impact
+	get_tree().current_scene.add_child(bomb)
+	bomb.global_position = drop["from"]
+
+	fab_cooldown = fab_reload
+	Sfx.play_3d("bomb_release", drop["from"])
+
+
+func fab_impact(at: Vector3) -> void:
+	var explosion := JavelinExplosion.new()
+	explosion.size = fab_radius / 8.0
+	explosion.position = at
+	get_tree().current_scene.add_child(explosion)
+
+	# A ring of secondary blasts sells the size of it.
+	if explosion_scene != null:
+		for i in 6:
+			var angle := TAU * i / 6.0 + randf() * 0.4
+			var ring_pos := at + Vector3(cos(angle), 0.0, sin(angle)) * fab_radius * randf_range(0.45, 0.8)
+			var blast := explosion_scene.instantiate() as Node3D
+			get_tree().current_scene.add_child(blast)
+			blast.global_position = ring_pos
+			# Below the sound threshold, so the main boom isn't drowned out.
+			blast.scale = Vector3.ONE * 0.25
+
+	Sfx.play_3d("explosion", at, 7.0, 0.55, 0.03)
+	Global.shake(1.0, at)
+	damage_enemies(at, fab_radius, fab_damage)
+
+
+# Red ring on the ground where a bomb dropped now would land.
+func update_bomb_marker() -> void:
+	var wanted: bool = current_weapon == Weapon.FAB and camera != null and not (shooter != null and shooter.get("dead"))
+
+	if bomb_marker == null or not is_instance_valid(bomb_marker):
+		if not wanted:
+			return
+		bomb_marker = build_bomb_marker()
+
+	bomb_marker.visible = wanted
+	if not wanted:
+		return
+
+	var drop := get_bomb_drop()
+	var landing: Dictionary = Bomb.predict(drop["from"], drop["velocity"], fab_gravity, ground_y)
+	bomb_marker.global_position = landing["position"] + Vector3.UP * 0.15
+
+	# Dim while reloading, pulse when ready.
+	var armed := fab_cooldown <= 0.0
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 150.0)
+	var alpha := (0.45 + 0.35 * pulse) if armed else 0.18
+	for child in bomb_marker.get_children():
+		var mesh := child as MeshInstance3D
+		if mesh != null:
+			mesh.material_override.albedo_color.a = alpha
+
+
+func build_bomb_marker() -> Node3D:
+	var marker := Node3D.new()
+	get_tree().current_scene.add_child(marker)
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(1.0, 0.25, 0.15, 0.6)
+	material.no_depth_test = true
+
+	# Blast-radius ring.
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = fab_radius - 0.5
+	torus.outer_radius = fab_radius
+	torus.rings = 48
+	ring.mesh = torus
+	ring.scale = Vector3(1.0, 0.05, 1.0)
+	ring.material_override = material
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	marker.add_child(ring)
+
+	# Cross at the impact point.
+	for angle in [45.0, -45.0]:
+		var bar := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(3.0, 0.05, 0.4)
+		bar.mesh = box
+		bar.rotation_degrees.y = angle
+		bar.material_override = material
+		bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		marker.add_child(bar)
+
+	return marker
 
 
 func find_nearest_enemy(point: Vector3, max_distance: float) -> Node3D:

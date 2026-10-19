@@ -17,7 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-Global="*uid://0t8wisdx0vji"
+Global="*res://global.gd"
 Sfx="*res://scenes/audio/sfx.gd"
 
 [display]

@@ -42,6 +42,10 @@ const MIX := {
 	# Minigun spin-up whine and overheat hiss.
 	"spin_up": -15.0,
 	"overheat": -5.0,
+	# Rocket pods and the FAB bomb.
+	"rocket_fire": -9.0,
+	"bomb_release": -6.0,
+	"bomb_whistle": -9.0,
 }
 
 # Per sound: [max voices at once, min milliseconds between starts].
@@ -54,6 +58,7 @@ const LIMITS := {
 	"tank_fire": [3, 60],
 	"hit_tick": [2, 70],
 	"kill_tick": [3, 40],
+	"rocket_fire": [6, 40],
 }
 
 var streams: Dictionary = {}
@@ -82,6 +87,9 @@ func _ready() -> void:
 	streams["combo"] = make_stream(synth_blips([880.0, 1175.0, 1760.0], 0.08))
 	streams["spin_up"] = make_stream(synth_spin_up())
 	streams["overheat"] = make_stream(synth_overheat())
+	streams["rocket_fire"] = streams["missile_launch"]
+	streams["bomb_release"] = make_stream(synth_clang(0.4, [140.0, 390.0, 820.0], 9.0))
+	streams["bomb_whistle"] = make_stream(synth_whistle())
 
 
 func get_stream(sound: String) -> AudioStream:
@@ -413,4 +421,21 @@ func synth_overheat() -> PackedFloat32Array:
 		var hiss := (white - prev) * minf(t / 0.05, 1.0) * exp(-t * 3.5)
 		prev = white
 		out[i] = clunk * 0.9 + hiss * 0.6
+	return out
+
+
+# Falling bomb: a whistle that drops in pitch as it comes down.
+func synth_whistle() -> PackedFloat32Array:
+	var duration := 1.7
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var progress := t / duration
+		var freq := lerpf(1500.0, 520.0, progress) + sin(t * 30.0) * 12.0
+		phase += freq / RATE
+		var env := minf(t / 0.4, 1.0) * minf((duration - t) / 0.05, 1.0)
+		out[i] = (sin(TAU * phase) + noise() * 0.08) * env
 	return out
