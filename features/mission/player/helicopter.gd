@@ -14,7 +14,7 @@ signal damage_taken(amount: float, source: String)
 
 @export var camera: Camera3D
 @export var speed: float = 24.0
-# How quickly the helicopter reaches the requested speed.
+# How quickly the helicopter spools up to full speed (see throttle_response).
 @export var acceleration: float = 5.0
 @export var altitude: float = 16.0
 # Radius of the area of operations around the rig. Past it a warning
@@ -24,57 +24,136 @@ signal damage_taken(amount: float, source: String)
 @export var bounds_overshoot: float = 20.0
 # How far out an assault starts, flying in from friendly territory.
 @export var ingress_distance: float = 90.0
+# Agility: how fast the nose follows the cursor and the flight path bends
+# toward the steering direction.
 @export var turn_speed: float = 6.0
 @export var max_tilt_degrees: float = 16.0
 # Height of the ground plane used for mouse aiming.
 @export var ground_y: float = -0.4
+
+@export_group("Handling")
+# The helicopter has momentum: it spools up to full speed at a steady rate,
+# bends its flight path toward the steering direction while keeping its
+# speed, and glides to a stop when the keys are let go. These turn the
+# airframe's acceleration and turn_speed (which the loadout and upgrades
+# set) into those rates, so the hangar bars keep their ranges.
+#
+# Seconds from a hover to full speed = throttle_response / acceleration
+# (Little Bird ~0.2 s, Hind ~0.45 s).
+@export var throttle_response: float = 1.5
+# Stopping takes this share of the spool-up time.
+@export var brake_ratio: float = 0.8
+# Degrees per second the flight path turns, per point of turn_speed
+# (Little Bird ~540, Hind ~290).
+@export var path_turn_scale: float = 64.0
+# Steering further than this off the current heading brakes and reverses
+# in a straight line instead of swinging round in an arc.
+@export var reverse_angle: float = 120.0
+# How fast the nose follows the cursor, per point of turn_speed.
+@export var turn_scale: float = 3.0
+# Lean from the steering force on top of the lean from speed, and the most
+# it can lean, in multiples of max_tilt_degrees.
+@export var thrust_lean: float = 0.6
+@export var max_lean: float = 1.7
 
 @export_group("Health")
 @export var max_health: float = 100.0
 @export var explosion_scene: PackedScene
 # Seconds between being shot down and the round restarting.
 @export var restart_delay: float = 2.0
-# Test range cheats: hits still count but do no harm, and flares and the
-# dash recharge instantly.
+# Test range cheats: hits still count but do no harm, and flares, dash
+# charges, the dive and the slam recharge instantly.
 var invulnerable: bool = false
 var infinite_flares: bool = false
 
 @export_group("Flares")
-# Flares are unlimited but recharge: F or Space drops a spread, then they
+# Flares are unlimited but recharge: F drops a spread, then they
 # take this many seconds to be ready again. The loadout sets it from the
 # airframe and its "Flare rate" upgrade.
 @export var flare_cooldown: float = 8.0
 # After a drop, nothing can lock on for this long.
 @export var flare_protection: float = 1.8
 
-@export_group("Low flight")
-# Hold Ctrl to drop to this altitude. Low, the helicopter rams anything it
-# flies over, its weapons are more accurate, and it hides from radar (SAM
-# trucks, SAM sites and ripple launchers can't lock), but small arms, flak,
-# Stingers and Shilkas hit it harder.
+@export_group("Dive")
+# Q: drop to low_altitude for dive_duration seconds, then climb back on its
+# own. Low, the helicopter rams anything it flies over, its weapons are more
+# accurate, and it hides from radar (SAM trucks, SAM sites and ripple
+# launchers can't lock). Q again pulls up early.
 @export var low_altitude: float = 4.5
+@export var dive_duration: float = 3.5
+# Starts counting once the dive ends.
+@export var dive_cooldown: float = 9.0
+# Share of the unused dive time taken off the cooldown when pulling up
+# early (0 = no refund, 1 = cooldown matches the time spent low).
+@export var dive_refund: float = 0.6
 # How fast the helicopter drops and climbs (0..1 blend per second).
-@export var dive_rate: float = 2.2
+@export var dive_drop_rate: float = 6.0
+@export var dive_climb_rate: float = 2.2
 @export var ram_radius: float = 3.5
 # Damage to everything rammed (infantry die outright)...
 @export var ram_damage: float = 8.0
 # ...and to the helicopter's hull per vehicle or fort hit.
 @export var ram_self_damage: float = 3.0
 @export var ram_interval: float = 0.3
-@export var low_damage_multiplier: float = 1.5
+# Extra damage from small arms, flak, Stingers and Shilkas while low. The
+# dive's cooldown is its main cost, so 1.0 = none.
+@export var low_damage_multiplier: float = 1.0
 
 @export_group("Dash")
-# Shift: a quick burst in the steering direction, then a cooldown. The
-# loadout sets the cooldown from the airframe.
-@export var dash_distance: float = 12.0
+# Space or Shift, at any altitude: a quick burst in the steering direction (or straight ahead). It
+# takes over the movement, fastest at the start and easing out, and
+# nothing can hurt the helicopter while it lasts.
+@export var dash_distance: float = 14.0
 @export var dash_time: float = 0.18
+# Dashes stored up; each one recharges in dash_cooldown seconds, one at a
+# time. The loadout sets the cooldown from the airframe.
+@export var dash_charges: int = 2
 @export var dash_cooldown: float = 3.0
+# Speed coming out of a dash, as a fraction of `speed`. It is kept for
+# dash_carry seconds (even with no keys held), then bleeds back to full
+# speed at overspeed_bleed times the spool-up rate.
+@export var dash_exit_speed: float = 1.15
+@export var dash_carry: float = 0.15
+@export var overspeed_bleed: float = 0.35
+# A dash throws the body over toward the dash, this many degrees past its
+# normal lean, and eases back level at dash_tilt_recover per second after.
+@export var dash_bank_degrees: float = 15.0
+@export var dash_tilt_recover: float = 3.5
+# The rotor spools up for the burst: extra spin, rotor pitch and blur at the
+# peak (as a fraction of normal), fading at dash_rotor_recover per second.
+@export var dash_rotor_boost: float = 0.6
+@export var dash_rotor_recover: float = 1.8
+# Extra seconds of invulnerability after a dash ends.
+@export var dash_grace: float = 0.06
+# Arcade see-through copies left along a dash, every afterimage_interval
+# seconds. Off by default for a more believable look.
+@export var dash_afterimages: bool = false
+@export var afterimage_interval: float = 0.035
+# Dash or slam pressed this many seconds too early (still dashing,
+# plunging, or out of charges) fires as soon as it can.
+@export var input_buffer: float = 0.15
+
+@export_group("Slam")
+# E: the helicopter plunges almost to the ground and smashes everything
+# around it, then climbs back. During a dive it hits almost at once and
+# ends the dive.
+@export var slam_altitude: float = 1.6
+# Seconds from pressing E to the impact, from cruising altitude...
+@export var slam_time: float = 0.28
+# ...and from a dive.
+@export var slam_time_low: float = 0.08
+# How fast it climbs back after the impact (0..1 blend per second).
+@export var slam_recover_rate: float = 2.5
+@export var slam_radius: float = 9.0
+@export var slam_damage: float = 45.0
+@export var slam_cooldown: float = 7.0
 
 # Damage sources that hit harder while flying low: everything but radar
 # SAMs (which can't lock on low anyway) and the helicopter's own rams.
 const LOW_SAFE_SOURCES := ["", "RAM", "SAM TRUCK", "SAM SITE", "RIPPLE"]
 
 const Flare := preload("res://features/mission/player/flare.gd")
+const MovementFx := preload("res://features/mission/player/movement_fx.gd")
 
 var velocity: Vector3 = Vector3.ZERO
 var time: float = 0.0
@@ -90,15 +169,45 @@ var flare_cooldown_left: float = 0.0
 var flare_protection_left: float = 0.0
 # 0 = cruising altitude, 1 = flying low.
 var low_blend: float = 0.0
+# Above zero while diving.
+var dive_time_left: float = 0.0
+var dive_cooldown_left: float = 0.0
 var ram_timer: float = 0.0
-var dash_cooldown_left: float = 0.0
+var dash_charges_left: int = 0
+# Time until the next charge is back (counts only while one is missing).
+var dash_recharge_left: float = 0.0
 var dash_time_left: float = 0.0
-var dash_velocity: Vector3 = Vector3.ZERO
+var dash_direction: Vector3 = Vector3.ZERO
+# Invulnerable while above zero (the dash plus dash_grace).
+var dodge_left: float = 0.0
+var dodged_this_dash: bool = false
+var afterimage_timer: float = 0.0
+# "dash" or "slam" pressed too early, kept for input_buffer seconds.
+var buffered_action: String = ""
+var buffer_left: float = 0.0
+# Steering force as a fraction of `speed`, for leaning the body.
+var thrust: Vector3 = Vector3.ZERO
+var dash_carry_left: float = 0.0
+# 1 while dashing, easing to 0 after: the extra bank into the dash...
+var dash_tilt: float = 0.0
+# ...and the rotor's spool-up.
+var rotor_boost: float = 0.0
+# Smoothed 0..1.2 speed, for the rotor's spin and pitch.
+var rotor_effort: float = 0.0
+var slam_cooldown_left: float = 0.0
+# Counts down to the impact while plunging, from slam_plunge_time.
+var slam_time_left: float = 0.0
+var slam_plunge_time: float = 0.0
+# 0 = normal altitude, 1 = at slam_altitude.
+var slam_blend: float = 0.0
 
 var body: Node3D
 var main_rotor: Node3D
 var tail_rotor: Node3D
 var muzzle: Marker3D
+var rotor_blur: StandardMaterial3D
+var rotor_blur_alpha: float = 0.12
+var blade_count: int = 4
 # Weapon id -> muzzle markers of its mounted copies (for the gun controller).
 var weapon_muzzles: Dictionary = {}
 var bomb_bay: Marker3D
@@ -120,6 +229,7 @@ var mission: MissionContext
 func initialize(mission_context: MissionContext, airframe: HelicopterData, weapons: Array) -> void:
 	mission = mission_context
 	health = max_health
+	dash_charges_left = dash_charges
 	build_model(airframe, weapons)
 	build_hud()
 	build_sounds()
@@ -130,6 +240,12 @@ func initialize(mission_context: MissionContext, airframe: HelicopterData, weapo
 # `source` names who fired, for the test range's damage stats.
 func take_damage(amount: float, source: String = "") -> void:
 	if dead:
+		return
+	# Dashing through fire: nothing lands, and the first dodge says so.
+	if dodge_left > 0.0:
+		if not dodged_this_dash and source != "RAM":
+			dodged_this_dash = true
+			mission.hud.spawn_popup("DODGE", global_position, Color(0.55, 0.85, 1.0))
 		return
 
 	if is_low() and not LOW_SAFE_SOURCES.has(source):
@@ -159,7 +275,7 @@ func can_be_locked() -> bool:
 	return not dead and flare_protection_left <= 0.0
 
 
-# Flying low (Ctrl held and the drop mostly done).
+# Flying low (diving and the drop mostly done, or not yet climbed out).
 func is_low() -> bool:
 	return low_blend > 0.75
 
@@ -167,10 +283,15 @@ func is_low() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	# Physical keys, so this works on any keyboard layout.
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode == KEY_F or event.physical_keycode == KEY_SPACE:
-			deploy_flares()
-		elif event.physical_keycode == KEY_SHIFT:
-			dash()
+		match event.physical_keycode:
+			KEY_F:
+				deploy_flares()
+			KEY_SPACE, KEY_SHIFT:
+				request("dash")
+			KEY_Q:
+				toggle_dive()
+			KEY_E:
+				request("slam")
 
 
 # Drops a spread of decoys. Missiles already homing on the helicopter
@@ -242,6 +363,54 @@ func get_bomb_bay_position() -> Vector3:
 	return bomb_bay.global_position if bomb_bay != null else global_position + Vector3.DOWN * 1.5
 
 
+# Spool-up in m/s², from a hover to full speed in throttle_response /
+# acceleration seconds.
+func get_acceleration_rate() -> float:
+	return speed * acceleration / maxf(throttle_response, 0.01)
+
+
+# Braking in m/s², to a stop in brake_ratio of the spool-up time.
+func get_brake_rate() -> float:
+	return get_acceleration_rate() / maxf(brake_ratio, 0.01)
+
+
+# One frame of normal flight. Steering mostly bends the flight path at a
+# fixed turn rate and holds the speed; a hard reversal brakes straight
+# through instead, and no input glides to a stop.
+func steer(delta: float) -> void:
+	var input := get_input_direction()
+	var desired := input * speed
+	var rate := get_acceleration_rate()
+	var brake := get_brake_rate()
+	var current := velocity.length()
+	# Coming out of a dash: keep the extra speed for a moment.
+	var carrying := dash_carry_left > 0.0
+	dash_carry_left = maxf(dash_carry_left - delta, 0.0)
+
+	if input == Vector3.ZERO:
+		if not carrying:
+			velocity = velocity.move_toward(Vector3.ZERO, brake * delta)
+	elif current < 0.5:
+		# From a hover: just spool up along the input.
+		velocity = velocity.move_toward(desired, rate * delta)
+	else:
+		var heading := velocity / current
+		var angle := heading.signed_angle_to(input, Vector3.UP)
+		if absf(angle) > deg_to_rad(reverse_angle):
+			velocity = velocity.move_toward(desired, brake * delta)
+		else:
+			var max_turn := deg_to_rad(turn_speed * path_turn_scale) * delta
+			heading = heading.rotated(Vector3.UP, clampf(angle, -max_turn, max_turn))
+			if current < speed:
+				current = move_toward(current, speed, rate * delta)
+			elif not carrying:
+				current = move_toward(current, speed, rate * overspeed_bleed * delta)
+			velocity = heading * current
+
+	thrust = ((desired - velocity) / speed).limit_length(1.0)
+	position += velocity * delta
+
+
 func get_input_direction() -> Vector3:
 	var direction := Vector3.ZERO
 
@@ -272,25 +441,39 @@ func get_mouse_ground_point() -> Variant:
 
 func _physics_process(delta: float) -> void:
 	time += delta
+	update_buffer(delta)
+	dodge_left = maxf(dodge_left - delta, 0.0)
 
-	# Smoothly accelerate toward the input direction.
-	var desired := get_input_direction() * speed
-	velocity = velocity.lerp(desired, 1.0 - exp(-acceleration * delta))
-
-	position += velocity * delta
-	# A dash adds a short burst on top of normal flight.
 	if dash_time_left > 0.0:
-		dash_time_left -= delta
-		position += dash_velocity * delta
+		update_dash(delta)
+	else:
+		steer(delta)
 	keep_in_bounds(delta)
 
-	# Lift off the pad, then hold altitude (or drop low while Ctrl is held)
-	# with a gentle bob.
+	# Lift off the pad, then hold altitude (or drop low while diving) with a
+	# gentle bob. The drop is quick, the climb back gentler.
 	takeoff = minf(takeoff + delta / 2.5, 1.0)
-	var want_low := Input.is_physical_key_pressed(KEY_CTRL) and takeoff >= 1.0
-	low_blend = move_toward(low_blend, 1.0 if want_low else 0.0, dive_rate * delta)
+	if dive_time_left > 0.0:
+		dive_time_left -= delta
+		if dive_time_left <= 0.0:
+			end_dive()
+	var want_low := dive_time_left > 0.0
+	low_blend = move_toward(low_blend, 1.0 if want_low else 0.0,
+		(dive_drop_rate if want_low else dive_climb_rate) * delta)
 	var cruise := lerpf(altitude, low_altitude, smoothstep(0.0, 1.0, low_blend))
 	position.y = lerpf(2.5, cruise, smoothstep(0.0, 1.0, takeoff)) + sin(time * 1.7) * 0.25
+
+	# A slam plunges toward the ground, hits, then eases back up.
+	if slam_time_left > 0.0:
+		slam_time_left -= delta
+		slam_blend = move_toward(slam_blend, 1.0, delta / maxf(slam_plunge_time, 0.01))
+		if slam_time_left <= 0.0:
+			slam_blend = 1.0
+			slam_impact()
+	else:
+		slam_blend = move_toward(slam_blend, 0.0, slam_recover_rate * delta)
+	if slam_blend > 0.0:
+		position.y = lerpf(position.y, slam_altitude, smoothstep(0.0, 1.0, slam_blend))
 
 	if is_low():
 		ram_timer -= delta
@@ -305,13 +488,22 @@ func _physics_process(delta: float) -> void:
 		var to_aim: Vector3 = aim - global_position
 		if Vector2(to_aim.x, to_aim.z).length() > 1.0:
 			var desired_yaw := atan2(-to_aim.x, -to_aim.z)
-			rotation.y = lerp_angle(rotation.y, desired_yaw, 1.0 - exp(-turn_speed * delta))
+			rotation.y = lerp_angle(rotation.y, desired_yaw, 1.0 - exp(-turn_speed * turn_scale * delta))
 
-	# Tilt the body into the direction of travel.
-	var local_velocity := global_transform.basis.inverse() * velocity
-	var tilt := deg_to_rad(max_tilt_degrees)
-	body.rotation.x = lerpf(body.rotation.x, tilt * local_velocity.z / speed, 1.0 - exp(-5.0 * delta))
-	body.rotation.z = lerpf(body.rotation.z, -tilt * local_velocity.x / speed, 1.0 - exp(-5.0 * delta))
+	# Tilt the body into the direction of travel, and further into the
+	# steering force: nose down speeding up, flared back braking, banked
+	# into turns, thrown hard into a dash.
+	var lean := velocity / speed + thrust * thrust_lean
+	var to_local := global_transform.basis.inverse()
+	var local_lean := (to_local * lean).limit_length(max_lean) * deg_to_rad(max_tilt_degrees)
+	# A dash throws it further over, snapping in fast and easing back out.
+	if dash_time_left <= 0.0:
+		dash_tilt = move_toward(dash_tilt, 0.0, dash_tilt_recover * delta)
+	var bank := smoothstep(0.0, 1.0, dash_tilt)
+	local_lean += to_local * dash_direction * deg_to_rad(dash_bank_degrees) * bank
+	var follow := 1.0 - exp(-lerpf(8.0, 30.0, bank) * delta)
+	body.rotation.x = lerpf(body.rotation.x, local_lean.z, follow)
+	body.rotation.z = lerpf(body.rotation.z, -local_lean.x, follow)
 
 
 # Flying low smashes whatever is underneath: infantry die, vehicles and
@@ -341,21 +533,164 @@ func ram() -> void:
 	mission.shake(0.25 + 0.1 * heavy)
 
 
-# A quick burst in the steering direction (or straight ahead), then a
-# cooldown.
-func dash() -> void:
-	if dead or dash_cooldown_left > 0.0:
+# Dash / slam: do it now if possible, otherwise keep it for
+# input_buffer seconds so an early press isn't lost.
+func request(action: String) -> void:
+	buffered_action = action
+	buffer_left = input_buffer
+	try_buffered()
+
+
+func update_buffer(delta: float) -> void:
+	if buffered_action == "":
 		return
+	buffer_left -= delta
+	if buffer_left <= 0.0:
+		buffered_action = ""
+	else:
+		try_buffered()
+
+
+func try_buffered() -> void:
+	var done := slam() if buffered_action == "slam" else dash()
+	if done:
+		buffered_action = ""
+
+
+# Fills every ability at once (the RECHARGE pickup).
+func recharge_abilities() -> void:
+	flare_cooldown_left = 0.0
+	dash_charges_left = dash_charges
+	dash_recharge_left = 0.0
+	dive_cooldown_left = 0.0
+	slam_cooldown_left = 0.0
+
+
+# Q: start a dive, or pull up early from one.
+func toggle_dive() -> void:
+	if dive_time_left > 0.0:
+		end_dive()
+		return
+	if dead or dive_cooldown_left > 0.0 or slam_time_left > 0.0 or takeoff < 1.0:
+		return
+	dive_time_left = dive_duration
+	# Rotor wash hits the ground as it drops.
+	MovementFx.dust_ring(MissionContext.spawn_parent(self), global_position, 5.0, 0.45)
+	mission.shake(0.15)
+	Sfx.play_3d("dash_whoosh", global_position, 0.0, 0.7, 0.1)
+
+
+# Climbs back out (on its own when the time runs out, or pulled up early or
+# by a slam). The cooldown gives back part of the time left unused.
+func end_dive() -> void:
+	var unused := clampf(dive_time_left / maxf(dive_duration, 0.01), 0.0, 1.0)
+	dive_time_left = 0.0
+	dive_cooldown_left = 0.0 if infinite_flares else dive_cooldown * (1.0 - dive_refund * unused)
+
+
+# A quick burst in the steering direction (or straight ahead), using up a
+# charge. False if it can't go yet (the press may be buffered).
+func dash() -> bool:
+	if dead or dash_charges_left <= 0 or dash_time_left > 0.0 or slam_time_left > 0.0:
+		return false
 	var direction := get_input_direction()
 	if direction == Vector3.ZERO:
 		direction = -global_transform.basis.z
 		direction.y = 0.0
 		direction = direction.normalized()
-	dash_velocity = direction * dash_distance / maxf(dash_time, 0.01)
+	dash_direction = direction
 	dash_time_left = dash_time
-	dash_cooldown_left = 0.0 if infinite_flares else dash_cooldown
-	velocity += direction * speed * 0.4
-	Sfx.play_3d("missile_launch", global_position, -6.0, 1.7)
+	dodge_left = dash_time + dash_grace
+	dodged_this_dash = false
+	afterimage_timer = 0.0
+	if not infinite_flares:
+		if dash_charges_left == dash_charges:
+			dash_recharge_left = dash_cooldown
+		dash_charges_left -= 1
+	# Coming out of it at a bit over full speed, carried for dash_carry
+	# seconds (see steer). The body is thrown over into it and the rotor
+	# spools up (see the tilt in _physics_process and the rotor in _process).
+	velocity = direction * speed * dash_exit_speed
+	dash_carry_left = dash_carry
+	thrust = direction
+	dash_tilt = 1.0
+	rotor_boost = 1.0
+
+	var parent := MissionContext.spawn_parent(self)
+	if is_low():
+		MovementFx.dust_ring(parent, global_position, 4.0)
+	mission.kick(direction, 1.2)
+	# The last charge sounds a little higher, so you hear you're out.
+	var pitch := 1.15 if dash_charges_left == 0 else 1.0
+	Sfx.play_3d("dash_whoosh", global_position, 0.0, pitch, 0.12)
+	return true
+
+
+# Moves along the dash on an ease-out curve: most of the distance in the
+# first few frames, so it feels instant, then a soft finish.
+func update_dash(delta: float) -> void:
+	var duration := maxf(dash_time, 0.01)
+	var before := dash_ease(1.0 - dash_time_left / duration)
+	dash_time_left = maxf(dash_time_left - delta, 0.0)
+	var after := dash_ease(1.0 - dash_time_left / duration)
+	position += dash_direction * dash_distance * (after - before)
+
+	afterimage_timer -= delta
+	if dash_afterimages and afterimage_timer <= 0.0:
+		afterimage_timer = afterimage_interval
+		MovementFx.afterimage(body, MissionContext.spawn_parent(self))
+
+
+static func dash_ease(t: float) -> float:
+	var left := 1.0 - clampf(t, 0.0, 1.0)
+	return 1.0 - left * left
+
+
+# E: plunge to the ground and smash everything around the helicopter (see
+# slam_impact), then a cooldown. From a dive the plunge is short.
+# False if it can't go yet.
+func slam() -> bool:
+	if dead or slam_cooldown_left > 0.0 or slam_time_left > 0.0 or dash_time_left > 0.0 or takeoff < 1.0:
+		return false
+	slam_plunge_time = slam_time_low if is_low() else slam_time
+	slam_time_left = slam_plunge_time
+	slam_cooldown_left = 0.0 if infinite_flares else slam_cooldown
+	Sfx.play_3d("bomb_whistle", global_position, 0.0, 1.6)
+	return true
+
+
+# The slam lands: heavy damage and a blast in slam_radius on the ground.
+# Kills score and drop pickups like any other (it goes through the guns).
+func slam_impact() -> void:
+	if dead:
+		return
+	# A slam finishes a dive: the helicopter bounces back up from the impact.
+	if dive_time_left > 0.0:
+		end_dive()
+	var ground := Vector3(global_position.x, 0.0, global_position.z)
+	var hit_any := false
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy != null and not enemy.is_queued_for_deletion():
+			var offset := enemy.global_position - ground
+			if Vector2(offset.x, offset.z).length() <= slam_radius:
+				hit_any = true
+				break
+	mission.guns.damage_enemies(ground, slam_radius, slam_damage)
+	MovementFx.dust_ring(MissionContext.spawn_parent(self), ground, slam_radius)
+	# Freeze for a beat only when it actually hit something.
+	if hit_any:
+		mission.hit_stop(0.08)
+
+	if explosion_scene != null:
+		var explosion := explosion_scene.instantiate() as Node3D
+		MissionContext.spawn_parent(self).add_child(explosion)
+		explosion.global_position = ground
+		explosion.scale = Vector3.ONE * 2.0
+
+	Sfx.play_3d("explosion", ground)
+	Sfx.play_3d("body_thud", ground, 4.0, 0.6)
+	mission.shake(0.8)
 
 
 # Soft edge of the area of operations: push back past it, harder the
@@ -367,7 +702,10 @@ func keep_in_bounds(delta: float) -> void:
 	if not out_of_bounds:
 		return
 	var inward := -flat.normalized()
-	velocity += Vector3(inward.x, 0.0, inward.y) * minf(over * 1.5, speed) * 3.0 * delta
+	# Scaled with the spool-up rate so the steering can't simply out-pull
+	# it: holding outward settles about 8 m past the edge for any airframe.
+	var push := get_acceleration_rate() * minf(over / 8.0, 1.6)
+	velocity += Vector3(inward.x, 0.0, inward.y) * push * delta
 	if over > bounds_overshoot:
 		flat = flat.normalized() * (bounds + bounds_overshoot)
 		position.x = flat.x
@@ -380,10 +718,24 @@ func _process(delta: float) -> void:
 	if dead:
 		return
 
+	# The rotor works harder, and sounds it, the faster the helicopter goes,
+	# and spools right up for a dash.
+	var effort := clampf(velocity.length() / speed, 0.0, 1.2)
+	rotor_effort = lerpf(rotor_effort, effort, 1.0 - exp(-6.0 * delta))
+	if dash_time_left <= 0.0:
+		rotor_boost = move_toward(rotor_boost, 0.0, dash_rotor_recover * delta)
+	var boost := rotor_boost * dash_rotor_boost
+	rotor_sound.pitch_scale = lerpf(0.95, 1.12, rotor_effort) + 0.25 * boost
+	var spin := 1.0 + 0.3 * rotor_effort + boost
+	# Turning more than half a blade gap per frame makes the blades seem to
+	# crawl or spin backwards, so cap the step; past that, the thickening
+	# blur disc shows the extra speed.
 	if main_rotor != null:
-		main_rotor.rotate_y(delta * 28.0)
+		main_rotor.rotate_y(minf(delta * 28.0 * spin, PI / blade_count * 0.85))
 	if tail_rotor != null:
-		tail_rotor.rotate_x(delta * 40.0)
+		tail_rotor.rotate_x(minf(delta * 40.0 * spin, PI / 4.0 * 0.85))
+	if rotor_blur != null:
+		rotor_blur.albedo_color.a = rotor_blur_alpha * (1.0 + 0.5 * rotor_effort + 2.5 * boost)
 
 
 func update_hud(delta: float) -> void:
@@ -391,11 +743,25 @@ func update_hud(delta: float) -> void:
 	lock_warning_timer = maxf(lock_warning_timer - delta, 0.0)
 	flare_cooldown_left = maxf(flare_cooldown_left - delta, 0.0)
 	flare_protection_left = maxf(flare_protection_left - delta, 0.0)
-	dash_cooldown_left = maxf(dash_cooldown_left - delta, 0.0)
+	slam_cooldown_left = maxf(slam_cooldown_left - delta, 0.0)
+	dive_cooldown_left = maxf(dive_cooldown_left - delta, 0.0)
+	# Dash charges come back one at a time.
+	if dash_charges_left < dash_charges:
+		dash_recharge_left -= delta
+		if dash_recharge_left <= 0.0:
+			dash_charges_left += 1
+			dash_recharge_left = dash_cooldown
 	var flares := "FLARES [F]" if flare_cooldown_left <= 0.0 else "FLARES %.1fs" % flare_cooldown_left
-	var dash_text := "DASH [SHIFT]" if dash_cooldown_left <= 0.0 else "DASH %.1fs" % dash_cooldown_left
-	var altitude_text := "LOW: RAMMING, RADAR-HIDDEN" if is_low() else "LOW [CTRL]"
-	flare_label.text = "%s     %s     %s" % [flares, dash_text, altitude_text]
+	var dash_text := "DASH %d/%d [SPACE]" % [dash_charges_left, dash_charges]
+	if dash_charges_left < dash_charges:
+		dash_text = "DASH %d/%d %.1fs" % [dash_charges_left, dash_charges, dash_recharge_left]
+	var dive_text := "DIVE [Q]"
+	if dive_time_left > 0.0:
+		dive_text = "DIVING %.1fs: RAMMING, RADAR-HIDDEN" % dive_time_left
+	elif dive_cooldown_left > 0.0:
+		dive_text = "DIVE %.1fs" % dive_cooldown_left
+	var slam_text := "SLAM [E]" if slam_cooldown_left <= 0.0 else "SLAM %.1fs" % slam_cooldown_left
+	flare_label.text = "%s     %s     %s     %s" % [flares, dash_text, dive_text, slam_text]
 	flare_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.35) if is_low() else Color(1.0, 0.85, 0.5))
 
 	var incoming := false
@@ -517,3 +883,6 @@ func build_model(airframe: HelicopterData, weapons: Array) -> void:
 	muzzle = parts["muzzle"]
 	weapon_muzzles = parts["muzzles"]
 	bomb_bay = parts["bomb_bay"]
+	rotor_blur = parts["rotor_blur"]
+	rotor_blur_alpha = rotor_blur.albedo_color.a
+	blade_count = maxi(airframe.blades, 1)

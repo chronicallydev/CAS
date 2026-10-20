@@ -58,6 +58,8 @@ const MIX := {
 	"scream": -11.0,
 	# Flare pop when the helicopter drops decoys.
 	"flare": -9.0,
+	# The helicopter's dash.
+	"dash_whoosh": -8.0,
 }
 
 # Per sound: [max voices at once, min milliseconds between starts].
@@ -109,6 +111,7 @@ func _ready() -> void:
 	streams["gear_clank"] = make_stream(synth_clang(0.3, [930.0, 2150.0, 3400.0], 16.0))
 	streams["scream"] = make_stream(synth_scream())
 	streams["flare"] = make_stream(synth_explosion(0.35, 0.95, 260.0))
+	streams["dash_whoosh"] = make_stream(synth_whoosh())
 
 
 func get_stream(sound: String) -> AudioStream:
@@ -457,6 +460,26 @@ func synth_whistle() -> PackedFloat32Array:
 		phase += freq / RATE
 		var env := minf(t / 0.4, 1.0) * minf((duration - t) / 0.05, 1.0)
 		out[i] = (sin(TAU * phase) + noise() * 0.08) * env
+	return out
+
+
+# Dash: a short rising-then-falling band of air noise.
+func synth_whoosh() -> PackedFloat32Array:
+	var duration := 0.32
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var progress := t / duration
+		var cutoff := lerpf(0.05, 0.35, sin(progress * PI))
+		lp += cutoff * (noise() - lp)
+		lp2 += cutoff * 0.5 * (lp - lp2)
+		var env := minf(t / 0.015, 1.0) * pow(1.0 - progress, 1.6)
+		# Band-pass: the difference of two low-passes.
+		out[i] = (lp - lp2) * env
 	return out
 
 

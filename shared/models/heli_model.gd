@@ -10,8 +10,9 @@ extends RefCounted
 # in heli.hardpoints.
 #
 # Returns {"body", "main_rotor", "tail_rotor", "muzzle", "bomb_bay",
-# "muzzles"}: muzzle is a marker at the nose, and muzzles maps a weapon id
-# to the muzzle markers of its mounted copies, in hardpoint order.
+# "muzzles", "rotor_blur"}: muzzle is a marker at the nose, muzzles maps a
+# weapon id to the muzzle markers of its mounted copies, in hardpoint order,
+# and rotor_blur is the blur disc's own material (for thickening it).
 
 const P := preload("res://shared/props/prop_builder.gd")
 
@@ -117,4 +118,4 @@ static func build(parent: Node3D, heli: HelicopterData, weapons: Array = []) -> 
 	bomb_bay.position = Vector3(0, belly + 0.2, 0.2)
 	body.add_child(bomb_bay)
 
-	return {"body": body, "main_rotor": main_rotor, "tail_rotor": tail_rotor, "muzzle": muzzle, "bomb_bay": bomb_bay, "muzzles": muzzles}
+	return {"body": body, "main_rotor": main_rotor, "tail_rotor": tail_rotor, "muzzle": muzzle, "bomb_bay": bomb_bay, "muzzles": muzzles, "rotor_blur": blur}

@@ -142,14 +142,24 @@ and the hovered enemy's health, armour and lock state.
 
 ## Piloting, pickups and pacing
 
-- **Low flight (hold Ctrl)**: the helicopter drops to `low_altitude`. Low,
-  it rams whatever it flies over (`Helicopter.ram()`: infantry die, vehicles
-  and forts take damage and cost some hull), its weapons spread less
-  (`GunController.spread_scale()`), and radar-guided lockers (SAM truck,
-  SAM site, ripple launcher) can't lock it (`update_lock(..., radar_guided)`).
-  In exchange, small arms, flak, Stingers and Shilkas deal 1.5x damage.
-- **Dash (Shift)**: a ~12 m burst with a per-airframe cooldown
-  (`HelicopterData.dash_cooldown`).
+- **Flight model** (`Helicopter.steer()`): momentum, not snapping. Speed
+  spools up and brakes at constant rates set by the airframe's
+  `acceleration` (`throttle_response`, `brake_ratio`), the flight path bends
+  toward the input at a rate set by `turn_speed` (`path_turn_scale`) while
+  keeping speed, and steering past `reverse_angle` brakes straight through.
+  The body leans into the steering force (`thrust`).
+- **Dive (Q)**: a timed active. The helicopter drops to `low_altitude` for
+  `dive_duration` seconds, then climbs back; Q again pulls up early and
+  refunds part of the cooldown. Low, it rams whatever it flies over
+  (`Helicopter.ram()`: infantry die, vehicles and forts take damage and cost
+  some hull), its weapons spread less (`GunController.spread_scale()`), and
+  radar-guided lockers (SAM truck, SAM site, ripple launcher) can't lock it
+  (`update_lock(..., radar_guided)`). The cooldown is the cost
+  (`low_damage_multiplier` can add extra small-arms damage while low).
+- **Dash (Space / Shift)**: a ~14 m burst at any altitude, with charges and a
+  per-airframe cooldown (`HelicopterData.dash_cooldown`).
+- **Slam (E)**: plunges to the ground and blasts everything around it. From a
+  dive it lands almost at once and ends the dive.
 - **Pickups** (`mission/pickups/`): `PickupDropper` rolls on every kill and
   drops cash (added to the payout), a flare + dash recharge, or weapon
   frenzy (double fire rate, no reloads). Fly over them to collect.

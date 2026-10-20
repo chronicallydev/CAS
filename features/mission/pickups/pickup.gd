@@ -4,7 +4,7 @@ extends Node3D
 # token that floats over the ground for a few seconds. Fly over it to grab
 # it; the mission context applies its effect. It blinks before it fades.
 #   CASH     - bonus money added to the mission's payout
-#   RECHARGE - flares and dash ready at once
+#   RECHARGE - flares, dash and slam ready at once
 #   FRENZY   - a few seconds of double fire rate and no reloads
 
 enum Kind { CASH, RECHARGE, FRENZY }

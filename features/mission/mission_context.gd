@@ -153,6 +153,13 @@ func shake(amount: float, at: Variant = null) -> void:
 	camera_rig.add_trauma(amount)
 
 
+## Jolts the view a little toward `direction` (on the ground), then it
+## springs back: for the player's own moves, where shake would be noise.
+func kick(direction: Vector3, amount: float) -> void:
+	if camera_rig != null:
+		camera_rig.add_kick(direction, amount)
+
+
 ## Freezes the game for a moment (real time), for impact.
 func hit_stop(seconds: float) -> void:
 	if _hit_stop_active or get_tree().paused:
@@ -176,9 +183,8 @@ func collect_pickup(kind: int, value: int, at: Vector3) -> void:
 		hud.spawn_popup("+$%d" % value, at, Color(0.45, 0.95, 0.45))
 		Sfx.play_2d("kill_tick")
 	elif kind == kinds.RECHARGE:
-		helicopter.flare_cooldown_left = 0.0
-		helicopter.dash_cooldown_left = 0.0
-		hud.spawn_popup("FLARES + DASH READY", at, Color(0.45, 0.8, 1.0))
+		helicopter.recharge_abilities()
+		hud.spawn_popup("FLARES + DASH + SLAM READY", at, Color(0.45, 0.8, 1.0))
 		Sfx.play_2d("combo")
 	else:
 		guns.start_frenzy(6.0)

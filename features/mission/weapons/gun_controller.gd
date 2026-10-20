@@ -26,6 +26,9 @@ const WEAPON_IDS := ["cannon", "minigun", "javelin", "rockets", "fab"]
 # Mouse button per equipped slot.
 const SLOT_BUTTONS := [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]
 const SLOT_NAMES := ["LMB", "RMB"]
+# Killing an enemy with at least this much health (tanks, Shilkas, forts)
+# freezes the game for a moment.
+const HEAVY_KILL_HEALTH := 10.0
 
 const JavelinMissile := preload("res://features/mission/weapons/javelin_missile.gd")
 const JavelinExplosion := preload("res://features/mission/vfx/javelin_explosion.gd")
@@ -826,6 +829,7 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 	# Light rounds come from the gun; blasts push away from their centre.
 	var from := get_shot_origin() if light_weapon else position
 	var killed := 0
+	var heavy_killed := false
 
 	# Damage enemies near the explosion. Distance is measured on the ground
 	# plane so tall or floating enemies are hit the same as vehicles.
@@ -852,6 +856,8 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 			if killed_now:
 				register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
 				killed += 1
+				if enemy.get("max_health") != null and enemy.max_health >= HEAVY_KILL_HEALTH:
+					heavy_killed = true
 			else:
 				register_hit()
 				if enemy.has_method("register_hit"):
@@ -861,9 +867,12 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 			register_kill(enemy, 10)
 			killed += 1
 
-	# A tiny freeze on big multi-kills makes them land harder.
+	# A tiny freeze on big multi-kills, or on killing something big, makes
+	# them land harder.
 	if killed >= 3:
 		mission.hit_stop(0.05 + minf(killed, 8) * 0.01)
+	elif heavy_killed:
+		mission.hit_stop(0.045)
 
 
 # Where shots come from, for placing hit marks on the side that was hit.
