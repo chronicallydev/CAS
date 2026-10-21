@@ -24,7 +24,7 @@ signal damage_taken(amount: float, source: String)
 # Agility: how fast the nose follows the cursor and the flight path bends
 # toward the steering direction.
 @export var turn_speed: float = 6.0
-@export var max_tilt_degrees: float = 16.0
+@export var max_tilt_degrees: float = 40.0
 # Height of the ground plane used for mouse aiming.
 @export var ground_y: float = -0.4
 
@@ -36,13 +36,13 @@ signal damage_taken(amount: float, source: String)
 # those rates.
 #
 # Seconds from a hover to full speed = throttle_response / acceleration
-# (Little Bird ~0.2 s, Hind ~0.45 s).
+# (Cobra ~0.15 s).
 @export var throttle_response: float = 1.5
-# Stopping takes this share of the spool-up time.
-@export var brake_ratio: float = 0.8
+# Stopping takes this multiple of the spool-up time (Cobra ~0.28 s).
+@export var brake_ratio: float = 1.9
 # Degrees per second the flight path turns, per point of turn_speed
-# (Little Bird ~540, Hind ~290).
-@export var path_turn_scale: float = 64.0
+# (Cobra ~1300).
+@export var path_turn_scale: float = 146.0
 # Steering further than this off the current heading brakes and reverses
 # in a straight line instead of swinging round in an arc.
 @export var reverse_angle: float = 120.0
@@ -50,7 +50,7 @@ signal damage_taken(amount: float, source: String)
 @export var turn_scale: float = 3.0
 # Lean from the steering force on top of the lean from speed, and the most
 # it can lean, in multiples of max_tilt_degrees.
-@export var thrust_lean: float = 0.6
+@export var thrust_lean: float = 2.0
 @export var max_lean: float = 1.7
 
 @export_group("Health")

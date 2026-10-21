@@ -38,8 +38,8 @@ const MOVEMENT := [
 		["path_turn_scale", "Path turn / agility", 10.0, 200.0, 1.0],
 		["reverse_angle", "Reverse angle", 60.0, 180.0, 1.0],
 		["turn_scale", "Nose turn / agility", 0.5, 10.0, 0.1],
-		["max_tilt_degrees", "Tilt", 0.0, 40.0, 0.5],
-		["thrust_lean", "Thrust lean", 0.0, 2.0, 0.05],
+		["max_tilt_degrees", "Tilt", 0.0, 70.0, 0.5],
+		["thrust_lean", "Thrust lean", 0.0, 4.0, 0.05],
 	]],
 	["Dash (helicopter.gd)", [
 		["dash_distance", "Distance", 2.0, 40.0, 0.5],
