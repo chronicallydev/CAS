@@ -184,8 +184,15 @@ func take_damage(amount: float, source: String = "") -> void:
 		health = maxf(health - amount, 0.0)
 	health_bar.value = health
 	# Small-arms hits only tint the screen a little; missiles flash it red.
-	hit_flash.color.a = maxf(hit_flash.color.a, clampf(0.06 + amount / 55.0, 0.06, 0.45))
-	HitFlash.trigger(body)
+	# In 1-bit a tint would come out grey, so heavy hits invert the screen
+	# for a frame or two instead.
+	if PixelArt.is_monochrome():
+		if amount >= 8.0:
+			PixelArt.invert_flash(0.06 if amount < 25.0 else 0.12)
+	else:
+		hit_flash.color.a = maxf(hit_flash.color.a, clampf(0.06 + amount / 55.0, 0.06, 0.45))
+	# Black: the 1-bit helicopter is already white.
+	HitFlash.trigger(body, Color.BLACK)
 	Sfx.play_2d("heli_hit")
 	# Rifle rounds rattle the cabin; missiles throw it about.
 	mission.shake(clampf(0.12 + amount / 40.0, 0.12, 0.55))
@@ -625,3 +632,6 @@ func build_model(airframe: HelicopterData, weapons: Array) -> void:
 	rotor_blur = parts["rotor_blur"]
 	rotor_blur_alpha = rotor_blur.albedo_color.a
 	blade_count = maxi(airframe.blades, 1)
+	# Near-white with black outlines in 1-bit, against near-black enemies.
+	OneBit.paper(body)
+	OneBit.rim(body)

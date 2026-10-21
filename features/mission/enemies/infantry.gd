@@ -95,8 +95,8 @@ func update_rifle(delta: float) -> void:
 	var from := rifle.global_position
 	var target := heli.global_position + Vector3(randf_range(-3.0, 3.0), randf_range(-1.0, 1.0), randf_range(-3.0, 3.0))
 	var tracer := Tracer.new()
-	tracer.radius = 0.12
-	tracer.color = Color(1.0, 0.9, 0.5)
+	tracer.radius = 0.22
+	tracer.length = 2.0
 	MissionContext.spawn_parent(self).add_child(tracer)
 	tracer.setup(from, target, 0.3, 0.0, rifle_hit.bind(heli))
 	Sfx.play_3d("car_gun", from)

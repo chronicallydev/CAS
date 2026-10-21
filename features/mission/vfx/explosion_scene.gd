@@ -2,42 +2,56 @@ class_name ExplosionScene
 extends Node3D
 
 # The shared explosion. Two looks:
-#   chunky (retro) - hard-edged blobs stepped at 12 fps: a white flash, then
-#                    fire that cools from yellow through orange and red,
-#                    then smoke puffs that rise and pop out instead of
-#                    fading. The debris sparks stay.
+#   chunky (retro) - hard-edged blobs stepped at 12 fps, made for the 1-bit
+#                    look: a white flash, then solid white fire balls with
+#                    black outlines, then solid black smoke puffs that rise
+#                    and pop out instead of fading. Bullet impacts (scale
+#                    under 0.5) are just the flash and black dust kicks.
+#                    The debris sparks stay.
 #   soft           - the original particle fireball and smoke.
+# Mid-tones would dither into the sand, so every blob is pure black or
+# white; the outlines keep the white fire from vanishing into bright ground.
 
 # Switched from the test range's LOOK section.
 static var chunky: bool = true
 
 const FPS := 12.0
-const FIRE_RAMP: Array[Color] = [
-	Color(1.0, 1.0, 0.85), Color(1.0, 0.9, 0.35), Color(1.0, 0.6, 0.15),
-	Color(0.9, 0.3, 0.1), Color(0.55, 0.16, 0.08)]
-const SMOKE_RAMP: Array[Color] = [
-	Color(0.42, 0.4, 0.38), Color(0.3, 0.28, 0.27), Color(0.2, 0.19, 0.18)]
+# Outline thickness in world units: about one low-res pixel at the default
+# zoom, so even a small bullet impact keeps a visible rim.
+const OUTLINE := 0.45
 
 static var blob_mesh: SphereMesh
+static var white: StandardMaterial3D
+static var black: StandardMaterial3D
+# Black, drawn inside out: an "inverted hull" behind the blob shows only as
+# a rim around it.
+static var hull: StandardMaterial3D
+# The debris streaks in solid black: the scene's glowing orange ones come
+# out white and vanish into the sand.
+static var streak_mesh: Mesh
 
 @onready var debris: GPUParticles3D = %Debris
 @onready var fire: GPUParticles3D = %Fire
 @onready var smoke: GPUParticles3D = %Smoke
 
-# Each: {node, material, start, life, size, ramp, rise}, times in frames.
+# Each: {node, rim, start, life, size, rise, base}, times in frames.
 var blobs: Array[Dictionary] = []
 var age: float = 0.0
 var frame: int = -1
 
 
 func _ready() -> void:
-	debris.emitting = true
 	# Scale is set by whoever spawned us, right after adding us to the tree.
 	if chunky:
+		if streak_mesh == null:
+			streak_mesh = debris.draw_pass_1.duplicate()
+			streak_mesh.surface_set_material(0, OneBit.solid(Color.BLACK))
+		debris.draw_pass_1 = streak_mesh
 		build_blobs.call_deferred()
 	else:
 		fire.emitting = true
 		smoke.emitting = true
+	debris.emitting = true
 	play_sound.call_deferred()
 
 	# Free the effect once the particles are done.
@@ -55,41 +69,70 @@ func _process(delta: float) -> void:
 		step_blobs()
 
 
+static func make_materials() -> void:
+	blob_mesh = SphereMesh.new()
+	blob_mesh.radial_segments = 8
+	blob_mesh.rings = 4
+	white = unshaded(Color.WHITE)
+	black = unshaded(Color.BLACK)
+	hull = unshaded(Color.BLACK)
+	hull.cull_mode = BaseMaterial3D.CULL_FRONT
+
+
+static func unshaded(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = color
+	return material
+
+
 func build_blobs() -> void:
 	if blob_mesh == null:
-		blob_mesh = SphereMesh.new()
-		blob_mesh.radial_segments = 8
-		blob_mesh.rings = 4
-	# Bullet impacts and sparks get a short pop; blasts the full show.
-	var small := scale.x < 0.5
+		make_materials()
+	# Bullet impacts: a flash, then black dust kicked up off the sand. Sized
+	# up against their small scale so they read wider than the tracers.
+	if scale.x < 0.5:
+		add_blob(Vector3.ZERO, 0, 2, 9.0, white, 0.0)
+		for i in 3:
+			var at := Vector3(randf_range(-2.5, 2.5), randf_range(0.0, 1.0), randf_range(-2.5, 2.5))
+			add_blob(at, randi_range(1, 2), randi_range(3, 4), randf_range(4.0, 5.0), black, 0.6)
+		step_blobs()
+		return
 	# The flash: one big white ball for the first two frames.
 	# Sizes are diameters at scale 1, to match the old particle fireball.
-	add_blob(Vector3.ZERO, 0, 2, 4.0, [Color.WHITE], 0.0)
-	for i in (2 if small else 6):
+	add_blob(Vector3.ZERO, 0, 2, 4.0, white, 0.0)
+	for i in 6:
 		var at := Vector3(randf_range(-1.4, 1.4), randf_range(0.0, 1.0), randf_range(-1.4, 1.4))
-		add_blob(at, randi_range(0, 2), randi_range(3, 4) if small else randi_range(4, 6), randf_range(1.8, 2.6), FIRE_RAMP, 0.1)
-	for i in (0 if small else 4):
+		add_blob(at, randi_range(0, 2), randi_range(4, 6), randf_range(1.8, 2.6), white, 0.1)
+	for i in 4:
 		var at := Vector3(randf_range(-1.2, 1.2), randf_range(0.8, 1.6), randf_range(-1.2, 1.2))
-		add_blob(at, randi_range(3, 5), randi_range(6, 9), randf_range(1.5, 2.2), SMOKE_RAMP, 0.35)
+		add_blob(at, randi_range(3, 5), randi_range(6, 9), randf_range(1.5, 2.2), black, 0.35)
 	step_blobs()
 
 
-func add_blob(at: Vector3, start: int, life: int, size: float, ramp: Array[Color], rise: float) -> void:
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var node := MeshInstance3D.new()
-	node.mesh = blob_mesh
-	node.material_override = material
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+func add_blob(at: Vector3, start: int, life: int, size: float, material: Material, rise: float) -> void:
+	var node := make_mesh(material)
 	node.position = at
 	node.visible = false
 	add_child(node)
-	blobs.append({"node": node, "material": material, "start": start, "life": life,
-		"size": size, "ramp": ramp, "rise": rise, "base": at})
+	# Only white needs an outline; black already stands out.
+	var rim: MeshInstance3D = null
+	if material == white:
+		rim = make_mesh(hull)
+		node.add_child(rim)
+	blobs.append({"node": node, "rim": rim, "start": start, "life": life, "size": size, "rise": rise, "base": at})
 
 
-# One 12 fps frame: each blob swells, cools a colour step and rises,
-# all in whole steps, and vanishes at the end of its life.
+func make_mesh(material: Material) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = blob_mesh
+	mesh.material_override = material
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mesh
+
+
+# One 12 fps frame: each blob swells, rises and burns down in whole steps,
+# and vanishes at the end of its life.
 func step_blobs() -> void:
 	for blob in blobs:
 		var node: MeshInstance3D = blob.node
@@ -98,12 +141,14 @@ func step_blobs() -> void:
 		if not node.visible:
 			continue
 		var progress: float = float(t) / blob.life
-		var ramp: Array[Color] = blob.ramp
-		blob.material.albedo_color = ramp[mini(floori(progress * ramp.size()), ramp.size() - 1)]
-		# Swells fast, then shrinks a little as it burns out.
-		var swell: float = 0.6 + 0.4 * minf(t / 2.0, 1.0) - 0.25 * maxf(progress - 0.6, 0.0)
+		# Swells fast, then shrinks as it burns out.
+		var swell: float = 0.6 + 0.4 * minf(t / 2.0, 1.0) - 0.5 * maxf(progress - 0.5, 0.0)
 		node.scale = Vector3.ONE * blob.size * swell
 		node.position = blob.base + Vector3.UP * blob.rise * t
+		if blob.rim != null:
+			# The same world thickness whatever the blob's size.
+			var diameter: float = blob.size * swell * scale.x
+			blob.rim.scale = Vector3.ONE * (diameter + OUTLINE * 2.0) / diameter
 
 
 # Small effects (hit sparks, muzzle flashes) stay silent; their source

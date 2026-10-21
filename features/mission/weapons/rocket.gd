@@ -20,28 +20,22 @@ func launch(from: Vector3, to: Vector3, rocket_speed: float, hit_callback: Calla
 
 
 func _ready() -> void:
+	# 1-bit: the player's fire is white with black rims, and drawn about
+	# twice life size so it's more than a pixel wide.
 	var body := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.09
-	mesh.bottom_radius = 0.09
-	mesh.height = 1.0
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.82, 0.82, 0.78)
-	mesh.material = material
+	mesh.top_radius = 0.2
+	mesh.bottom_radius = 0.2
+	mesh.height = 1.6
+	mesh.material = OneBit.solid(Color.WHITE)
 	body.mesh = mesh
 	body.rotation_degrees.x = 90.0
 	add_child(body)
+	OneBit.rim(self, Color.BLACK, 0.25)
 
 	var flame := MeshInstance3D.new()
-	var flame_mesh := SphereMesh.new()
-	flame_mesh.radius = 0.18
-	flame_mesh.height = 0.36
-	var flame_mat := StandardMaterial3D.new()
-	flame_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flame_mat.albedo_color = Color(1.0, 0.75, 0.3)
-	flame_mesh.material = flame_mat
-	flame.mesh = flame_mesh
-	flame.position = Vector3(0, 0, 0.55)
+	flame.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.3)
+	flame.position = Vector3(0, 0, 0.95)
 	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(flame)
 
@@ -49,22 +43,19 @@ func _ready() -> void:
 	trail.amount = 40
 	trail.lifetime = 0.7
 	trail.local_coords = false
-	trail.position = Vector3(0, 0, 0.6)
+	trail.position = Vector3(0, 0, 1.0)
 	trail.direction = Vector3(0, 0, 1)
 	trail.spread = 6.0
 	trail.initial_velocity_min = 0.2
 	trail.initial_velocity_max = 0.6
 	trail.gravity = Vector3(0, 0.3, 0)
 	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var smoke := SphereMesh.new()
-	smoke.radius = 0.18
-	smoke.height = 0.36
-	var smoke_mat := StandardMaterial3D.new()
-	smoke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	smoke_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	smoke_mat.albedo_color = Color(0.85, 0.85, 0.85, 0.4)
-	smoke.material = smoke_mat
-	trail.mesh = smoke
+	trail.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.28)
+	# Puffs shrink away and pop out rather than fading.
+	var shrink := Curve.new()
+	shrink.add_point(Vector2(0.0, 1.0))
+	shrink.add_point(Vector2(1.0, 0.2))
+	trail.scale_amount_curve = shrink
 	add_child(trail)
 
 

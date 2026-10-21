@@ -46,11 +46,12 @@ static func create_from(source: Node3D) -> Node3D:
 
 func _ready() -> void:
 	start_y = position.y
-	fire = make_particles(Color(1.0, 0.55, 0.15), 24, 0.7, 1.2, 0.35, 2.0, true)
-	smoke = make_particles(Color(0.25, 0.24, 0.23, 0.6), 30, 2.5, 0.8, 0.6, 4.0, false)
+	# 1-bit: white fire with black rims, black smoke with white rims.
+	fire = make_particles(Color.WHITE, Color.BLACK, 24, 0.7, 1.2, 0.35, 2.0)
+	smoke = make_particles(Color.BLACK, Color.WHITE, 30, 2.5, 0.8, 0.6, 4.0)
 
 
-func make_particles(color: Color, amount: int, life: float, size: float, radius: float, rise: float, glow: bool) -> CPUParticles3D:
+func make_particles(fill: Color, rim: Color, amount: int, life: float, size: float, radius: float, rise: float) -> CPUParticles3D:
 	var particles := CPUParticles3D.new()
 	particles.amount = amount
 	particles.lifetime = life
@@ -67,28 +68,13 @@ func make_particles(color: Color, amount: int, life: float, size: float, radius:
 	particles.scale_amount_max = 1.3
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
+	# Swell, then shrink away and pop out: solid puffs can't fade.
 	var curve := Curve.new()
 	curve.add_point(Vector2(0, 0.5))
 	curve.add_point(Vector2(0.3, 1.0))
-	curve.add_point(Vector2(1, 0.2 if glow else 1.0))
+	curve.add_point(Vector2(1, 0.2))
 	particles.scale_amount_curve = curve
-
-	var mesh := SphereMesh.new()
-	mesh.radius = size * 0.5
-	mesh.height = size
-	mesh.radial_segments = 8
-	mesh.rings = 4
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = color
-	mesh.material = material
-	particles.mesh = mesh
-
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(1, 1, 1, 1))
-	ramp.set_color(1, Color(1, 1, 1, 0))
-	particles.color_ramp = ramp
+	particles.mesh = OneBit.puff(fill, rim, size * 0.5)
 
 	add_child(particles)
 	return particles

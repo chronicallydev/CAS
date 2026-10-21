@@ -488,9 +488,14 @@ func spawn_tracer(from: Vector3, target: Vector3, flight_time: float, vfx_scale:
 	if shooter == null or flight_time <= 0.0:
 		return
 
+	# A white streak with a black rim, each at least a low-res pixel wide
+	# (about 0.5 m at the default zoom), so it reads in 1-bit on any ground.
 	var tracer := Tracer.new()
-	tracer.radius = 0.12 + 0.13 * clampf(vfx_scale, 0.0, 1.0)
-	tracer.color = Color(1.0, 0.85, 0.45)
+	tracer.radius = 0.22 + 0.13 * clampf(vfx_scale, 0.0, 1.0)
+	tracer.length = 3.5
+	tracer.outline = 0.4
+	tracer.color = Color.WHITE
+	tracer.outline_color = Color.BLACK
 	MissionContext.spawn_parent(self).add_child(tracer)
 	tracer.setup(from, target, flight_time, 0.0, Callable())
 

@@ -40,15 +40,9 @@ func _physics_process(delta: float) -> void:
 
 
 func build_visuals() -> void:
-	var glow := StandardMaterial3D.new()
-	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = Color(1.0, 0.92, 0.7)
+	# 1-bit: the player's stuff is white with black rims.
 	var core := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.35
-	sphere.height = 0.7
-	sphere.material = glow
-	core.mesh = sphere
+	core.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.5, 0.35)
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(core)
 
@@ -69,13 +63,10 @@ func build_visuals() -> void:
 	trail.scale_amount_min = 0.7
 	trail.scale_amount_max = 1.3
 	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var puff := SphereMesh.new()
-	puff.radius = 0.25
-	puff.height = 0.5
-	var smoke := StandardMaterial3D.new()
-	smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	smoke.albedo_color = Color(0.95, 0.93, 0.9, 0.5)
-	puff.material = smoke
-	trail.mesh = puff
+	trail.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.25)
+	# Puffs shrink away and pop out rather than fading.
+	var shrink := Curve.new()
+	shrink.add_point(Vector2(0.0, 1.0))
+	shrink.add_point(Vector2(1.0, 0.2))
+	trail.scale_amount_curve = shrink
 	add_child(trail)

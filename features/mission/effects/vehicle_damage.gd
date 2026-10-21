@@ -65,13 +65,11 @@ func register_hit(from: Vector3, light_weapon: bool, armored: bool) -> void:
 
 
 func update_damage_state(fraction: float) -> void:
+	# 1-bit: black smoke with white rims, then white fire with black rims.
 	if fraction < 0.5 and smoke == null:
-		smoke = make_emitter(Color(0.55, 0.55, 0.55, 0.55), 20, 1.8, 1.0, 3.0)
+		smoke = make_emitter(Color.BLACK, Color.WHITE, 20, 1.8, 1.0, 3.0)
 	if fraction < 0.25 and fire == null:
-		fire = make_emitter(Color(1.0, 0.55, 0.15, 0.95), 18, 0.6, 0.9, 2.0)
-		# Smoke turns black once it's burning.
-		if smoke != null:
-			(smoke.mesh.surface_get_material(0) as StandardMaterial3D).albedo_color = Color(0.12, 0.11, 0.1, 0.65)
+		fire = make_emitter(Color.WHITE, Color.BLACK, 18, 0.6, 0.9, 2.0)
 
 
 # --- Hit placement ------------------------------------------------------
@@ -177,14 +175,10 @@ static func make_mark_texture(heavy: bool) -> ImageTexture:
 
 # --- Sparks -------------------------------------------------------------
 
+# 1-bit: white with a black rim, so sparks show over the black vehicle and
+# the bright sand alike; big enough to be a pixel or two.
 static func make_spark_mesh() -> Mesh:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.14, 0.14, 0.14)
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.vertex_color_use_as_albedo = true
-	mesh.material = material
-	return mesh
+	return OneBit.puff(Color.WHITE, Color.BLACK, 0.16, 0.6)
 
 
 func spawn_sparks(at: Vector3, normal: Vector3, ricochet: bool) -> void:
@@ -207,10 +201,6 @@ func spawn_sparks(at: Vector3, normal: Vector3, ricochet: bool) -> void:
 	sparks.scale_amount_min = 0.7
 	sparks.scale_amount_max = 1.3
 	sparks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(1.0, 1.0, 0.75))
-	ramp.set_color(1, Color(1.0, 0.45, 0.1))
-	sparks.color_ramp = ramp
 	scene.add_child(sparks)
 	sparks.global_position = at
 	sparks.emitting = true
@@ -219,7 +209,7 @@ func spawn_sparks(at: Vector3, normal: Vector3, ricochet: bool) -> void:
 
 # --- Smoke and fire -----------------------------------------------------
 
-func make_emitter(color: Color, amount: int, life: float, size: float, rise: float) -> CPUParticles3D:
+func make_emitter(fill: Color, rim: Color, amount: int, life: float, size: float, rise: float) -> CPUParticles3D:
 	var box := get_bounds()
 	var particles := CPUParticles3D.new()
 	particles.amount = amount
@@ -236,28 +226,12 @@ func make_emitter(color: Color, amount: int, life: float, size: float, rise: flo
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	var curve := Curve.new()
+	# Swell, then shrink away and pop out: solid puffs can't fade.
 	curve.add_point(Vector2(0, 0.4))
 	curve.add_point(Vector2(0.4, 1.0))
-	curve.add_point(Vector2(1, 0.8))
+	curve.add_point(Vector2(1, 0.3))
 	particles.scale_amount_curve = curve
-
-	var mesh := SphereMesh.new()
-	mesh.radius = size * 0.5
-	mesh.height = size
-	mesh.radial_segments = 8
-	mesh.rings = 4
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.vertex_color_use_as_albedo = true
-	material.albedo_color = color
-	mesh.material = material
-	particles.mesh = mesh
-
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(1, 1, 1, 1))
-	ramp.set_color(1, Color(1, 1, 1, 0))
-	particles.color_ramp = ramp
+	particles.mesh = OneBit.puff(fill, rim, size * 0.5)
 
 	vehicle.add_child(particles)
 	return particles

@@ -47,6 +47,8 @@ var layer: CanvasLayer
 var display: TextureRect
 
 var pixel_size: int = 3
+# Seconds the image stays inverted (see invert_flash).
+var invert_left: float = 0.0
 # The scene camera we're copying, and its own cull mask to restore.
 var source_camera: Camera3D
 var source_cull_mask: int = 0
@@ -102,7 +104,11 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if invert_left > 0.0:
+		invert_left -= delta
+		palette_material.set_shader_parameter("invert", invert_left > 0.0)
+
 	var camera := get_viewport().get_camera_3d()
 	var active := enabled and camera != null and is_instance_valid(camera)
 
@@ -120,6 +126,18 @@ func _process(_delta: float) -> void:
 	# The scene camera keeps working for aiming and audio, but draws nothing.
 	camera.cull_mask = 0
 	sync_camera(camera)
+
+
+## Inverts the whole image for `seconds`: the 1-bit way to flash the
+## screen, where a coloured tint would only come out grey or dithered.
+func invert_flash(seconds: float) -> void:
+	invert_left = maxf(invert_left, seconds)
+	palette_material.set_shader_parameter("invert", true)
+
+
+## True while the palette is black and white or another monochrome set.
+func is_monochrome() -> bool:
+	return RetroPalettes.LIST[palette].get("lightness", false)
 
 
 func release_source() -> void:

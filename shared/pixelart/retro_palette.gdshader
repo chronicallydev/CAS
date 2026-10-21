@@ -29,6 +29,8 @@ uniform float levels = 8.0;
 uniform float dither = 0.5;
 // The camera's position in low-res pixels (set by pixel_art.gd).
 uniform ivec2 dither_offset = ivec2(0);
+// Inverts the whole image (the 1-bit damage flash; see PixelArt.invert_flash).
+uniform bool invert = false;
 
 const float BAYER[16] = float[](
 	0.0, 8.0, 2.0, 10.0,
@@ -116,5 +118,8 @@ void fragment() {
 			color = clamp(floor(source.rgb * steps + 0.5 + threshold * dither) / steps, 0.0, 1.0);
 		}
 		COLOR = vec4(color, source.a);
+	}
+	if (invert) {
+		COLOR.rgb = vec3(1.0) - COLOR.rgb;
 	}
 }

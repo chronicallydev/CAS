@@ -112,23 +112,15 @@ static func launch_part(part: Node3D, origin: Vector3, big: bool) -> void:
 		debris.add_smoke_trail()
 
 
-static var dust_mesh: SphereMesh
+static var dust_mesh: Mesh
 
 # A puff of sand kicked up where something hits the ground.
 static func spawn_dust(scene: Node, at: Vector3, size: float = 1.0) -> void:
 	if scene == null:
 		return
 	if dust_mesh == null:
-		dust_mesh = SphereMesh.new()
-		dust_mesh.radius = 0.35
-		dust_mesh.height = 0.7
-		dust_mesh.radial_segments = 6
-		dust_mesh.rings = 3
-		var material := StandardMaterial3D.new()
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.vertex_color_use_as_albedo = true
-		dust_mesh.material = material
+		# 1-bit: solid white puffs with black rims, so they show on sand.
+		dust_mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.35)
 
 	var dust := CPUParticles3D.new()
 	dust.one_shot = true
@@ -147,10 +139,7 @@ static func spawn_dust(scene: Node, at: Vector3, size: float = 1.0) -> void:
 	dust.scale_amount_min = 0.7 * size
 	dust.scale_amount_max = 1.3 * size
 	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(0.78, 0.66, 0.5, 0.8))
-	ramp.set_color(1, Color(0.78, 0.66, 0.5, 0.0))
-	dust.color_ramp = ramp
+	dust.scale_amount_curve = shrink_curve()
 	scene.add_child(dust)
 	dust.global_position = at
 	dust.emitting = true
@@ -195,18 +184,18 @@ func add_smoke_trail() -> void:
 	trail.initial_velocity_max = 1.5
 	trail.gravity = Vector3(0, 0.5, 0)
 	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.4
-	mesh.height = 0.8
-	mesh.radial_segments = 6
-	mesh.rings = 3
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(0.15, 0.14, 0.13, 0.6)
-	mesh.material = material
-	trail.mesh = mesh
+	# 1-bit: solid black puffs with white rims.
+	trail.mesh = OneBit.puff(Color.BLACK, Color.WHITE, 0.4)
+	trail.scale_amount_curve = shrink_curve()
 	add_child(trail)
+
+
+# Solid 1-bit puffs can't fade, so they shrink away and pop out.
+static func shrink_curve() -> Curve:
+	var curve := Curve.new()
+	curve.add_point(Vector2(0.0, 1.0))
+	curve.add_point(Vector2(1.0, 0.2))
+	return curve
 
 
 func _physics_process(delta: float) -> void:

@@ -4,6 +4,7 @@ class_name HealthBar
 # A health bar floating in the 3D world: a 2D ProgressBar rendered into a
 # SubViewport and shown on this sprite. Used by the rig and by vehicles
 # and forts; their scripts call update_health() whenever health changes.
+# Styled for 1-bit: a black fill in a white bar with a black border.
 
 @onready var viewport: SubViewport = $SubViewport
 @onready var health_bar: ProgressBar = $SubViewport/ProgressBar

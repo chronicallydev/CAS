@@ -47,7 +47,9 @@ var explosion_scale: float = 1.0
 var airburst: bool = true
 # The helicopter counts as inside a little beyond the edge (its rotor).
 var heli_margin: float = 1.0
-var color: Color = Color(1.0, 0.15, 0.1)
+# The fill's colour. In 1-bit, see-through black over the sand comes out as
+# a darker dither that thickens as impact nears.
+var color: Color = Color.BLACK
 
 var time_left: float = 0.0
 var active_left: float = 0.0
@@ -102,10 +104,11 @@ func _physics_process(delta: float) -> void:
 	fill.scale = Vector3(grow, 1.0, grow)
 	fill_material.albedo_color.a = lerpf(0.15, 0.4, progress)
 
-	# Outline blinks faster and faster, solid for the last moment.
+	# Outline blinks black and white, faster and faster, solid black for the
+	# last moment. Swapping colours reads on bright sand and dark ground.
 	var rate := lerpf(2.5, 12.0, progress)
 	var lit := time_left < 0.25 or fmod(progress * warning_time * rate, 1.0) < 0.6
-	outline_material.albedo_color.a = 0.95 if lit else 0.35
+	outline_material.albedo_color = Color.BLACK if lit else Color.WHITE
 
 	if time_left <= 0.0:
 		detonate()
@@ -202,7 +205,7 @@ func detonate() -> void:
 		# Stays live; the first tick lands at once.
 		active_left = active_time
 		tick_left = 0.0
-		outline_material.albedo_color.a = 0.95
+		outline_material.albedo_color = Color.BLACK
 		return
 
 	hurt_helicopter()
@@ -211,32 +214,25 @@ func detonate() -> void:
 	finish()
 
 
-# Flashes white and fades out.
+# Flashes white and dithers away; the outline goes white with it.
 func finish() -> void:
 	done = true
-	fill_material.albedo_color = Color(1.0, 0.9, 0.7, 0.7)
-	var fade := create_tween().set_parallel()
+	fill_material.albedo_color = Color(1.0, 1.0, 1.0, 0.9)
+	outline_material.albedo_color = Color.WHITE
+	var fade := create_tween()
 	fade.tween_property(fill_material, "albedo_color:a", 0.0, 0.4)
-	fade.tween_property(outline_material, "albedo_color:a", 0.0, 0.4)
-	fade.chain().tween_callback(queue_free)
+	fade.tween_callback(queue_free)
 
 
 # A fireball flash at flight height, right where the helicopter would be
 # hit; from the camera it sits over the marker.
 func spawn_airburst() -> void:
 	var radius := minf(size, length) * 0.4
+	# 1-bit: a solid white ball with a black rim that swells, then pops.
 	var burst := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(1.0, 0.7, 0.35, 0.6)
-	mesh.material = material
-	burst.mesh = mesh
+	burst.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 1.0, 0.15)
 	burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	burst.scale = Vector3.ONE * 0.4
+	burst.scale = Vector3.ONE * 0.4 * radius
 	add_child(burst)
 	burst.global_position = strike_point()
 
@@ -248,9 +244,9 @@ func spawn_airburst() -> void:
 	light.global_position = strike_point()
 
 	var fade := create_tween().set_parallel()
-	fade.tween_property(burst, "scale", Vector3.ONE * 1.2, 0.3).set_ease(Tween.EASE_OUT)
-	fade.tween_property(material, "albedo_color:a", 0.0, 0.3)
+	fade.tween_property(burst, "scale", Vector3.ONE * 1.2 * radius, 0.3).set_ease(Tween.EASE_OUT)
 	fade.tween_property(light, "light_energy", 0.0, 0.35)
+	fade.chain().tween_callback(burst.queue_free)
 
 
 func build_visuals() -> void:
@@ -264,8 +260,8 @@ func build_visuals() -> void:
 	fill_material.albedo_color = Color(color.r, color.g, color.b, 0.15)
 	fill_material.render_priority = 1
 
-	outline_material = fill_material.duplicate()
-	outline_material.albedo_color = Color(color.r, color.g, color.b, 0.95)
+	# Solid, so it stays pure black or white through the palette pass.
+	outline_material = OneBit.solid(Color.BLACK)
 	outline_material.render_priority = 2
 
 	fill = MeshInstance3D.new()
@@ -278,7 +274,8 @@ func build_visuals() -> void:
 	marker.add_child(fill)
 
 	# Four edges and a small centre cross.
-	var edge := 0.35
+	# At least a low-res pixel wide (about 0.5 m at the default zoom).
+	var edge := 0.6
 	var half_w := size * 0.5
 	var half_l := length * 0.5
 	add_bar(Vector3(0, 0, -half_l), Vector3(size + edge, 0.06, edge))

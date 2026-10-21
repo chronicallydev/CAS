@@ -18,7 +18,7 @@ uniform float depth_threshold = 0.9;
 uniform float normal_threshold = 0.2;
 // Brightening of crease lines and darkening of silhouette lines.
 uniform float line_highlight = 0.22;
-uniform float line_shadow = 0.5;
+uniform float line_shadow = 1.0;
 // Colour steps per channel (0 = off) and a saturation boost.
 uniform float color_levels = 28.0;
 uniform float saturation = 1.05;

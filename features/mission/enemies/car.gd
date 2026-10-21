@@ -108,7 +108,6 @@ func fire_at(base: Node3D) -> void:
 
 	var tracer := Tracer.new()
 	tracer.radius = 0.3
-	tracer.color = Color(1.0, 0.75, 0.2)
 	MissionContext.spawn_parent(self).add_child(tracer)
 	tracer.setup(from, target, shot_flight_time, 0.3, shot_hit.bind(base))
 	Sfx.play_3d("car_gun", from)

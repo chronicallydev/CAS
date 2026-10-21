@@ -92,7 +92,8 @@ var wobble_phase: float = 0.0
 func _ready() -> void:
 	add_to_group("aa_missiles")
 	build_visuals()
-	model.scale *= size
+	# Drawn 1.6x life size so it reads in 1-bit (it was about a pixel wide).
+	model.scale *= size * 1.6
 	# Dark until the motor lights.
 	flame.visible = false
 	motor_light.visible = false
@@ -407,32 +408,17 @@ func make_smoke(amount: int, life: float, color: Color) -> CPUParticles3D:
 	smoke.gravity = Vector3(0, 0.5, 0)
 	smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	var puff := SphereMesh.new()
-	puff.radius = 0.25
-	puff.height = 0.5
-	puff.radial_segments = 8
-	puff.rings = 4
-	var material := StandardMaterial3D.new()
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.vertex_color_use_as_albedo = true
-	puff.material = material
-	smoke.mesh = puff
+	# 1-bit: solid puffs, white with a black rim for light smoke and black
+	# with a white rim for dark, instead of see-through ones that would only
+	# dither into the sand.
+	var light := color.get_luminance() > 0.5
+	smoke.mesh = OneBit.puff(Color.WHITE if light else Color.BLACK, Color.BLACK if light else Color.WHITE, 0.25)
 
-	# Hot and bright at the nozzle, cooling to grey and fading out.
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.15, 1.0])
-	ramp.colors = PackedColorArray([
-		Color(1.0, 0.8, 0.5, color.a),
-		color,
-		Color(color.r * 0.8, color.g * 0.8, color.b * 0.8, 0.0),
-	])
-	smoke.color_ramp = ramp
-
-	# Puffs swell as they drift.
+	# Puffs swell off the nozzle, then shrink away and pop out.
 	var grow := Curve.new()
-	grow.add_point(Vector2(0.0, 0.4))
-	grow.add_point(Vector2(1.0, 1.0))
+	grow.add_point(Vector2(0.0, 0.5))
+	grow.add_point(Vector2(0.2, 1.0))
+	grow.add_point(Vector2(1.0, 0.3))
 	smoke.scale_amount_curve = grow
 	return smoke
 
@@ -442,8 +428,10 @@ func build_visuals() -> void:
 	model = Node3D.new()
 	add_child(model)
 
-	var white := StandardMaterial3D.new()
-	white.albedo_color = body_color
+	# 1-bit: a solid black body (enemy fire is ink), drawn bigger than life
+	# so it's more than a pixel wide; `body_color` only tints the colour
+	# palettes.
+	var white := OneBit.solid(body_color.darkened(0.85))
 
 	# Body (forward is -Z).
 	var body := MeshInstance3D.new()
@@ -456,15 +444,13 @@ func build_visuals() -> void:
 	body.rotation_degrees.x = 90.0
 	model.add_child(body)
 
-	# Red nose.
+	# Nose cone.
 	var nose := MeshInstance3D.new()
 	var nose_mesh := CylinderMesh.new()
 	nose_mesh.top_radius = 0.0
 	nose_mesh.bottom_radius = 0.18
 	nose_mesh.height = 0.4
-	var red := StandardMaterial3D.new()
-	red.albedo_color = Color(0.85, 0.15, 0.1)
-	nose_mesh.material = red
+	nose_mesh.material = white
 	nose.mesh = nose_mesh
 	nose.rotation_degrees.x = -90.0
 	nose.position = Vector3(0, 0, -1.0)
@@ -472,14 +458,7 @@ func build_visuals() -> void:
 
 	# Motor glow: big in the boost, goes out at burnout.
 	flame = MeshInstance3D.new()
-	var flame_mesh := SphereMesh.new()
-	flame_mesh.radius = 0.3
-	flame_mesh.height = 0.9
-	var flame_mat := StandardMaterial3D.new()
-	flame_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flame_mat.albedo_color = Color(1.0, 0.75, 0.35)
-	flame_mesh.material = flame_mat
-	flame.mesh = flame_mesh
+	flame.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.35)
 	flame.position = Vector3(0, 0, 1.0)
 	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	model.add_child(flame)

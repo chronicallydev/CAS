@@ -100,6 +100,7 @@ light_color = Color(1, 0.84, 0.66, 1)
 light_energy = 1.3
 shadow_enabled = true
 directional_shadow_max_distance = 160.0
+shadow_opacity = 0.55
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="World/Atmosphere" unique_id=1249058794]
 environment = SubResource("Environment_0wfyh")

@@ -221,7 +221,6 @@ func fire_at(target: Vector3) -> void:
 	# Fat, long bolts so the stream reads at the camera's distance.
 	tracer.radius = 0.22
 	tracer.length = 2.6
-	tracer.color = Color(1.0, 0.6, 0.25)
 	MissionContext.spawn_parent(self).add_child(tracer)
 	tracer.setup(from, target, shell_flight_time, 0.0, shell_burst)
 	muzzle_flash.global_position = from

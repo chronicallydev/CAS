@@ -197,7 +197,8 @@ static func get_blood_drop_mesh() -> Mesh:
 		mesh.size = Vector3(0.14, 0.14, 0.14)
 		var material := StandardMaterial3D.new()
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.albedo_color = Color(0.45, 0.04, 0.04)
+		# Near-black, so it reads as dark splatter in 1-bit.
+		material.albedo_color = Color(0.2, 0.02, 0.02)
 		mesh.material = material
 		blood_mesh = mesh
 	return blood_mesh

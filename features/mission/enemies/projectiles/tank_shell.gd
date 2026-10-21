@@ -1,6 +1,9 @@
 extends Node3D
 
 # Tank shell: flies along an arc from start to target, then calls on_hit.
+# Also the tracer round for every gun. The defaults are enemy fire in the
+# 1-bit look: a black round with a white rim. The player's minigun sets
+# white with a black rim.
 
 var start: Vector3
 var target: Vector3
@@ -9,10 +12,15 @@ var arc_height: float = 4.0
 var on_hit: Callable
 # Set before adding to the tree.
 var radius: float = 0.3
-var color: Color = Color(1.0, 0.85, 0.4)
+var color: Color = Color.BLACK
 # Above zero, drawn as a streak this long along its flight instead of a
 # ball, so fast fire reads as a stream (for straight shots, arc_height 0).
 var length: float = 0.0
+# Above zero, a solid rim this thick (world units) around the shell, in
+# the opposite colour, so the round reads on both bright sand and dark
+# shapes.
+var outline: float = 0.3
+var outline_color: Color = Color.WHITE
 
 var elapsed: float = 0.0
 
@@ -27,20 +35,29 @@ func setup(from: Vector3, to: Vector3, time: float, height: float, hit_callback:
 
 
 func _ready() -> void:
+	add_shell(radius, length, color, false)
+	if outline > 0.0:
+		# Drawn inside out, so only the rim around the shell shows.
+		add_shell(radius + outline, length + outline * 2.0 if length > 0.0 else 0.0, outline_color, true)
+
+
+func add_shell(shell_radius: float, shell_length: float, shell_color: Color, inside_out: bool) -> void:
 	var shell := MeshInstance3D.new()
 	var mesh: PrimitiveMesh
-	if length > 0.0:
+	if shell_length > 0.0:
 		var box := BoxMesh.new()
-		box.size = Vector3(radius * 2.0, radius * 2.0, length)
+		box.size = Vector3(shell_radius * 2.0, shell_radius * 2.0, shell_length)
 		mesh = box
 	else:
 		var sphere := SphereMesh.new()
-		sphere.radius = radius
-		sphere.height = radius * 2.0
+		sphere.radius = shell_radius
+		sphere.height = shell_radius * 2.0
 		mesh = sphere
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = color
+	material.albedo_color = shell_color
+	if inside_out:
+		material.cull_mode = BaseMaterial3D.CULL_FRONT
 	mesh.material = material
 	shell.mesh = mesh
 	shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

@@ -3,10 +3,15 @@
 [ext_resource type="Script" uid="uid://dhuvwt1e11h7p" path="res://shared/health_bar/health_bar_3d.gd" id="1_rv3oe"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4jjk6"]
-bg_color = Color(0.70753706, 0.028349759, 0.167631, 1)
+bg_color = Color(1, 1, 1, 1)
+border_width_left = 14
+border_width_top = 14
+border_width_right = 14
+border_width_bottom = 14
+border_color = Color(0, 0, 0, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vut6t"]
-bg_color = Color(0, 0.7128204, 0.4441755, 1)
+bg_color = Color(0, 0, 0, 1)
 
 [node name="HealthBar3D" type="Sprite3D" unique_id=242640874]
 billboard = 1

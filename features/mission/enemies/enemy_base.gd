@@ -56,6 +56,9 @@ func _ready() -> void:
 		damage_fx = VehicleDamage.new()
 		add_child(damage_fx)
 	update_health_bar()
+	# Near-black, to stand out in 1-bit; deferred, since some enemies build
+	# their model after this.
+	OneBit.ink.call_deferred(self)
 
 
 func take_damage(amount: float, light_weapon: bool = false) -> bool:
