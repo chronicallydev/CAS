@@ -30,6 +30,11 @@ var mission: MissionContext
 var god_mode: bool = true
 var infinite_ammo: bool = false
 
+## Movement values tuned from the panel (helicopter property -> value),
+## kept across rebuilds, and what they were before any tuning.
+var movement_overrides: Dictionary = {}
+var movement_defaults: Dictionary = {}
+
 ## Stats since the last reset.
 var damage_taken_total: float = 0.0
 var damage_by_source: Dictionary = {}  # source name -> damage
@@ -79,6 +84,7 @@ func rebuild() -> void:
 	mission.helicopter.damage_taken.connect(_on_damage_taken)
 	mission.guns.damage_dealt.connect(_on_damage_dealt)
 	apply_cheats()
+	apply_movement()
 	panel.refresh()
 
 
@@ -88,6 +94,37 @@ func apply_cheats() -> void:
 	mission.helicopter.invulnerable = god_mode
 	mission.helicopter.infinite_flares = infinite_ammo
 	mission.guns.infinite_ammo = infinite_ammo
+
+
+# --- Movement tuning ---------------------------------------------------------
+
+## Puts the tuned movement values back on a freshly built helicopter.
+func apply_movement() -> void:
+	var heli := mission.helicopter
+	for property in movement_overrides:
+		heli.set(property, movement_overrides[property])
+	heli.dash_charges_left = mini(heli.dash_charges_left, heli.dash_charges)
+
+
+## Sets one movement value on the live helicopter, remembering the
+## original the first time it changes.
+func tune(property: String, value: float) -> void:
+	var heli := mission.helicopter
+	if not movement_defaults.has(property):
+		movement_defaults[property] = heli.get(property)
+	if heli.get(property) is int:
+		value = roundi(value)
+	movement_overrides[property] = value
+	heli.set(property, value)
+	heli.dash_charges_left = mini(heli.dash_charges_left, heli.dash_charges)
+
+
+## Undoes all tuning.
+func reset_movement() -> void:
+	for property in movement_defaults:
+		mission.helicopter.set(property, movement_defaults[property])
+	movement_overrides.clear()
+	movement_defaults.clear()
 
 
 func clear_enemies() -> void:

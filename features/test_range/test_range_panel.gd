@@ -6,6 +6,9 @@ extends CanvasLayer
 #                and DPS, and the enemy under the cursor
 #   SPAWN      - unit and count; middle-click or G drops them at the cursor
 #   HELICOPTER - reset the range, god mode, instant flares and no reloads
+#   MOVEMENT   - live sliders for the flight model and dash; kept across
+#                resets. COPY puts the changed values on the clipboard, to
+#                bake into cobra.tres / helicopter.gd.
 #
 # The X (or Tab) closes it; the PANEL button (or Tab) brings it back.
 
@@ -19,6 +22,33 @@ const DANGER := Color(1.0, 0.4, 0.32)
 var selected_unit: int = 0
 var spawn_count: int = 1
 const COUNTS := [1, 3, 5, 10]
+
+## The movement sliders: [property, label, min, max, step], grouped by
+## where the value lives. The airframe group comes from cobra.tres (the
+## mission copies it onto the helicopter); the rest are helicopter.gd exports.
+const MOVEMENT := [
+	["Airframe (cobra.tres)", [
+		["speed", "Top speed", 8.0, 60.0, 0.5],
+		["acceleration", "Acceleration", 1.0, 20.0, 0.1],
+		["turn_speed", "Agility", 1.0, 20.0, 0.1],
+		["dash_cooldown", "Dash cooldown", 0.2, 10.0, 0.1],
+	]],
+	["Handling (helicopter.gd)", [
+		["brake_ratio", "Stop time ratio", 0.1, 3.0, 0.05],
+		["path_turn_scale", "Path turn / agility", 10.0, 200.0, 1.0],
+		["reverse_angle", "Reverse angle", 60.0, 180.0, 1.0],
+		["turn_scale", "Nose turn / agility", 0.5, 10.0, 0.1],
+		["max_tilt_degrees", "Tilt", 0.0, 40.0, 0.5],
+		["thrust_lean", "Thrust lean", 0.0, 2.0, 0.05],
+	]],
+	["Dash (helicopter.gd)", [
+		["dash_distance", "Distance", 2.0, 40.0, 0.5],
+		["dash_time", "Duration", 0.05, 0.6, 0.01],
+		["dash_charges", "Charges", 1.0, 5.0, 1.0],
+		["dash_exit_speed", "Exit speed", 0.5, 2.0, 0.05],
+		["dash_carry", "Exit carry", 0.0, 1.0, 0.01],
+	]],
+]
 
 var range_context: TestRangeContext
 var panel: PanelContainer
@@ -109,6 +139,47 @@ func stepper(name: String, value: String, step: Callable, name_width: float = 11
 	return row
 
 
+# "Name  [----o----]  value". Calls `changed` with the new value; the name
+# turns gold once the value differs from `original`.
+func slider(name: String, value: float, original: float, min_value: float, max_value: float, step: float, changed: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var name_label := label(name, 13, GOLD if not is_equal_approx(value, original) else MUTED)
+	name_label.custom_minimum_size = Vector2(130, 0)
+	row.add_child(name_label)
+
+	var bar := HSlider.new()
+	bar.min_value = min_value
+	bar.max_value = max_value
+	bar.step = step
+	bar.value = value
+	bar.focus_mode = Control.FOCUS_NONE
+	# The wheel scrolls the panel, not the value.
+	bar.scrollable = false
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(bar)
+
+	var value_label := label(format_value(value, step), 13)
+	value_label.custom_minimum_size = Vector2(46, 0)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(value_label)
+
+	bar.value_changed.connect(func(new_value: float) -> void:
+		value_label.text = format_value(new_value, step)
+		name_label.add_theme_color_override("font_color", GOLD if not is_equal_approx(new_value, original) else MUTED)
+		changed.call(new_value))
+	return row
+
+
+func format_value(value: float, step: float) -> String:
+	if step >= 1.0:
+		return "%d" % roundi(value)
+	if step >= 0.1:
+		return "%.1f" % value
+	return "%.2f" % value
+
+
 func clear(node: Node) -> void:
 	for child in node.get_children():
 		node.remove_child(child)
@@ -182,6 +253,7 @@ func refresh() -> void:
 	clear(setup_box)
 	build_spawn(setup_box)
 	build_helicopter(setup_box)
+	build_movement(setup_box)
 
 
 func build_spawn(box: VBoxContainer) -> void:
@@ -208,6 +280,56 @@ func build_helicopter(box: VBoxContainer) -> void:
 		range_context.apply_cheats()))
 
 
+func build_movement(box: VBoxContainer) -> void:
+	box.add_child(section("MOVEMENT"))
+	var c := range_context
+	var heli := c.mission.helicopter
+	for group in MOVEMENT:
+		box.add_child(label(group[0], 15, TEXT))
+		for entry in group[1]:
+			var property: String = entry[0]
+			var value: float = heli.get(property)
+			var original: float = c.movement_defaults.get(property, value)
+			box.add_child(slider(entry[1], value, original, entry[2], entry[3], entry[4], func(new_value: float) -> void:
+				c.tune(property, new_value)))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	box.add_child(row)
+	var reset := button("RESET MOVEMENT", func() -> void:
+		c.reset_movement()
+		refresh())
+	reset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(reset)
+	var copy := button("COPY CHANGES", copy_movement)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(copy)
+
+
+## Puts the tuned values on the clipboard, grouped by the file they belong
+## in, and prints them to the output too.
+func copy_movement() -> void:
+	var c := range_context
+	var lines: Array[String] = []
+	for group in MOVEMENT:
+		var changed: Array[String] = []
+		for entry in group[1]:
+			var property: String = entry[0]
+			if not c.movement_overrides.has(property):
+				continue
+			var value: float = c.movement_overrides[property]
+			var original: float = c.movement_defaults[property]
+			if is_equal_approx(value, original):
+				continue
+			changed.append("%s = %s   # was %s" % [property, format_value(value, entry[4]), format_value(original, entry[4])])
+		if not changed.is_empty():
+			lines.append("# " + group[0])
+			lines.append_array(changed)
+	var text := "\n".join(lines) if not lines.is_empty() else "# No movement changes"
+	DisplayServer.clipboard_set(text)
+	print(text)
+
+
 func update_stats() -> void:
 	var c := range_context
 	var lines: Array[String] = []
@@ -221,6 +343,11 @@ func update_stats() -> void:
 	var heli := c.mission.helicopter
 	var flares := "ready" if heli.flare_cooldown_left <= 0.0 else "%.1fs" % heli.flare_cooldown_left
 	lines.append("Hull %d / %d   Flares %s" % [heli.health, heli.max_health, flares])
+	# What the movement numbers add up to.
+	var spool := heli.speed / maxf(heli.get_acceleration_rate(), 0.01)
+	var stop := heli.speed / maxf(heli.get_brake_rate(), 0.01)
+	lines.append("Speed %.1f / %.1f   0-full %.2fs   stop %.2fs" % [heli.velocity.length(), heli.speed, spool, stop])
+	lines.append("Path turn %d°/s   dash %.1f m/s" % [roundi(heli.turn_speed * heli.path_turn_scale), heli.dash_distance / maxf(heli.dash_time, 0.01)])
 
 	var enemy := c.enemy_under_cursor()
 	if enemy == null:
