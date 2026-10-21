@@ -7,7 +7,8 @@ extends CanvasLayer
 #   SPAWN      - unit and count; middle-click or G drops them at the cursor
 #   HELICOPTER - reset the range, god mode, instant flares and no reloads
 #   LOOK       - retro palette, dither amount and pixel resolution (set on
-#                the PixelArt autoload, so they last across resets)
+#                the PixelArt autoload), the white hit flash and chunky
+#                explosions; all last across resets
 #   MOVEMENT   - live sliders for the flight model and dash; kept across
 #                resets. COPY puts the changed values on the clipboard, to
 #                bake into cobra.tres / helicopter.gd.
@@ -299,6 +300,10 @@ func build_look(box: VBoxContainer) -> void:
 			index = RESOLUTIONS.find(240.0)
 		PixelArt.target_height = RESOLUTIONS[clampi(index + step, 0, RESOLUTIONS.size() - 1)]
 		refresh()))
+	box.add_child(check("White hit flash", HitFlash.enabled, func(on: bool) -> void:
+		HitFlash.enabled = on))
+	box.add_child(check("Chunky 12 fps explosions", ExplosionScene.chunky, func(on: bool) -> void:
+		ExplosionScene.chunky = on))
 
 
 func build_movement(box: VBoxContainer) -> void:

@@ -185,6 +185,7 @@ func take_damage(amount: float, source: String = "") -> void:
 	health_bar.value = health
 	# Small-arms hits only tint the screen a little; missiles flash it red.
 	hit_flash.color.a = maxf(hit_flash.color.a, clampf(0.06 + amount / 55.0, 0.06, 0.45))
+	HitFlash.trigger(body)
 	Sfx.play_2d("heli_hit")
 	# Rifle rounds rattle the cabin; missiles throw it about.
 	mission.shake(clampf(0.12 + amount / 40.0, 0.12, 0.55))

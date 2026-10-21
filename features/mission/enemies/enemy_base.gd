@@ -71,9 +71,12 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 	update_health_bar()
 
 	if health <= 0.0:
+		# Wrecks, corpses and debris copy the meshes: not mid-flash.
+		HitFlash.clear(self)
 		die()
 		return true
 
+	HitFlash.trigger(self)
 	return false
 
 
