@@ -12,6 +12,9 @@ extends CanvasLayer
 #   MOVEMENT   - live sliders for the flight model and dash; kept across
 #                resets. COPY puts the changed values on the clipboard, to
 #                bake into cobra.tres / helicopter.gd.
+#   PORTRAIT   - a test character portrait (CharacterPortrait) in the
+#                bottom-left corner, with its style, detail and shading
+#                live; COPY puts the changed values on the clipboard.
 #
 # The X (or Tab) closes it; the PANEL button (or Tab) brings it back.
 
@@ -55,6 +58,29 @@ const MOVEMENT := [
 	]],
 ]
 
+const PORTRAIT_MODEL := preload("res://assets/characters/girl1/girl1.fbx")
+## The portrait's size in window pixels; detail is how many of them make
+## one image pixel.
+const PORTRAIT_SIZE := Vector2i(360, 450)
+const PORTRAIT_SCALES := [1, 2, 3, 4]
+const PORTRAIT_STYLES := ["Dither", "Hatching"]
+## The portrait sliders: [uniform, label, min, max, step, default, true for
+## the ink pass]. Defaults match the shaders. "light_side" is the key
+## light's angle round the face, turned into key_direction.
+const PORTRAIT := [
+	["light_side", "Light side", -90.0, 90.0, 1.0, -24.0, false],
+	["contrast_curve", "Contrast", 0.4, 2.5, 0.05, 1.0, false],
+	["black_point", "Black point", 0.0, 0.5, 0.01, 0.1, false],
+	["white_point", "White point", 0.5, 1.0, 0.01, 0.85, false],
+	["fill_strength", "Fill light", 0.0, 1.0, 0.05, 0.4, false],
+	["ambient", "Ambient", 0.0, 0.6, 0.01, 0.18, false],
+	["rim_strength", "Rim light", 0.0, 2.0, 0.05, 0.9, false],
+	["specular_strength", "Shine", 0.0, 2.0, 0.05, 0.6, false],
+	["hatch_spacing", "Hatch spacing", 3.0, 10.0, 1.0, 5.0, false],
+	["silhouette_ink", "Outlines", 0.0, 1.0, 1.0, 1.0, true],
+	["crease_ink", "Crease lines", 0.0, 1.0, 1.0, 1.0, true],
+]
+
 var range_context: TestRangeContext
 var panel: PanelContainer
 # Shown in the panel's place while it is closed.
@@ -62,6 +88,15 @@ var open_button: Button
 var setup_box: VBoxContainer
 var stats_label: RichTextLabel
 var _stats_timer: float = 0.0
+
+# Its own layer, drawn in window pixels so the portrait's pixels stay even.
+var portrait_layer: CanvasLayer
+var portrait_frame: PanelContainer
+var portrait: CharacterPortrait
+var portrait_scale: int = 2
+var portrait_style: int = 0
+var portrait_sway: bool = true
+var portrait_values: Dictionary = {}  # uniform -> value, once changed
 
 
 func initialize(context: TestRangeContext) -> void:
@@ -82,6 +117,7 @@ func set_open(open: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	place_portrait()
 	_stats_timer -= delta
 	if _stats_timer <= 0.0 and stats_label != null and panel.visible and range_context.mission != null:
 		_stats_timer = 0.2
@@ -252,6 +288,8 @@ func build_ui() -> void:
 	open_button.visible = false
 	add_child(open_button)
 
+	build_portrait()
+
 
 ## Rebuilds the spawn and helicopter sections.
 func refresh() -> void:
@@ -260,6 +298,7 @@ func refresh() -> void:
 	build_helicopter(setup_box)
 	build_look(setup_box)
 	build_movement(setup_box)
+	build_portrait_controls(setup_box)
 
 
 func build_spawn(box: VBoxContainer) -> void:
@@ -352,6 +391,110 @@ func copy_movement() -> void:
 			lines.append("# " + group[0])
 			lines.append_array(changed)
 	var text := "\n".join(lines) if not lines.is_empty() else "# No movement changes"
+	DisplayServer.clipboard_set(text)
+	print(text)
+
+
+# --- Portrait ---------------------------------------------------------------
+
+func build_portrait() -> void:
+	portrait_layer = CanvasLayer.new()
+	portrait_layer.layer = layer - 1
+	add_child(portrait_layer)
+
+	# Black frame, like a dialogue box in a 1-bit game.
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color.WHITE
+	style.border_color = Color.BLACK
+	style.set_border_width_all(4)
+	style.set_content_margin_all(4)
+	portrait_frame = PanelContainer.new()
+	portrait_frame.add_theme_stylebox_override("panel", style)
+	portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_layer.add_child(portrait_frame)
+
+	portrait = CharacterPortrait.new()
+	portrait.model = PORTRAIT_MODEL
+	portrait.frame_height = 0.85
+	portrait.resolution = PORTRAIT_SIZE / portrait_scale
+	portrait.pixel_scale = portrait_scale
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_frame.add_child(portrait)
+
+
+# Bottom-left corner, undoing the window's content scale like PixelArt does.
+func place_portrait() -> void:
+	if portrait_layer == null or not portrait_layer.visible:
+		return
+	var window := Vector2(get_window().size)
+	var canvas_scale: float = window.y / get_viewport().get_visible_rect().size.y
+	portrait_layer.transform = Transform2D.IDENTITY.scaled(Vector2.ONE / canvas_scale)
+	portrait_frame.position = Vector2(16, window.y - portrait_frame.size.y - 16).floor()
+
+
+func portrait_value(entry: Array) -> float:
+	return portrait_values.get(entry[0], entry[5])
+
+
+func set_portrait_value(entry: Array, value: float) -> void:
+	portrait_values[entry[0]] = value
+	if entry[0] == "light_side":
+		var angle := deg_to_rad(value)
+		portrait.set_shade("key_direction", Vector3(sin(angle), 0.55, cos(angle)))
+	elif entry[6]:
+		portrait.set_ink(entry[0], value)
+	else:
+		portrait.set_shade(entry[0], value)
+
+
+func build_portrait_controls(box: VBoxContainer) -> void:
+	box.add_child(section("PORTRAIT"))
+	box.add_child(check("Show portrait", portrait_layer.visible, func(on: bool) -> void:
+		portrait_layer.visible = on))
+	box.add_child(check("Sway", portrait_sway, func(on: bool) -> void:
+		portrait_sway = on
+		portrait.sway_degrees = 12.0 if on else 0.0
+		if not on:
+			portrait.pivot.rotation.y = 0.0))
+	box.add_child(stepper("Style", PORTRAIT_STYLES[portrait_style], func(step: int) -> void:
+		portrait_style = posmod(portrait_style + step, PORTRAIT_STYLES.size())
+		portrait.set_shade("pattern", portrait_style)
+		refresh()))
+	var detail := PORTRAIT_SIZE / portrait_scale
+	box.add_child(stepper("Detail", "%dx%d" % [detail.x, detail.y], func(step: int) -> void:
+		var index := clampi(PORTRAIT_SCALES.find(portrait_scale) - step, 0, PORTRAIT_SCALES.size() - 1)
+		portrait_scale = PORTRAIT_SCALES[index]
+		portrait.set_detail(PORTRAIT_SIZE / portrait_scale, portrait_scale)
+		portrait_frame.reset_size()
+		refresh()))
+	for entry in PORTRAIT:
+		box.add_child(slider(entry[1], portrait_value(entry), entry[5], entry[2], entry[3], entry[4], func(value: float) -> void:
+			set_portrait_value(entry, value)))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	box.add_child(row)
+	var reset := button("RESET PORTRAIT", func() -> void:
+		for entry in PORTRAIT:
+			set_portrait_value(entry, entry[5])
+		portrait_values.clear()
+		refresh())
+	reset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(reset)
+	var copy := button("COPY CHANGES", copy_portrait)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(copy)
+
+
+## Puts the changed portrait values on the clipboard, to bake into the
+## shader defaults, and prints them too.
+func copy_portrait() -> void:
+	var lines: Array[String] = ["# Portrait: %s, detail %s" % [PORTRAIT_STYLES[portrait_style], PORTRAIT_SIZE / portrait_scale]]
+	for entry in PORTRAIT:
+		var value := portrait_value(entry)
+		if not is_equal_approx(value, entry[5]):
+			lines.append("%s = %s   # was %s" % [entry[0], format_value(value, entry[4]), format_value(entry[5], entry[4])])
+	var text := "\n".join(lines)
 	DisplayServer.clipboard_set(text)
 	print(text)
 
