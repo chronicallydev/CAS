@@ -32,8 +32,9 @@ signal request_retry
 ## The weapons that can be mounted, in fire-button order: the first type
 ## mounted fires with LMB, the second with RMB.
 @export var weapons: Array[WeaponData] = []
-## Weapon id per hardpoint of the airframe ("" = empty).
-@export var loadout: PackedStringArray = []
+## Weapon id per hardpoint of the airframe ("" = empty). Defaults to the
+## Cobra's fit: minigun on the chin, rockets on both wings, belly empty.
+@export var loadout: PackedStringArray = ["minigun", "rockets", "rockets", ""]
 
 @export_group("Options")
 @export var blood: bool = true
