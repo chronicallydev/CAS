@@ -144,7 +144,7 @@ func build_layout() -> void:
 	column.add_child(test_button)
 
 	column.add_child(make_spacer(2))
-	column.add_child(make_label("WASD fly   |   Mouse aim   |   LMB / RMB fire   |   Space / Shift dash   |   Q dive   |   E slam   |   F flares   |   Esc menu", 16, MUTED))
+	column.add_child(make_label("WASD fly   |   Mouse aim   |   LMB / RMB fire   |   Space / Shift dash   |   F flares   |   Esc menu", 16, MUTED))
 
 
 func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:

@@ -143,10 +143,9 @@ func helicopter() -> Helicopter:
 
 # Advances a lock on the helicopter by `delta`. Returns true once
 # `lock_time` is reached, and starts over. Warns the player while locking;
-# flares (Helicopter.can_be_locked) break the lock, and radar-guided weapons
-# lose a helicopter flying low (ground clutter).
-func update_lock(heli: Helicopter, delta: float, lock_time: float, radar_guided: bool = false) -> bool:
-	if heli == null or not heli.can_be_locked() or (radar_guided and heli.is_low()):
+# flares (Helicopter.can_be_locked) break the lock.
+func update_lock(heli: Helicopter, delta: float, lock_time: float) -> bool:
+	if heli == null or not heli.can_be_locked():
 		lock_timer = 0.0
 		return false
 	lock_timer += delta

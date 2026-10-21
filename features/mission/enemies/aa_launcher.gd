@@ -76,7 +76,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# Lock on (flares break it), then fire and reload.
-	if update_lock(heli, delta, lock_time, true):
+	if update_lock(heli, delta, lock_time):
 		reload_timer = reload_time
 		fire_at(heli)
 

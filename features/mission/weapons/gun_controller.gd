@@ -435,11 +435,6 @@ func play_shot_sound(mix: String, pitch_min: float, pitch_max: float, from: Vect
 		shoot_sound.play()
 
 
-# Flying low tightens every weapon's spread.
-func spread_scale() -> float:
-	return 0.6 if shooter != null and shooter.has_method("is_low") and shooter.is_low() else 1.0
-
-
 func random_spread(spread: float) -> Vector3:
 	var angle := randf() * TAU
 	var radius := sqrt(randf()) * spread
@@ -460,7 +455,7 @@ func fire_round() -> void:
 		return
 
 	var from := take_muzzle(Weapon.CANNON)
-	var target: Vector3 = hit + random_spread(impact_spread * spread_scale())
+	var target: Vector3 = hit + random_spread(impact_spread)
 	var delay := impact_delay
 
 	if shooter != null:
@@ -478,7 +473,7 @@ func fire_minigun_round() -> void:
 		return
 
 	# Rounds scatter around the reticle, wider the hotter the barrels get.
-	var spread := (minigun_spread + minigun_bloom * minigun_heat) * spread_scale()
+	var spread := minigun_spread + minigun_bloom * minigun_heat
 	var from := take_muzzle(Weapon.MINIGUN)
 
 	play_shot_sound("gun_minigun", 1.4, 1.7, from)
@@ -626,7 +621,7 @@ func fire_rocket() -> void:
 		return
 
 	var from := take_muzzle(Weapon.ROCKETS)
-	var target: Vector3 = hit + random_spread(rockets_spread * spread_scale())
+	var target: Vector3 = hit + random_spread(rockets_spread)
 	var rocket := Rocket.new()
 	MissionContext.spawn_parent(self).add_child(rocket)
 	rocket.launch(from, target, rockets_speed, rocket_impact)

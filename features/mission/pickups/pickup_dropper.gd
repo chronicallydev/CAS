@@ -10,7 +10,6 @@ const Pickup := preload("res://features/mission/pickups/pickup.gd")
 
 # Chance per kill, before the bonus for big kills.
 @export_range(0.0, 1.0, 0.01) var cash_chance: float = 0.14
-@export_range(0.0, 1.0, 0.01) var recharge_chance: float = 0.05
 @export_range(0.0, 1.0, 0.01) var frenzy_chance: float = 0.03
 # Kills worth at least this many points roll with doubled chances.
 @export var big_kill_points: int = 40
@@ -24,9 +23,7 @@ func on_kill(points: int, world_position: Vector3, _label: String) -> void:
 	var roll := randf()
 	if roll < frenzy_chance * boost:
 		drop(Pickup.Kind.FRENZY, 0, world_position)
-	elif roll < (frenzy_chance + recharge_chance) * boost:
-		drop(Pickup.Kind.RECHARGE, 0, world_position)
-	elif roll < (frenzy_chance + recharge_chance + cash_chance) * boost:
+	elif roll < (frenzy_chance + cash_chance) * boost:
 		drop(Pickup.Kind.CASH, cash_base + int(points * cash_per_point), world_position)
 
 

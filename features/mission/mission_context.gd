@@ -182,10 +182,6 @@ func collect_pickup(kind: int, value: int, at: Vector3) -> void:
 		state.pickup_cash += value
 		hud.spawn_popup("+$%d" % value, at, Color(0.45, 0.95, 0.45))
 		Sfx.play_2d("kill_tick")
-	elif kind == kinds.RECHARGE:
-		helicopter.recharge_abilities()
-		hud.spawn_popup("FLARES + DASH + SLAM READY", at, Color(0.45, 0.8, 1.0))
-		Sfx.play_2d("combo")
 	else:
 		guns.start_frenzy(6.0)
 		hud.spawn_popup("FRENZY!", at, Color(1.0, 0.45, 0.25), true)

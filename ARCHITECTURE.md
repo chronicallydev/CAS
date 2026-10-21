@@ -109,7 +109,7 @@ drawn.
 
 Lock-on enemies share `EnemyBase.update_lock()`: it counts up `lock_timer`
 (which makes the HUD's edge arrow pulse), warns the player, and gives up
-while `Helicopter.can_be_locked()` is false. Dropping flares (F / Space)
+while `Helicopter.can_be_locked()` is false. Dropping flares (F)
 makes that false for a moment and retargets every missile already homing
 on the helicopter to a decoy. Flares are unlimited but recharge: each
 airframe has its own `HelicopterData.flare_cooldown` (Little Bird 6 s,
@@ -148,21 +148,12 @@ and the hovered enemy's health, armour and lock state.
   toward the input at a rate set by `turn_speed` (`path_turn_scale`) while
   keeping speed, and steering past `reverse_angle` brakes straight through.
   The body leans into the steering force (`thrust`).
-- **Dive (Q)**: a timed active. The helicopter drops to `low_altitude` for
-  `dive_duration` seconds, then climbs back; Q again pulls up early and
-  refunds part of the cooldown. Low, it rams whatever it flies over
-  (`Helicopter.ram()`: infantry die, vehicles and forts take damage and cost
-  some hull), its weapons spread less (`GunController.spread_scale()`), and
-  radar-guided lockers (SAM truck, SAM site, ripple launcher) can't lock it
-  (`update_lock(..., radar_guided)`). The cooldown is the cost
-  (`low_damage_multiplier` can add extra small-arms damage while low).
-- **Dash (Space / Shift)**: a ~14 m burst at any altitude, with charges and a
-  per-airframe cooldown (`HelicopterData.dash_cooldown`).
-- **Slam (E)**: plunges to the ground and blasts everything around it. From a
-  dive it lands almost at once and ends the dive.
+- **One job per ability**: dash beats bullets, flares beat missiles.
+- **Dash (Space / Shift)**: a ~14 m burst with brief invulnerability, with
+  charges and a per-airframe cooldown (`HelicopterData.dash_cooldown`).
 - **Pickups** (`mission/pickups/`): `PickupDropper` rolls on every kill and
-  drops cash (added to the payout), a flare + dash recharge, or weapon
-  frenzy (double fire rate, no reloads). Fly over them to collect.
+  drops cash (added to the payout) or weapon frenzy (double fire rate, no
+  reloads). Fly over them to collect.
 - **Pacing**: waves overlap (the next starts when the current one's spawns
   are out and at most `overlap_fraction` of it is alive), breaks are short,
   waves are bigger, AA arrives earlier, assaults fly in only 90 m past a

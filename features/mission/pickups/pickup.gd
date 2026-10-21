@@ -4,14 +4,12 @@ extends Node3D
 # token that floats over the ground for a few seconds. Fly over it to grab
 # it; the mission context applies its effect. It blinks before it fades.
 #   CASH     - bonus money added to the mission's payout
-#   RECHARGE - flares, dash and slam ready at once
 #   FRENZY   - a few seconds of double fire rate and no reloads
 
-enum Kind { CASH, RECHARGE, FRENZY }
+enum Kind { CASH, FRENZY }
 
 const COLORS := {
 	Kind.CASH: Color(0.45, 0.95, 0.45),
-	Kind.RECHARGE: Color(0.45, 0.8, 1.0),
 	Kind.FRENZY: Color(1.0, 0.45, 0.25),
 }
 
@@ -47,9 +45,7 @@ func _physics_process(delta: float) -> void:
 	if heli == null or heli.dead:
 		return
 	var offset := heli.global_position - global_position
-	# Flying low reaches a little further.
-	var reach := collect_radius + (2.0 if heli.is_low() else 0.0)
-	if Vector2(offset.x, offset.z).length() <= reach:
+	if Vector2(offset.x, offset.z).length() <= collect_radius:
 		mission.collect_pickup(kind, value, global_position)
 		queue_free()
 
@@ -73,11 +69,6 @@ func build_visuals() -> void:
 			var box := BoxMesh.new()
 			box.size = Vector3(1.6, 0.5, 1.0)
 			core.mesh = box
-		Kind.RECHARGE:
-			var sphere := SphereMesh.new()
-			sphere.radius = 0.7
-			sphere.height = 1.4
-			core.mesh = sphere
 		_:
 			var prism := PrismMesh.new()
 			prism.size = Vector3(1.4, 1.4, 0.5)
