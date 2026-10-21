@@ -6,6 +6,8 @@ extends CanvasLayer
 #                and DPS, and the enemy under the cursor
 #   SPAWN      - unit and count; middle-click or G drops them at the cursor
 #   HELICOPTER - reset the range, god mode, instant flares and no reloads
+#   LOOK       - retro palette, dither amount and pixel resolution (set on
+#                the PixelArt autoload, so they last across resets)
 #   MOVEMENT   - live sliders for the flight model and dash; kept across
 #                resets. COPY puts the changed values on the clipboard, to
 #                bake into cobra.tres / helicopter.gd.
@@ -22,6 +24,8 @@ const DANGER := Color(1.0, 0.4, 0.32)
 var selected_unit: int = 0
 var spawn_count: int = 1
 const COUNTS := [1, 3, 5, 10]
+## Heights of the low-res image to pick from (PixelArt.target_height).
+const RESOLUTIONS := [120.0, 144.0, 160.0, 180.0, 200.0, 240.0, 288.0]
 
 ## The movement sliders: [property, label, min, max, step], grouped by
 ## where the value lives. The airframe group comes from cobra.tres (the
@@ -253,6 +257,7 @@ func refresh() -> void:
 	clear(setup_box)
 	build_spawn(setup_box)
 	build_helicopter(setup_box)
+	build_look(setup_box)
 	build_movement(setup_box)
 
 
@@ -278,6 +283,22 @@ func build_helicopter(box: VBoxContainer) -> void:
 	box.add_child(check("Instant flares, no reloads", range_context.infinite_ammo, func(on: bool) -> void:
 		range_context.infinite_ammo = on
 		range_context.apply_cheats()))
+
+
+func build_look(box: VBoxContainer) -> void:
+	box.add_child(section("LOOK"))
+	box.add_child(stepper("Palette", RetroPalettes.LIST[PixelArt.palette].name, func(step: int) -> void:
+		PixelArt.palette += step
+		refresh()))
+	box.add_child(slider("Dither", PixelArt.dither, 0.5, 0.0, 1.0, 0.05, func(value: float) -> void:
+		PixelArt.dither = value))
+	var height := PixelArt.target_height
+	box.add_child(stepper("Resolution", "%dp" % roundi(height), func(step: int) -> void:
+		var index := RESOLUTIONS.find(height)
+		if index == -1:
+			index = RESOLUTIONS.find(240.0)
+		PixelArt.target_height = RESOLUTIONS[clampi(index + step, 0, RESOLUTIONS.size() - 1)]
+		refresh()))
 
 
 func build_movement(box: VBoxContainer) -> void:

@@ -8,7 +8,8 @@ extends Node
 # filtering behind the 2D UI, which stays crisp. With an orthographic
 # camera the pixel camera is snapped to the pixel grid and the leftover
 # sub-pixel offset is applied to the upscaled image, so the scene doesn't
-# shimmer as the view moves.
+# shimmer as the view moves. A retro colour pass on the upscaled image can
+# then snap it to a limited palette with ordered dithering (RetroPalettes).
 #
 # It is global because it follows whichever context's camera is active.
 # It holds no game state: the root context switches it on or off from
@@ -17,6 +18,7 @@ extends Node
 # Approach adapted from "3D Pixel Art - Tutorial" by Eduardo Schildt (MIT).
 
 const OUTLINE_SHADER := preload("res://shared/pixelart/pixel_outline.gdshader")
+const PALETTE_SHADER := preload("res://shared/pixelart/retro_palette.gdshader")
 
 # Set by the root context from GameSettings.pixel_art.
 @export var enabled: bool = true
@@ -24,8 +26,21 @@ const OUTLINE_SHADER := preload("res://shared/pixelart/pixel_outline.gdshader")
 @export var target_height: float = 240.0
 # Convert every StandardMaterial3D to toon shading as it appears.
 @export var toon_shading: bool = true
+# Index into RetroPalettes.LIST (0 = off).
+@export var palette: int = 0:
+	set(value):
+		palette = posmod(value, RetroPalettes.LIST.size())
+		if palette_material != null:
+			RetroPalettes.apply(palette_material, palette)
+# Ordered dither amount for the palette: 0 = hard bands, 1 = full step.
+@export_range(0.0, 1.0) var dither: float = 0.5:
+	set(value):
+		dither = value
+		if palette_material != null:
+			palette_material.set_shader_parameter("dither", dither)
 
 var viewport: SubViewport
+var palette_material: ShaderMaterial
 var pixel_camera: Camera3D
 var outline: MeshInstance3D
 var layer: CanvasLayer
@@ -77,6 +92,11 @@ func _ready() -> void:
 	display.stretch_mode = TextureRect.STRETCH_SCALE
 	display.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	palette_material = ShaderMaterial.new()
+	palette_material.shader = PALETTE_SHADER
+	display.material = palette_material
+	palette = palette
+	dither = dither
 	layer.add_child(display)
 
 	get_tree().node_added.connect(_on_node_added)
@@ -132,6 +152,8 @@ func sync_camera(camera: Camera3D) -> void:
 	# How much taller the low-res image is than the window (the margin).
 	var scale_y: float = low.y * pixel_size / window.y
 	var shift := Vector2.ZERO
+	# The camera's whole-pixel position, to pin the dither to the ground.
+	var dither_offset := Vector2i.ZERO
 
 	# Fold the camera's shake offsets into its position.
 	var xform := camera.global_transform
@@ -150,9 +172,12 @@ func sync_camera(camera: Camera3D) -> void:
 		# ...and move the upscaled image by what was left over.
 		var residual := Vector2(local.x - snapped.x, local.y - snapped.y) / world_per_pixel
 		shift = Vector2(-residual.x, residual.y) * pixel_size
+		# Image y runs down, the camera's y up.
+		dither_offset = Vector2i(roundi(snapped.x / world_per_pixel), -roundi(snapped.y / world_per_pixel))
 	else:
 		pixel_camera.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(camera.fov) * 0.5) * scale_y))
 
+	palette_material.set_shader_parameter("dither_offset", dither_offset)
 	pixel_camera.global_transform = xform
 	display.position = (window - display.size) * 0.5 + shift
 
