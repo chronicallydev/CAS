@@ -64,6 +64,16 @@ var close_call_radius: float = 6.0
 # After it overshoots, it flies on unguided this long and airbursts.
 var lost_burst_delay: float = 0.6
 
+# Deflected by a perfect dodge (see ChainDodge): it turns on the enemies,
+# homing at deflect_turn_rate on the nearest one (favouring those ahead),
+# and blows up on contact, hurting every enemy within deflect_radius.
+var deflect_speed: float = 46.0
+var deflect_turn_rate: float = 2.6
+var deflect_time: float = 3.0
+var deflect_damage: float = 120.0
+var deflect_radius: float = 7.0
+var deflect_contact: float = 3.5
+
 var velocity: Vector3
 # Where it points. Before ignition this turns on its own while the
 # rocket drifts; once lit it follows the flight path.
@@ -80,6 +90,10 @@ var lost: bool = false
 var lost_age: float = 0.0
 var ignited: bool = false
 var burned_out: bool = false
+var deflected: bool = false
+var deflect_homing: bool = true
+var deflect_left: float = 0.0
+var deflect_target: Node3D
 
 var model: Node3D
 var flame: MeshInstance3D
@@ -126,6 +140,9 @@ func burn_age() -> float:
 
 func _physics_process(delta: float) -> void:
 	age += delta
+	if deflected:
+		fly_deflected(delta)
+		return
 	if not ignited and age >= eject_time:
 		ignite()
 
@@ -260,6 +277,73 @@ func lose_target() -> void:
 		mission.hit_stop(0.28, 0.3)
 
 
+## Perfect-dodged: stop chasing the helicopter and turn on the enemies.
+func deflect(homing: bool) -> void:
+	deflected = true
+	deflect_homing = homing
+	deflect_left = deflect_time
+	target = null
+	velocity = velocity.normalized() * maxf(velocity.length(), deflect_speed)
+
+
+func fly_deflected(delta: float) -> void:
+	deflect_left -= delta
+	if deflect_homing:
+		if not is_valid_enemy(deflect_target):
+			deflect_target = pick_enemy()
+		if deflect_target != null:
+			var desired := (deflect_target.global_position - global_position).normalized()
+			var current := velocity.normalized()
+			var angle := current.angle_to(desired)
+			var step := deflect_turn_rate * delta
+			var direction := desired if angle <= step else current.slerp(desired, step / angle).normalized()
+			velocity = direction * velocity.length()
+	velocity = velocity.normalized() * move_toward(velocity.length(), deflect_speed, 40.0 * delta)
+	nose = velocity.normalized()
+	global_position += velocity * delta
+	face(nose)
+	update_motor(delta)
+
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if is_valid_enemy(enemy) and global_position.distance_to(enemy.global_position) <= deflect_contact:
+			detonate()
+			return
+	if deflect_left <= 0.0 or global_position.y <= ground_y:
+		detonate()
+
+
+func is_valid_enemy(enemy: Node) -> bool:
+	return enemy != null and is_instance_valid(enemy) and not enemy.is_queued_for_deletion() and enemy.get("health") > 0.0
+
+
+# Nearest enemy, with those behind the missile counted as further away.
+func pick_enemy() -> Node3D:
+	var best: Node3D = null
+	var best_score := INF
+	var forward := velocity.normalized()
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_valid_enemy(enemy):
+			continue
+		var offset: Vector3 = enemy.global_position - global_position
+		var score := offset.length() * (2.0 - forward.dot(offset.normalized()))
+		if score < best_score:
+			best = enemy
+			best_score = score
+	return best
+
+
+# Every enemy in the blast takes the deflected missile's damage.
+func blast_enemies() -> int:
+	var kills := 0
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_valid_enemy(enemy):
+			continue
+		if global_position.distance_to(enemy.global_position) <= deflect_radius:
+			if enemy.take_damage(deflect_damage):
+				kills += 1
+	return kills
+
+
 func update_motor(delta: float) -> void:
 	# Wobble the model so the smoke corkscrews a little.
 	wobble_phase += delta * 9.0
@@ -329,7 +413,13 @@ func face(direction: Vector3) -> void:
 
 func detonate() -> void:
 	var on_ground := global_position.y <= ground_y + 0.5
-	var hurt := blast_helicopter()
+	# A deflected missile is the player's: it spares the helicopter.
+	var hurt := false if deflected else blast_helicopter()
+	if deflected:
+		var kills := blast_enemies()
+		var mission := MissionContext.of(self)
+		if kills > 0 and mission != null:
+			mission.hud.dodge_fx.deflect_kill(global_position, kills)
 
 	if explosion_scene != null and get_parent() != null:
 		var explosion := explosion_scene.instantiate() as Node3D
@@ -337,6 +427,9 @@ func detonate() -> void:
 		explosion.global_position = global_position
 		# Airbursts get the full boom; a hit gets a bigger one.
 		explosion.scale = Vector3.ONE * (1.3 if hurt else (0.8 if on_ground else 1.0))
+		# A deflected missile is the payoff: the biggest boom.
+		if deflected:
+			explosion.scale = Vector3.ONE * 1.8
 
 	if hurt:
 		var mission := MissionContext.of(self)

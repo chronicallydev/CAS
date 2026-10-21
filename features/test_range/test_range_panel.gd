@@ -12,6 +12,9 @@ extends CanvasLayer
 #   MOVEMENT   - live sliders for the flight model and dash; kept across
 #                resets. COPY puts the changed values on the clipboard, to
 #                bake into cobra.tres / helicopter.gd.
+#   CHAIN DODGE - missile salvos at the helicopter (H) and live tuning of
+#                the perfect dodge, slow motion and deflection (ChainDodge);
+#                kept across resets
 #   PORTRAIT   - a test character portrait (CharacterPortrait) in the
 #                bottom-left corner, with its style, detail and shading
 #                live; COPY puts the changed values on the clipboard.
@@ -57,6 +60,19 @@ const MOVEMENT := [
 		["dash_carry", "Exit carry", 0.0, 1.0, 0.01],
 	]],
 ]
+
+const SALVO_COUNTS := [1, 2, 3, 5, 8]
+## The chain dodge sliders: [ChainDodge static, label, min, max, step].
+const CHAIN := [
+	["perfect_window", "Perfect window", 0.05, 1.0, 0.01],
+	["max_distance", "Max distance", 5.0, 40.0, 0.5],
+	["slow_scale", "Slow speed", 0.0, 0.5, 0.01],
+	["slow_time", "Slow time", 0.1, 3.0, 0.05],
+	["slow_shrink", "Shrink per link", 0.3, 1.0, 0.05],
+	["min_slow_time", "Min slow time", 0.05, 1.5, 0.05],
+	["chain_timeout", "Chain timeout", 0.2, 5.0, 0.1],
+]
+var chain_defaults: Dictionary = {}
 
 const PORTRAIT_MODEL := preload("res://assets/characters/girl1/girl1.fbx")
 ## The portrait's size in window pixels; detail is how many of them make
@@ -257,7 +273,7 @@ func build_ui() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title)
 	title_row.add_child(button("X", set_open.bind(false), 16))
-	var hint := label("Middle-click or G: spawn   |   Tab: panel   |   Esc: quit", 13, MUTED)
+	var hint := label("MMB/G: spawn   |   H: salvo   |   Tab: panel   |   Esc: quit", 13, MUTED)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(hint)
 
@@ -296,6 +312,7 @@ func refresh() -> void:
 	clear(setup_box)
 	build_spawn(setup_box)
 	build_helicopter(setup_box)
+	build_chain_dodge(setup_box)
 	build_look(setup_box)
 	build_movement(setup_box)
 	build_portrait_controls(setup_box)
@@ -323,6 +340,35 @@ func build_helicopter(box: VBoxContainer) -> void:
 	box.add_child(check("Instant flares, no reloads", range_context.infinite_ammo, func(on: bool) -> void:
 		range_context.infinite_ammo = on
 		range_context.apply_cheats()))
+
+
+func build_chain_dodge(box: VBoxContainer) -> void:
+	var c := range_context
+	box.add_child(section("CHAIN DODGE"))
+	box.add_child(button("FIRE SALVO  [H]", c.fire_salvo, 16))
+	box.add_child(stepper("Salvo", "%d missiles" % c.salvo_count, func(step: int) -> void:
+		c.salvo_count = SALVO_COUNTS[clampi(SALVO_COUNTS.find(c.salvo_count) + step, 0, SALVO_COUNTS.size() - 1)]
+		refresh()))
+	box.add_child(slider("Salvo spacing", c.salvo_stagger, 0.3, 0.05, 1.5, 0.05, func(value: float) -> void:
+		c.salvo_stagger = value))
+	box.add_child(slider("Salvo arc", c.salvo_arc, 180.0, 0.0, 360.0, 5.0, func(value: float) -> void:
+		c.salvo_arc = value))
+
+	for entry in CHAIN:
+		var property: String = entry[0]
+		var value: float = ChainDodge.tuning(property)
+		if not chain_defaults.has(property):
+			chain_defaults[property] = value
+		box.add_child(slider(entry[1], value, chain_defaults[property], entry[2], entry[3], entry[4], func(new_value: float) -> void:
+			ChainDodge.tune(property, new_value)))
+	box.add_child(check("Perfect dodge refunds the dash", ChainDodge.refund_dash, func(on: bool) -> void:
+		ChainDodge.refund_dash = on))
+	box.add_child(check("Dodged missiles home on enemies", ChainDodge.deflect_homing, func(on: bool) -> void:
+		ChainDodge.deflect_homing = on))
+	box.add_child(button("RESET CHAIN DODGE", func() -> void:
+		for property in chain_defaults:
+			ChainDodge.tune(property, chain_defaults[property])
+		refresh()))
 
 
 func build_look(box: VBoxContainer) -> void:
@@ -517,6 +563,8 @@ func update_stats() -> void:
 	var stop := heli.speed / maxf(heli.get_brake_rate(), 0.01)
 	lines.append("Speed %.1f / %.1f   0-full %.2fs   stop %.2fs" % [heli.velocity.length(), heli.speed, spool, stop])
 	lines.append("Path turn %d°/s   dash %.1f m/s" % [roundi(heli.turn_speed * heli.path_turn_scale), heli.dash_distance / maxf(heli.dash_time, 0.01)])
+	var chain := heli.chain_dodge
+	lines.append("Chain %d   best %d   %s" % [chain.chain, c.best_chain, "SLOW %.2fs" % chain.slow_left if chain.is_slowed() else ""])
 
 	var enemy := c.enemy_under_cursor()
 	if enemy == null:

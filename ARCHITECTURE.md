@@ -60,6 +60,17 @@ its own salvo. Weapon tuning lives in the GunController's exported values.
 - **One job per ability**: dash beats bullets, flares beat missiles.
 - **Dash (Space / Shift)**: a ~14 m burst with brief invulnerability, with
   charges and a per-airframe cooldown (`HelicopterData.dash_cooldown`).
+- **Chain dodge** (`ChainDodge`, owned by the helicopter): a dash started
+  within `perfect_window` seconds of a missile hitting is a perfect dodge.
+  It refunds the dash, drops the game to `slow_scale` for a real-time
+  window (`MissionContext.base_time_scale`, which hit stops leave alone),
+  and a dash out of the slow motion cancels the current one, so it can be
+  the next link. Dodged missiles are deflected (`deflect()` in
+  `aa_missile.gd`): they home on the nearest enemy and blast it. Tuning
+  is static, so the test range's sliders last across resets; H fires a
+  practice salvo. All the feedback (callouts, shockwave ring, letterbox,
+  next-missile brackets, sounds) is `DodgeFx` on the HUD, driven by
+  ChainDodge's signals and animated in real time.
 - **Flares (F)**: lock-on enemies share `EnemyBase.update_lock()`: it counts
   up `lock_timer` (which makes the HUD's edge arrow pulse), warns the
   player, and gives up while `Helicopter.can_be_locked()` is false. Flares
@@ -93,13 +104,13 @@ and the hovered enemy's health, armour and lock state.
 ```
 features/
   loadout/     data classes (HelicopterData, HardpointData, WeaponData,
-               UpgradeData) + the Cobra, minigun and rockets
+			   UpgradeData) + the Cobra, minigun and rockets
   mission/     mission context, plus:
-    camera/ player/ weapons/ enemies/ (projectiles/) effects/
-    environment/ hud/ vfx/
+	camera/ player/ weapons/ enemies/ (projectiles/) effects/
+	environment/ hud/ vfx/
   test_range/  test range context and its side panel (main scene)
 shared/        audio, pixelart, ui style, prop builder, helicopter model,
-               3D health bar
+			   3D health bar
 assets/        fonts, ui textures, audio files
 _parked/       out of the build (has a .gdignore), see its README
 ```

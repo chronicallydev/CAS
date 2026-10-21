@@ -42,6 +42,9 @@ signal request_retry
 var score: int = 0
 var is_over: bool = false
 var _hit_stop_active: bool = false
+## The time scale between hit stops: below 1 during a chain dodge's slow
+## motion (see ChainDodge), which hit stops then leave alone.
+var base_time_scale: float = 1.0
 
 
 func _ready() -> void:
@@ -134,12 +137,12 @@ func kick(direction: Vector3, amount: float) -> void:
 ## Freezes the game for a moment (real time), for impact. A higher
 ## `slow` gives slow motion instead (a close call).
 func hit_stop(seconds: float, slow: float = 0.05) -> void:
-	if _hit_stop_active or get_tree().paused:
+	if _hit_stop_active or get_tree().paused or base_time_scale < 1.0:
 		return
 	_hit_stop_active = true
 	Engine.time_scale = slow
 	await get_tree().create_timer(seconds, true, false, true).timeout
-	Engine.time_scale = 1.0
+	Engine.time_scale = base_time_scale
 	_hit_stop_active = false
 
 

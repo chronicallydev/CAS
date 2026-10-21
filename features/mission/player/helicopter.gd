@@ -154,6 +154,7 @@ var lock_sound: AudioStreamPlayer
 var inbound_sound: AudioStreamPlayer
 
 var mission: MissionContext
+var chain_dodge: ChainDodge
 
 
 # Called by the mission context once the loadout's stats have been set.
@@ -162,6 +163,9 @@ func initialize(mission_context: MissionContext, airframe: HelicopterData, weapo
 	mission = mission_context
 	health = max_health
 	dash_charges_left = dash_charges
+	chain_dodge = ChainDodge.new()
+	add_child(chain_dodge)
+	chain_dodge.setup(self, mission)
 	build_model(airframe, weapons)
 	build_hud()
 	build_sounds()
@@ -180,6 +184,7 @@ func take_damage(amount: float, source: String = "") -> void:
 		return
 
 	damage_taken.emit(amount, source)
+	chain_dodge.break_chain()
 	if not invulnerable:
 		health = maxf(health - amount, 0.0)
 	health_bar.value = health
@@ -401,7 +406,9 @@ func try_dash() -> void:
 # A quick burst in the steering direction (or straight ahead), using up a
 # charge. False if it can't go yet (the press may be buffered).
 func dash() -> bool:
-	if dead or dash_charges_left <= 0 or dash_time_left > 0.0:
+	# In a chain dodge's slow motion a new dash cuts the current one short.
+	var cancel := chain_dodge.is_slowed()
+	if dead or dash_charges_left <= 0 or (dash_time_left > 0.0 and not cancel):
 		return false
 	var direction := get_input_direction()
 	if direction == Vector3.ZERO:
@@ -429,6 +436,7 @@ func dash() -> bool:
 	# The last charge sounds a little higher, so you hear you're out.
 	var pitch := 1.15 if dash_charges_left == 0 else 1.0
 	Sfx.play_3d("dash_whoosh", global_position, 0.0, pitch, 0.12)
+	chain_dodge.on_dash()
 	return true
 
 

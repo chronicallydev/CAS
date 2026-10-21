@@ -27,6 +27,17 @@ extends Node
 ## How many seconds of damage the DPS readout averages over.
 const DPS_WINDOW := 5.0
 
+const Missile := preload("res://features/mission/enemies/projectiles/aa_missile.gd")
+const MISSILE_EXPLOSION := preload("res://features/mission/vfx/explosion_scene.tscn")
+
+## Missile salvos (H or the panel), for practising chain dodges: this many
+## SAM missiles, launched this many seconds apart from around the
+## helicopter, spread over salvo_arc degrees.
+var salvo_count: int = 3
+var salvo_stagger: float = 0.3
+var salvo_arc: float = 180.0
+var salvo_distance: float = 50.0
+
 var mission: MissionContext
 
 ## Cheats, kept across rebuilds.
@@ -42,6 +53,7 @@ var movement_defaults: Dictionary = {}
 var damage_taken_total: float = 0.0
 var damage_by_source: Dictionary = {}  # source name -> damage
 var damage_dealt_total: float = 0.0
+var best_chain: int = 0
 var _dealt_log: Array = []  # [time, amount], for DPS
 var _time: float = 0.0
 
@@ -68,6 +80,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if at != null:
 			spawn(panel.selected_unit, panel.spawn_count, at)
 		get_viewport().set_input_as_handled()
+	elif event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_H:
+		fire_salvo()
+		get_viewport().set_input_as_handled()
 
 
 # --- The range ---------------------------------------------------------------
@@ -86,6 +101,8 @@ func rebuild() -> void:
 	mission.request_retry.connect(rebuild, CONNECT_DEFERRED)
 	mission.helicopter.damage_taken.connect(_on_damage_taken)
 	mission.guns.damage_dealt.connect(_on_damage_dealt)
+	mission.helicopter.chain_dodge.perfect_dodge.connect(func(chain: int, _missiles: Array) -> void:
+		best_chain = maxi(best_chain, chain))
 	apply_cheats()
 	apply_movement()
 	panel.refresh()
@@ -167,6 +184,33 @@ func spawn_enemy(scene: PackedScene, at: Vector3) -> Node3D:
 	return enemy
 
 
+## Launches a salvo at the helicopter from points on a ring around it,
+## centred on where it's heading, one missile every salvo_stagger seconds
+## (game time, so slow motion holds the rest back too).
+func fire_salvo() -> void:
+	var heli := mission.helicopter
+	var heading := heli.velocity if heli.velocity.length() > 1.0 else -heli.global_transform.basis.z
+	var center := atan2(heading.x, heading.z)
+	var built := mission
+	for i in salvo_count:
+		if i > 0:
+			await get_tree().create_timer(salvo_stagger, false).timeout
+		# The range was reset meanwhile.
+		if mission != built or heli.dead:
+			return
+		var t := 0.5 if salvo_count == 1 else float(i) / (salvo_count - 1)
+		var angle := center + deg_to_rad(lerpf(-salvo_arc, salvo_arc, t) * 0.5)
+		var from := heli.global_position + Vector3(sin(angle), 0.0, cos(angle)) * salvo_distance
+		from.y = heli.global_position.y
+		var missile := Missile.new()
+		missile.target = heli
+		missile.explosion_scene = MISSILE_EXPLOSION
+		missile.eject_time = 0.3
+		missile.source_name = "SALVO"
+		mission.world.add_child(missile)
+		missile.launch(from, (heli.global_position - from).normalized())
+
+
 ## Where the mouse cursor meets the ground, or null.
 func cursor_ground() -> Variant:
 	var camera := get_viewport().get_camera_3d()
@@ -201,6 +245,7 @@ func reset_stats() -> void:
 	damage_taken_total = 0.0
 	damage_by_source.clear()
 	damage_dealt_total = 0.0
+	best_chain = 0
 	_dealt_log.clear()
 
 

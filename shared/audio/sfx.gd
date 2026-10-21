@@ -66,6 +66,9 @@ const MIX := {
 	"flare": -9.0,
 	# The helicopter's dash.
 	"dash_whoosh": -8.0,
+	# Chain dodge: time stopping on a perfect dodge, and starting again.
+	"time_stop": -2.0,
+	"time_resume": -9.0,
 }
 
 # Per sound: [max voices at once, min milliseconds between starts].
@@ -127,6 +130,8 @@ func _ready() -> void:
 	# The same whoosh, mixed louder (and pitched down when played) for a
 	# missile tearing past.
 	streams["missile_flyby"] = streams["dash_whoosh"]
+	streams["time_stop"] = make_stream(synth_time_stop())
+	streams["time_resume"] = make_stream(synth_time_resume())
 
 
 func get_stream(sound: String) -> AudioStream:
@@ -513,6 +518,49 @@ func synth_whistle() -> PackedFloat32Array:
 
 
 # Dash: a short rising-then-falling band of air noise.
+# Perfect dodge: a deep thump dropping in pitch, a crack of noise, and a
+# long glassy ring over it, like time snapping still.
+func synth_time_stop() -> PackedFloat32Array:
+	var duration := 1.4
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	var partials := [1318.5, 1975.5, 2637.0, 3951.0]
+	for i in n:
+		var t := float(i) / RATE
+		phase += lerpf(140.0, 38.0, minf(t / 0.25, 1.0)) / RATE
+		var s := sin(TAU * phase) * exp(-t * 5.0) * 1.4
+		s += noise() * exp(-t * 60.0) * 0.9
+		var ring := 0.0
+		for k in partials.size():
+			# Slight detune beats against the next partial: a shimmer.
+			ring += sin(TAU * partials[k] * t + sin(TAU * 5.0 * t) * 0.4) / (1.0 + k)
+		s += ring * minf(t / 0.01, 1.0) * exp(-t * 2.6) * 0.35
+		out[i] = s
+	return out
+
+
+# Time starting again: filtered noise swelling and rising into a cut-off,
+# like the world being sucked back up to speed.
+func synth_time_resume() -> PackedFloat32Array:
+	var duration := 0.35
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var progress := t / duration
+		var cutoff := lerpf(0.02, 0.45, progress * progress)
+		lp += cutoff * (noise() - lp)
+		lp2 += cutoff * 0.5 * (lp - lp2)
+		var env := pow(progress, 1.5) * minf((1.0 - progress) / 0.04, 1.0)
+		out[i] = (lp - lp2) * env
+	return out
+
+
 func synth_whoosh() -> PackedFloat32Array:
 	var duration := 0.32
 	var n := int(duration * RATE)

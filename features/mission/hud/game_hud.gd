@@ -31,6 +31,7 @@ var combo_label: Label
 var combo_tween: Tween
 
 var indicators: Control
+var dodge_fx: DodgeFx
 
 
 func _ready() -> void:
@@ -48,6 +49,11 @@ func initialize(mission_context: MissionContext) -> void:
 	indicators = Indicators.new()
 	indicators.helicopter = mission.helicopter
 	add_child(indicators)
+
+	# Chain dodge feedback, over the arrows and under the readouts.
+	dodge_fx = DodgeFx.new()
+	add_child(dodge_fx)
+	dodge_fx.setup(mission)
 
 	build_readout()
 	build_combo_label()
@@ -113,8 +119,9 @@ func register_kill(points: int, world_position: Vector3, label: String) -> void:
 
 
 # Floating score text that rises from where the enemy died. Drawn on the
-# HUD (not in 3D) so it stays crisp over the pixel-art scene.
-func spawn_popup(text: String, world_position: Vector3, color: Color, big: bool = false) -> void:
+# HUD (not in 3D) so it stays crisp over the pixel-art scene. `real_time`
+# keeps it moving through slow motion.
+func spawn_popup(text: String, world_position: Vector3, color: Color, big: bool = false, real_time: bool = false) -> void:
 	var popup := make_label(text, 30 if big else 21, color, HORIZONTAL_ALIGNMENT_CENTER)
 	popup.size = Vector2(240, 40)
 	popup.pivot_offset = popup.size * 0.5
@@ -129,7 +136,7 @@ func spawn_popup(text: String, world_position: Vector3, color: Color, big: bool 
 		popup.position = camera.unproject_position(anchor) - popup.size * 0.5 - Vector2(0, rise)
 	follow.call(0.0)
 
-	var tween := popup.create_tween().set_parallel()
+	var tween := popup.create_tween().set_parallel().set_ignore_time_scale(real_time)
 	tween.tween_method(follow, 0.0, 48.0, 1.0).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(popup, "modulate:a", 0.0, 0.4).set_delay(0.6)
 	tween.chain().tween_callback(popup.queue_free)
