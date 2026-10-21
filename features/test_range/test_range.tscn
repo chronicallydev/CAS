@@ -1,14 +1,14 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://c4qo13k1oaoaq"]
 
-[ext_resource type="Script" path="res://features/test_range/test_range_context.gd" id="1_ctx"]
-[ext_resource type="Script" path="res://features/test_range/test_range_panel.gd" id="2_panel"]
-[ext_resource type="PackedScene" path="res://features/mission/mission.tscn" id="3_mission"]
+[ext_resource type="Script" uid="uid://bmvux1ci1o2n8" path="res://features/test_range/test_range_context.gd" id="1_ctx"]
+[ext_resource type="Script" uid="uid://cf6jk5stvmsad" path="res://features/test_range/test_range_panel.gd" id="2_panel"]
+[ext_resource type="PackedScene" uid="uid://5b5k2yrr0egx" path="res://features/mission/mission.tscn" id="3_mission"]
 [ext_resource type="PackedScene" uid="uid://b6ug31vif04s7" path="res://features/mission/enemies/infantry.tscn" id="4_infantry"]
 [ext_resource type="PackedScene" uid="uid://djaquq00rer4f" path="res://features/mission/enemies/car.tscn" id="5_car"]
 [ext_resource type="PackedScene" path="res://features/mission/enemies/tank.tscn" id="6_tank"]
 [ext_resource type="PackedScene" path="res://features/mission/enemies/aa_launcher.tscn" id="7_aa"]
 
-[node name="TestRange" type="Node" node_paths=PackedStringArray("panel")]
+[node name="TestRange" type="Node" unique_id=1896558606 node_paths=PackedStringArray("panel")]
 script = ExtResource("1_ctx")
 mission_scene = ExtResource("3_mission")
 panel = NodePath("Panel")
@@ -17,5 +17,5 @@ car_scene = ExtResource("5_car")
 tank_scene = ExtResource("6_tank")
 aa_scene = ExtResource("7_aa")
 
-[node name="Panel" type="CanvasLayer" parent="."]
+[node name="Panel" type="CanvasLayer" parent="." unique_id=1551392278]
 script = ExtResource("2_panel")

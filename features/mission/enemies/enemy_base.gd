@@ -131,8 +131,8 @@ func helicopter() -> Helicopter:
 # Advances a lock on the helicopter by `delta`. Returns true once
 # `lock_time` is reached, and starts over. Warns the player while locking;
 # flares (Helicopter.can_be_locked) break the lock.
-func update_lock(heli: Helicopter, delta: float, lock_time: float) -> bool:
-	if heli == null or not heli.can_be_locked():
+func update_lock(heli: Helicopter, delta: float, lock_time: float, ignore_flares: bool = false) -> bool:
+	if heli == null or heli.dead or (not ignore_flares and not heli.can_be_locked()):
 		lock_timer = 0.0
 		return false
 	lock_timer += delta

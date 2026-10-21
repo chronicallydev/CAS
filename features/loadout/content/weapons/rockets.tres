@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="WeaponData" format=3]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://4a8g7khw4np5"]
 
-[ext_resource type="Script" path="res://features/loadout/data/weapon_data.gd" id="1_77ue5"]
-[ext_resource type="Script" path="res://features/loadout/data/upgrade_data.gd" id="2_nvxrw"]
+[ext_resource type="Script" uid="uid://c1127gnmw368" path="res://features/loadout/data/weapon_data.gd" id="1_77ue5"]
+[ext_resource type="Script" uid="uid://cm2tpvl3hajwk" path="res://features/loadout/data/upgrade_data.gd" id="2_nvxrw"]
 
 [sub_resource type="Resource" id="Resource_4jcq5"]
 script = ExtResource("2_nvxrw")
@@ -9,7 +9,6 @@ id = "rockets_damage"
 label = "Damage"
 per_level = 0.12
 base_cost = 450
-target_properties = PackedStringArray("rockets_damage")
 bar_base = 6.0
 bar_max = 15.0
 
@@ -20,7 +19,6 @@ label = "Salvo size"
 mode = 1
 per_level = 1.0
 base_cost = 500
-target_properties = PackedStringArray("rockets_salvo")
 bar_base = 4.0
 bar_max = 9.0
 
@@ -30,7 +28,6 @@ id = "rockets_reload"
 label = "Reload speed"
 mode = 2
 per_level = 0.12
-target_properties = PackedStringArray("rockets_reload")
 bar_max = 2.0
 
 [resource]

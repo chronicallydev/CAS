@@ -18,6 +18,9 @@ extends Node
 @export var car_scene: PackedScene
 @export var tank_scene: PackedScene
 @export var aa_scene: PackedScene
+@export var heavy_aa_scene: PackedScene = preload("res://features/mission/enemies/heavy_launcher.tscn")
+@export var mortar_scene: PackedScene = preload("res://features/mission/enemies/mortar_team.tscn")
+@export var shilka_scene: PackedScene = preload("res://features/mission/enemies/shilka.tscn")
 ## Height enemies are dropped at; each settles to its own ride height.
 @export var spawn_height: float = 5.69
 
@@ -141,6 +144,9 @@ func units() -> Array:
 		["Car", car_scene],
 		["Tank", tank_scene],
 		["SAM truck", aa_scene],
+		["Heavy SAM", heavy_aa_scene],
+		["Mortar team", mortar_scene],
+		["Shilka (flak)", shilka_scene],
 	]
 
 

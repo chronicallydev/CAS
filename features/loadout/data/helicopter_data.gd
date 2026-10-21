@@ -22,6 +22,8 @@ extends Resource
 @export var flare_cooldown: float = 8.0
 ## Seconds for one dash charge (Shift) to come back.
 @export var dash_cooldown: float = 3.0
+#
+
 
 @export_group("Weapons")
 ## Ids of the weapons this airframe can use (see WeaponData.id).

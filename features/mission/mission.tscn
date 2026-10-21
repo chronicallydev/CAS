@@ -5,37 +5,34 @@
 [ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="7_85g3d"]
 [ext_resource type="Texture2D" uid="uid://dcn4lsj5mnhfe" path="res://assets/ui/reticle.png" id="7_tipki"]
 [ext_resource type="AudioStream" uid="uid://321sn8sgrtnp" path="res://assets/audio/shooting.wav" id="8_85g3d"]
-[ext_resource type="Script" path="res://features/mission/environment/desert_environment.gd" id="11_desert"]
-[ext_resource type="Script" path="res://features/mission/camera/top_down_camera.gd" id="12_cam"]
-[ext_resource type="Script" path="res://features/mission/player/helicopter.gd" id="13_heli"]
-[ext_resource type="Script" path="res://features/mission/hud/game_hud.gd" id="15_hud"]
-[ext_resource type="Script" path="res://features/mission/mission_context.gd" id="16_ctx"]
-[ext_resource type="Resource" path="res://features/loadout/content/helicopters/cobra.tres" id="22_cobra"]
+[ext_resource type="Script" uid="uid://c4vnpvx5qere2" path="res://features/mission/environment/desert_environment.gd" id="11_desert"]
+[ext_resource type="Script" uid="uid://v0foxv7tf153" path="res://features/mission/camera/top_down_camera.gd" id="12_cam"]
+[ext_resource type="Script" uid="uid://dkm5guekfcke2" path="res://features/mission/player/helicopter.gd" id="13_heli"]
+[ext_resource type="Script" uid="uid://dvgg2tyej3oob" path="res://features/mission/hud/game_hud.gd" id="15_hud"]
+[ext_resource type="Script" uid="uid://0etjh7ivjog1" path="res://features/mission/mission_context.gd" id="16_ctx"]
+[ext_resource type="Resource" uid="uid://bsv7xxsnrr7j8" path="res://features/loadout/content/helicopters/cobra.tres" id="22_cobra"]
 [ext_resource type="Script" uid="uid://c1127gnmw368" path="res://features/loadout/data/weapon_data.gd" id="23_weapon_data"]
-[ext_resource type="Resource" path="res://features/loadout/content/weapons/minigun.tres" id="24_minigun"]
-[ext_resource type="Resource" path="res://features/loadout/content/weapons/rockets.tres" id="25_rockets"]
+[ext_resource type="Resource" uid="uid://vxc4h2qeiqum" path="res://features/loadout/content/weapons/minigun.tres" id="24_minigun"]
+[ext_resource type="Resource" uid="uid://4a8g7khw4np5" path="res://features/loadout/content/weapons/rockets.tres" id="25_rockets"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(4000, 1, 4000)
+
+[sub_resource type="Gradient" id="Gradient_sand"]
+colors = PackedColorArray(0.78, 0.76, 0.74, 1, 1, 1, 1, 1)
 
 [sub_resource type="FastNoiseLite" id="Noise_sand"]
 frequency = 0.008
 fractal_octaves = 4
 
-[sub_resource type="Gradient" id="Gradient_sand"]
-colors = PackedColorArray(0.78, 0.76, 0.74, 1, 1, 1, 1, 1)
-
 [sub_resource type="NoiseTexture2D" id="NoiseTexture_sand"]
-width = 512
-height = 512
-seamless = true
-color_ramp = SubResource("Gradient_sand")
 noise = SubResource("Noise_sand")
+color_ramp = SubResource("Gradient_sand")
+seamless = true
 
-[sub_resource type="StandardMaterial3D" id="Material_sand"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_abo30"]
 albedo_color = Color(0.72, 0.6, 0.46, 1)
 albedo_texture = SubResource("NoiseTexture_sand")
-roughness = 1.0
 uv1_scale = Vector3(0.02, 0.02, 0.02)
 uv1_triplanar = true
 
@@ -51,21 +48,20 @@ sky_material = SubResource("ProceduralSkyMaterial_sgp6g")
 [sub_resource type="Environment" id="Environment_0wfyh"]
 background_mode = 2
 sky = SubResource("Sky_o5qli")
+ambient_light_source = 2
+ambient_light_color = Color(0.42, 0.4, 0.5, 1)
+ambient_light_energy = 0.75
 tonemap_mode = 2
 ssao_enabled = true
 glow_enabled = true
 fog_enabled = true
 fog_light_color = Color(0.9, 0.72, 0.55, 1)
 fog_density = 0.0015
-ambient_light_source = 2
-ambient_light_color = Color(0.42, 0.4, 0.5, 1)
-ambient_light_energy = 0.75
+fog_sky_affect = 0.3
 adjustment_enabled = true
 adjustment_contrast = 1.12
-adjustment_saturation = 1.0
-fog_sky_affect = 0.3
 
-[node name="Mission" type="Node" node_paths=PackedStringArray("world", "camera_rig", "helicopter", "guns", "environment", "hud")]
+[node name="Mission" type="Node" unique_id=374180086 node_paths=PackedStringArray("world", "camera_rig", "helicopter", "guns", "environment", "hud")]
 process_mode = 3
 script = ExtResource("16_ctx")
 world = NodePath("World")
@@ -76,9 +72,8 @@ environment = NodePath("World/EnvironmentalMesh/DesertEnvironment")
 hud = NodePath("GameHUD")
 airframe = ExtResource("22_cobra")
 weapons = Array[ExtResource("23_weapon_data")]([ExtResource("24_minigun"), ExtResource("25_rockets")])
-loadout = PackedStringArray("minigun", "rockets", "rockets", "")
 
-[node name="World" type="Node3D" parent="."]
+[node name="World" type="Node3D" parent="." unique_id=866943819]
 process_mode = 1
 
 [node name="EnvironmentalMesh" type="Node3D" parent="World" unique_id=474078007]
@@ -87,9 +82,9 @@ process_mode = 1
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.9081261, 0)
 use_collision = true
 mesh = SubResource("BoxMesh_1pgxc")
-material = SubResource("Material_sand")
+material = SubResource("StandardMaterial3D_abo30")
 
-[node name="DesertEnvironment" type="Node3D" parent="World/EnvironmentalMesh"]
+[node name="DesertEnvironment" type="Node3D" parent="World/EnvironmentalMesh" unique_id=1664795072]
 script = ExtResource("11_desert")
 
 [node name="CameraController" parent="World" unique_id=1898930510 node_paths=PackedStringArray("target") instance=ExtResource("1_0wfyh")]
@@ -109,22 +104,24 @@ directional_shadow_max_distance = 160.0
 [node name="WorldEnvironment" type="WorldEnvironment" parent="World/Atmosphere" unique_id=1249058794]
 environment = SubResource("Environment_0wfyh")
 
-[node name="Helicopter" type="Node3D" parent="World" node_paths=PackedStringArray("camera")]
+[node name="Helicopter" type="Node3D" parent="World" unique_id=2122941272 node_paths=PackedStringArray("camera")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, 25)
 script = ExtResource("13_heli")
 camera = NodePath("../CameraController/Camera")
+speed = 34.0
+acceleration = 10.0
 explosion_scene = ExtResource("7_85g3d")
 
-[node name="GunController" type="Node3D" parent="World" unique_id=499024300 node_paths=PackedStringArray("camera", "cursor", "shooter")]
+[node name="GunController" type="Node3D" parent="World" unique_id=499024300 node_paths=PackedStringArray("camera", "shooter", "cursor")]
 script = ExtResource("6_o6xl0")
 camera = NodePath("../CameraController/Camera")
+shooter = NodePath("../Helicopter")
 explosion_scene = ExtResource("7_85g3d")
 cursor = NodePath("../CursorLayer/Cursor")
-shooter = NodePath("../Helicopter")
 
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="World/GunController" unique_id=2054740362]
-unit_size = 45.0
 stream = ExtResource("8_85g3d")
+unit_size = 45.0
 
 [node name="CursorLayer" type="CanvasLayer" parent="World" unique_id=229169152]
 scale = Vector2(0.715, 0.715)
@@ -148,7 +145,7 @@ theme_override_font_sizes/font_size = 48
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="GameHUD" type="CanvasLayer" parent="."]
+[node name="GameHUD" type="CanvasLayer" parent="." unique_id=1587116110]
 script = ExtResource("15_hud")
 
 [editable path="World/CameraController"]

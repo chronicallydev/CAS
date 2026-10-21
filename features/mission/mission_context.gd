@@ -130,12 +130,13 @@ func kick(direction: Vector3, amount: float) -> void:
 		camera_rig.add_kick(direction, amount)
 
 
-## Freezes the game for a moment (real time), for impact.
-func hit_stop(seconds: float) -> void:
+## Freezes the game for a moment (real time), for impact. A higher
+## `slow` gives slow motion instead (a close call).
+func hit_stop(seconds: float, slow: float = 0.05) -> void:
 	if _hit_stop_active or get_tree().paused:
 		return
 	_hit_stop_active = true
-	Engine.time_scale = 0.05
+	Engine.time_scale = slow
 	await get_tree().create_timer(seconds, true, false, true).timeout
 	Engine.time_scale = 1.0
 	_hit_stop_active = false

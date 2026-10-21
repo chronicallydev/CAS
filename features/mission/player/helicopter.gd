@@ -232,7 +232,7 @@ func deploy_flares() -> void:
 		decoys.append(flare)
 
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
-		if missile.get("target") == self:
+		if missile.get("target") == self and not missile.get("ignores_flares"):
 			missile.target = decoys.pick_random()
 	Sfx.play_3d("flare", global_position)
 

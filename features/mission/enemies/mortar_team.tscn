@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/mortar_team.gd" id="1_mortar"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+[ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
+
+[node name="MortarTeam" type="Node3D"]
+script = ExtResource("1_mortar")
+max_health = 3.0
+score_value = 30
+display_name = "MORTAR"
+shell_explosion = ExtResource("2_boom")
+
+[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 3.2, 0)

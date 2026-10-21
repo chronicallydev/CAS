@@ -27,6 +27,12 @@ const MIX := {
 	"lock_tone": -8.0,
 	"heli_hit": 0.0,
 	"missile_launch": -1.0,
+	"sam_launch": 0.0,
+	"missile_eject": -6.0,
+	"mortar_thump": -7.0,
+	"missile_flyby": -3.0,
+	# Enemy missile motor; it gets louder as it closes (aa_missile.gd).
+	"missile_motor": -14.0,
 	# Big events.
 	"explosion": -2.0,
 	"tank_fire": -4.0,
@@ -93,6 +99,12 @@ func _ready() -> void:
 	streams["missile_launch"] = make_stream(synth_missile_launch())
 	# Same whoosh, mixed separately for the player's own launches.
 	streams["javelin_launch"] = streams["missile_launch"]
+	streams["sam_launch"] = make_stream(synth_sam_launch())
+	streams["missile_motor"] = make_stream(synth_motor_loop(), true)
+	# Gas charge kicking the rocket out of the tube: a short dull pop.
+	streams["missile_eject"] = make_stream(synth_explosion(0.4, 0.25, 110.0))
+	# Mortar round leaving the tube: a hollow, deep thunk.
+	streams["mortar_thump"] = make_stream(synth_explosion(0.45, 0.1, 70.0))
 	streams["base_hit"] = make_stream(synth_structure_hit())
 	streams["heli_hit"] = make_stream(synth_clang(0.45, [400.0, 1150.0, 2300.0], 10.0))
 	streams["lock_tone"] = make_stream(synth_beep_loop(0.6, 0.18, 950.0), true)
@@ -112,6 +124,9 @@ func _ready() -> void:
 	streams["scream"] = make_stream(synth_scream())
 	streams["flare"] = make_stream(synth_explosion(0.35, 0.95, 260.0))
 	streams["dash_whoosh"] = make_stream(synth_whoosh())
+	# The same whoosh, mixed louder (and pitched down when played) for a
+	# missile tearing past.
+	streams["missile_flyby"] = streams["dash_whoosh"]
 
 
 func get_stream(sound: String) -> AudioStream:
@@ -290,6 +305,40 @@ func synth_missile_launch() -> PackedFloat32Array:
 		var env := minf(t / 0.03, 1.0) * (1.0 if t < 0.4 else exp(-(t - 0.4) * 3.0))
 		var pop := noise() * exp(-t * 60.0)
 		out[i] = lp * env + pop * 0.8
+	return out
+
+
+# Enemy SAM launch: the whoosh with a sharp crack and a deep thump.
+func synth_sam_launch() -> PackedFloat32Array:
+	var out := synth_missile_launch()
+	var phase := 0.0
+	for i in mini(int(0.5 * RATE), out.size()):
+		var t := float(i) / RATE
+		phase += 60.0 * exp(-t * 3.0) / RATE
+		var thump := sin(TAU * phase) * exp(-t * 9.0) * minf(t / 0.003, 1.0)
+		var crack := noise() * exp(-t * 90.0)
+		out[i] += thump * 1.3 + crack * 0.9
+	return out
+
+
+# Rocket motor in flight: a rough, fluttering roar that loops.
+func synth_motor_loop() -> PackedFloat32Array:
+	var n := RATE
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		lp += 0.25 * (noise() - lp)
+		lp2 += 0.05 * (lp - lp2)
+		# Whole-number flutter rates so the loop is seamless.
+		var flutter := 1.0 + 0.25 * sin(TAU * 23.0 * t) + 0.15 * sin(TAU * 7.0 * t)
+		out[i] = (lp * 0.6 + lp2 * 2.0) * flutter
+	var fade := int(0.02 * RATE)
+	for i in fade:
+		var w := float(i) / fade
+		out[i] = out[i] * w + out[n - fade + i] * (1.0 - w)
 	return out
 
 
