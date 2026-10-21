@@ -26,7 +26,7 @@ const PALETTE_SHADER := preload("res://shared/pixelart/retro_palette.gdshader")
 @export var target_height: float = 240.0
 # Convert every StandardMaterial3D to toon shading as it appears.
 @export var toon_shading: bool = true
-# Index into RetroPalettes.LIST (0 = off).
+# Index into RetroPalettes.LIST (0 = black & white, the game's look).
 @export var palette: int = 0:
 	set(value):
 		palette = posmod(value, RetroPalettes.LIST.size())

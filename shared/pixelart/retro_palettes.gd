@@ -6,8 +6,13 @@ extends RefCounted
 # (mode 1) or the steps per channel (mode 2). "lightness" matches on
 # brightness only, for monochrome palettes (colours listed dark to light),
 # and "curve" darkens the image first so the bright sand isn't all white.
+#
+# The game is designed as 1-bit: Black & White comes first, as the default
+# (PixelArt.palette = 0). The rest are for comparison.
 
 const LIST := [
+	{"name": "Black & White", "mode": 1, "lightness": true, "curve": 1.4, "colors": [
+		"000000", "ffffff"]},
 	{"name": "Off", "mode": 0},
 	{"name": "Mega Drive 512", "mode": 2, "levels": 8},
 	{"name": "Endesga 32", "mode": 1, "colors": [
@@ -21,8 +26,6 @@ const LIST := [
 	{"name": "Game Boy", "mode": 1, "lightness": true, "curve": 1.3, "colors": [
 		"0f380f", "306230", "8bac0f", "9bbc0f"]},
 	{"name": "Master System 64", "mode": 2, "levels": 4},
-	{"name": "Black & White", "mode": 1, "lightness": true, "curve": 1.4, "colors": [
-		"000000", "ffffff"]},
 	{"name": "Grey 4", "mode": 1, "lightness": true, "curve": 1.5, "colors": [
 		"000000", "555555", "aaaaaa", "ffffff"]},
 ]
