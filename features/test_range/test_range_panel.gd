@@ -6,6 +6,8 @@ extends CanvasLayer
 #                and DPS, and the enemy under the cursor
 #   SPAWN      - unit and count; middle-click or G drops them at the cursor
 #   HELICOPTER - reset the range, god mode, instant flares and no reloads
+#
+# The X (or Tab) closes it; the PANEL button (or Tab) brings it back.
 
 const TEXT := Color(0.93, 0.93, 0.9)
 const MUTED := Color(0.66, 0.66, 0.63)
@@ -19,6 +21,9 @@ var spawn_count: int = 1
 const COUNTS := [1, 3, 5, 10]
 
 var range_context: TestRangeContext
+var panel: PanelContainer
+# Shown in the panel's place while it is closed.
+var open_button: Button
 var setup_box: VBoxContainer
 var stats_label: RichTextLabel
 var _stats_timer: float = 0.0
@@ -30,9 +35,20 @@ func initialize(context: TestRangeContext) -> void:
 	build_ui()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_TAB:
+		set_open(not panel.visible)
+		get_viewport().set_input_as_handled()
+
+
+func set_open(open: bool) -> void:
+	panel.visible = open
+	open_button.visible = not open
+
+
 func _process(delta: float) -> void:
 	_stats_timer -= delta
-	if _stats_timer <= 0.0 and stats_label != null and range_context.mission != null:
+	if _stats_timer <= 0.0 and stats_label != null and panel.visible and range_context.mission != null:
 		_stats_timer = 0.2
 		update_stats()
 
@@ -102,7 +118,7 @@ func clear(node: Node) -> void:
 # --- Layout -----------------------------------------------------------------
 
 func build_ui() -> void:
-	var panel := PanelContainer.new()
+	panel = PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
 	panel.offset_left = -380
 	panel.offset_right = -10
@@ -121,10 +137,15 @@ func build_ui() -> void:
 	column.add_theme_constant_override("separation", 6)
 	scroll.add_child(column)
 
+	# Title with the close button on the right.
+	var title_row := HBoxContainer.new()
+	column.add_child(title_row)
 	var title := label("TEST RANGE", 26, TEXT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(title)
-	var hint := label("Middle-click or G: spawn at cursor   |   Esc: quit", 13, MUTED)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title)
+	title_row.add_child(button("X", set_open.bind(false), 16))
+	var hint := label("Middle-click or G: spawn   |   Tab: panel   |   Esc: quit", 13, MUTED)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(hint)
 
@@ -144,6 +165,16 @@ func build_ui() -> void:
 	setup_box = VBoxContainer.new()
 	setup_box.add_theme_constant_override("separation", 6)
 	column.add_child(setup_box)
+
+	# Top-right corner, where the panel was.
+	open_button = button("PANEL  [Tab]", set_open.bind(true), 16)
+	open_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	open_button.offset_left = -150
+	open_button.offset_right = -10
+	open_button.offset_top = 10
+	open_button.offset_bottom = 44
+	open_button.visible = false
+	add_child(open_button)
 
 
 ## Rebuilds the spawn and helicopter sections.
