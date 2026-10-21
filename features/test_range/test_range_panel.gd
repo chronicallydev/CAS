@@ -5,11 +5,7 @@ extends CanvasLayer
 #   STATS      - (top, always in view) damage taken by source, damage dealt
 #                and DPS, and the enemy under the cursor
 #   SPAWN      - unit and count; middle-click or G drops them at the cursor
-#   HELICOPTER - airframe, weapon per hardpoint and upgrade levels; APPLY
-#                rebuilds the range with them. God mode / instant flares and
-#                no reloads.
-#
-# Edits go to the range's sandbox services, never the real profile.
+#   HELICOPTER - reset the range, god mode, instant flares and no reloads
 
 const TEXT := Color(0.93, 0.93, 0.9)
 const MUTED := Color(0.66, 0.66, 0.63)
@@ -23,7 +19,6 @@ var spawn_count: int = 1
 const COUNTS := [1, 3, 5, 10]
 
 var range_context: TestRangeContext
-var loadout: Loadout
 var setup_box: VBoxContainer
 var stats_label: RichTextLabel
 var _stats_timer: float = 0.0
@@ -31,7 +26,6 @@ var _stats_timer: float = 0.0
 
 func initialize(context: TestRangeContext) -> void:
 	range_context = context
-	loadout = context.sandbox.loadout
 	layer = 20
 	build_ui()
 
@@ -130,7 +124,7 @@ func build_ui() -> void:
 	var title := label("TEST RANGE", 26, TEXT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(title)
-	var hint := label("Middle-click or G: spawn at cursor   |   Esc: menu", 13, MUTED)
+	var hint := label("Middle-click or G: spawn at cursor   |   Esc: quit", 13, MUTED)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(hint)
 
@@ -168,54 +162,12 @@ func build_spawn(box: VBoxContainer) -> void:
 	box.add_child(stepper("Count", str(spawn_count), func(step: int) -> void:
 		spawn_count = COUNTS[posmod(COUNTS.find(spawn_count) + step, COUNTS.size())]
 		refresh()))
-	var target := "Hunt the helicopter" if range_context.hunt_helicopter else "March on the rig"
-	box.add_child(stepper("Enemies", target, func(_step: int) -> void:
-		range_context.set_hunt(not range_context.hunt_helicopter)
-		refresh()))
 	box.add_child(button("CLEAR ENEMIES", range_context.clear_enemies))
 
 
 func build_helicopter(box: VBoxContainer) -> void:
 	box.add_child(section("HELICOPTER"))
-	var helis := loadout.catalog.helicopters
-	var heli := loadout.selected_heli()
-	box.add_child(stepper("Airframe", heli.display_name, func(step: int) -> void:
-		var index := posmod(helis.find(heli) + step, helis.size())
-		loadout.select_heli(helis[index].id)
-		refresh()))
-
-	# Weapon per hardpoint: anything this airframe can use, within the
-	# two-type limit (units are unlimited here).
-	var ids := loadout.mounted(heli.id)
-	for i in heli.hardpoints.size():
-		var index := i
-		var weapon_id: String = ids[i]
-		var text := loadout.weapon(weapon_id).display_name if weapon_id != "" else "- empty -"
-		box.add_child(stepper(heli.hardpoints[i].label, text, func(step: int) -> void:
-			var options := loadout.mount_options(heli.id, index)
-			var at := maxi(options.find(loadout.mounted(heli.id)[index]), 0)
-			loadout.set_mount(heli.id, index, options[posmod(at + step, options.size())])
-			refresh()))
-
-	# Upgrade levels: the airframe's, then each mounted weapon's.
-	box.add_child(label("Upgrades", 15, GOLD))
-	var defs: Array = []
-	for def in loadout.catalog.airframe_upgrades:
-		defs.append([def, "Airframe"])
-	for weapon_id in loadout.mounted_types(heli.id):
-		for def in loadout.weapon(weapon_id).upgrades:
-			defs.append([def, loadout.weapon(weapon_id).weight_class])
-	for entry in defs:
-		var def: UpgradeData = entry[0]
-		var level := loadout.level(def.id)
-		var change_level := func(step: int) -> void:
-			loadout.profile.upgrades[def.id] = clampi(loadout.level(def.id) + step, 0, loadout.catalog.max_level)
-			refresh()
-		var name := "%s %s" % [entry[1].capitalize(), def.label]
-		box.add_child(stepper(name, "%d / %d" % [level, loadout.catalog.max_level], change_level, 150.0))
-
-	var apply := button("APPLY  (resets the range)", range_context.rebuild, 16)
-	box.add_child(apply)
+	box.add_child(button("RESET RANGE", range_context.rebuild, 16))
 
 	box.add_child(check("God mode (hits count, no damage)", range_context.god_mode, func(on: bool) -> void:
 		range_context.god_mode = on

@@ -47,7 +47,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	global_position.y = ride_height
-	# Orbit centre: the rig, or the helicopter's ground spot in an assault.
+	# Orbit centre: the helicopter's ground spot.
 	var centre := objective_ground()
 
 	if not orbiting:
@@ -60,9 +60,8 @@ func _physics_process(delta: float) -> void:
 			orbit_angle = atan2(global_position.z - centre.z, global_position.x - centre.x)
 		return
 
-	# Hunting the helicopter the circle never closes in all the way.
-	var min_radius := 12.0 if is_assault() else 0.0
-	orbit_radius = maxf(orbit_radius - spiral_speed * delta, min_radius)
+	# The circle never closes in all the way.
+	orbit_radius = maxf(orbit_radius - spiral_speed * delta, 12.0)
 	orbit_angle += orbit_sign * speed / maxf(orbit_radius, 1.0) * delta
 
 	var target := centre + Vector3(cos(orbit_angle) * orbit_radius, 0.0, sin(orbit_angle) * orbit_radius)
@@ -78,11 +77,7 @@ func _physics_process(delta: float) -> void:
 
 
 func update_gun(delta: float) -> void:
-	# The rig, unless the helicopter comes within reach of the roof gun.
-	var base: Node3D = defence_target(30.0)
-	if base == null:
-		base = objective()
-
+	var base := objective()
 	if base == null:
 		return
 

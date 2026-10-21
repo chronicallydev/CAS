@@ -1,23 +1,20 @@
 class_name MissionContext
 extends Node
 
-## The battle: one mission flown over a rig (or a free-play defence).
+## The battle: the helicopter, its guns and whatever is spawned to fight.
 ##
-## This node owns the mission's state (MissionState) and wires its systems
-## together: the helicopter and its guns, the enemy generator, the rig, the
+## This node wires its systems together: the helicopter and its guns, the
 ## battlefield and the HUD. Those systems don't look each other up through
 ## globals. They are handed what they need in setup(), or reach the mission
 ## through MissionContext.of(self) when they are spawned mid-game
 ## (projectiles, effects, enemies).
 ##
 ## Gameplay lives under the `world` node, which pauses with the tree; this
-## node and the HUD keep running so the end screen and Esc still work.
+## node and the HUD keep running.
 ##
-## Leaving is up to the root context: this only emits request_* signals.
+## The test range owns the mission: a lost helicopter only asks it for a
+## reset (request_retry).
 
-signal request_menu
-signal request_map
-signal request_hangar
 signal request_retry
 
 @export_group("Scene")
@@ -26,87 +23,64 @@ signal request_retry
 @export var camera_rig: TopDownCamera
 @export var helicopter: Helicopter
 @export var guns: GunController
-@export var generator: EnemyGenerator
-@export var rig: MissionRig
 @export var environment: DesertEnvironment
 @export var hud: GameHud
-## Drops pickups (cash, recharge, frenzy) where enemies die.
-@export var pickups: PickupDropper
 
-var services: GameServices
-var state: MissionState
+@export_group("Loadout")
+## The airframe flown: its stats, look and hardpoints.
+@export var airframe: HelicopterData
+## The weapons that can be mounted, in fire-button order: the first type
+## mounted fires with LMB, the second with RMB.
+@export var weapons: Array[WeaponData] = []
+## Weapon id per hardpoint of the airframe ("" = empty).
+@export var loadout: PackedStringArray = []
 
-var _rig_id: String = ""
-## Test range: no waves, no payout or records, and a lost helicopter or rig
-## just asks for a reset (request_retry).
-var sandbox: bool = false
-## Started from the editor (F6) rather than by the root context.
-var _standalone: bool = false
+@export_group("Options")
+@export var blood: bool = true
+
+var score: int = 0
+var is_over: bool = false
 var _hit_stop_active: bool = false
 
 
-## Called by the root context before the mission enters the tree.
-## `rig_id` is the rig fought over, or "" for a free-play defence.
-## `sandbox_mode` is for the test range (see `sandbox`).
-func bind(game_services: GameServices, rig_id: String, sandbox_mode: bool = false) -> void:
-	services = game_services
-	_rig_id = rig_id
-	sandbox = sandbox_mode
-
-
 func _ready() -> void:
-	if services == null:
-		# Run directly from the editor: use the save on disk, free play,
-		# and keep the generator's Inspector values.
-		services = GameServices.create_default()
-		_standalone = true
 	setup()
 
 
-## Builds the mission state and hands every system what it needs.
+## Fits the airframe and its weapons and hands every system what it needs.
 func setup() -> void:
-	var campaign := services.campaign
-	var mission_rig: RigData = campaign.rig(_rig_id) if campaign.has_rig(_rig_id) else null
-	state = MissionState.new(mission_rig, mission_rig != null and not campaign.is_owned(_rig_id))
-
-	if state.is_campaign():
-		environment.biome = mission_rig.biome
-
-	# The airframe, its look, its mounted weapons and every upgrade bought
-	# in the hangar. The guns fire from the muzzles of the mounted weapons.
-	var loadout := services.loadout
-	var airframe := loadout.selected_heli()
-	loadout.apply_to_helicopter(helicopter)
-	loadout.apply_to_guns(guns)
-	helicopter.initialize(self, airframe, loadout.mounted_weapons(airframe.id))
-	guns.equip(loadout.mounted_types(airframe.id), helicopter.weapon_muzzles)
+	for property in ["speed", "acceleration", "max_health", "turn_speed", "flare_cooldown", "dash_cooldown"]:
+		helicopter.set(property, airframe.get(property))
+	helicopter.initialize(self, airframe, mounted_weapons())
+	guns.equip(mounted_types(), helicopter.weapon_muzzles)
 	camera_rig.snap()
-
-	var hull_bonus := campaign.hull_bonus(_rig_id) if state.is_campaign() and not state.is_assault else 0.0
-	rig.initialize(self, hull_bonus)
-
-	if sandbox:
-		# The test range spawns enemies by hand; the rig can't be lost.
-		generator.mission = self
-		rig.max_health = 1000000.0
-		rig.health = rig.max_health
-	else:
-		generator.start(self,
-				null if _standalone else services.difficulty(),
-				null if _standalone else services.settings)
 
 	hud.initialize(self)
 	guns.kill_registered.connect(hud.register_kill)
-	guns.kill_registered.connect(pickups.on_kill)
-	hud.retry_pressed.connect(request_retry.emit)
-	hud.map_pressed.connect(request_map.emit)
-	hud.hangar_pressed.connect(request_hangar.emit)
-	hud.menu_pressed.connect(request_menu.emit)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
-		request_menu.emit()
+## WeaponData per hardpoint (null where empty), for building the model.
+func mounted_weapons() -> Array:
+	var mounted: Array = []
+	for i in airframe.hardpoints.size():
+		mounted.append(weapon(loadout[i]) if i < loadout.size() else null)
+	return mounted
+
+
+## The weapon types mounted, in `weapons` order.
+func mounted_types() -> Array[String]:
+	var types: Array[String] = []
+	for weapon_data in weapons:
+		if loadout.has(weapon_data.id):
+			types.append(weapon_data.id)
+	return types
+
+
+func weapon(id: String) -> WeaponData:
+	for weapon_data in weapons:
+		if weapon_data.id == id:
+			return weapon_data
+	return null
 
 
 # --- Lookups for spawned nodes ---------------------------------------------
@@ -133,12 +107,8 @@ static func spawn_parent(node: Node) -> Node:
 
 # --- Services for gameplay nodes --------------------------------------------
 
-func is_assault() -> bool:
-	return state != null and state.is_assault
-
-
 func blood_enabled() -> bool:
-	return services.settings.blood
+	return blood
 
 
 ## Shakes the camera. With a position, the shake fades out for things far
@@ -172,60 +142,13 @@ func hit_stop(seconds: float) -> void:
 
 
 func add_score(points: int) -> void:
-	state.add_score(points)
+	score += points
 
 
-## A pickup was flown over (see pickup.gd). `value` is money for cash.
-func collect_pickup(kind: int, value: int, at: Vector3) -> void:
-	var kinds = PickupDropper.Pickup.Kind
-	if kind == kinds.CASH:
-		state.pickup_cash += value
-		hud.spawn_popup("+$%d" % value, at, Color(0.45, 0.95, 0.45))
-		Sfx.play_2d("kill_tick")
-	else:
-		guns.start_frenzy(6.0)
-		hud.spawn_popup("FRENZY!", at, Color(1.0, 0.45, 0.25), true)
-		Sfx.play_2d("combo")
-
-
-# --- Ending the mission -------------------------------------------------------
-
-## Ends the run in defeat: records bests, pays out and shows the end
-## screen. Safe to call more than once.
-func game_over(reason: String) -> void:
-	if state.is_over:
+## The helicopter is down: ask the test range for a reset. Safe to call
+## more than once.
+func game_over(_reason: String) -> void:
+	if is_over:
 		return
-	state.is_over = true
-	if sandbox:
-		request_retry.emit.call_deferred()
-		return
-
-	var beaten := services.profile.record_run(state.score, state.wave)
-	_pay_out(false)
-	get_tree().paused = true
-	hud.show_game_over(reason, beaten["score"] or beaten["wave"])
-
-
-## The assault's last wave and forts are down: the rig is captured.
-func mission_won() -> void:
-	if state.is_over:
-		return
-	state.is_over = true
-
-	_pay_out(true)
-	get_tree().paused = true
-	hud.show_victory(state.rig.display_name)
-
-
-## The score is paid out as money, plus cash pickups, income from every
-## owned rig (win or lose) and a bonus for a capture.
-func _pay_out(captured: bool) -> void:
-	state.payout = {"kills": state.score, "pickups": state.pickup_cash, "income": 0, "capture": 0}
-	if state.is_campaign():
-		if captured:
-			state.payout["capture"] = services.campaign.capture(state.rig.id)
-		state.payout["income"] = services.campaign.total_income()
-
-	state.earned = state.payout["kills"] + state.payout["pickups"] + state.payout["income"] + state.payout["capture"]
-	services.profile.earn(state.earned)
-	services.save()
+	is_over = true
+	request_retry.emit.call_deferred()

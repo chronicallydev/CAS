@@ -7,11 +7,12 @@ const Debris := preload("res://features/mission/effects/debris.gd")
 
 # Shared enemy behaviour: group membership, health and what to attack.
 # Weapons call take_damage(); it returns true when the hit killed the enemy.
-# The enemy finds its mission (and through it the helicopter and the rig)
-# with MissionContext.of() when it enters the tree.
+# The enemy finds its mission (and through it the helicopter) with
+# MissionContext.of() when it enters the tree. Every enemy hunts the
+# helicopter.
 
 @export var max_health: float = 1.0
-# Damage dealt to the base when this enemy reaches it.
+# Damage dealt when this enemy rams its target.
 @export var contact_damage: float = 10.0
 # Fraction of light-weapon (minigun) damage blocked by armour. 0 = none, 1 = immune.
 @export_range(0.0, 1.0, 0.01) var light_armor: float = 0.0
@@ -41,8 +42,8 @@ var last_hit_light: bool = false
 # The mission this enemy fights in (null if run outside one).
 var mission: MissionContext
 
-# Lock-on weapons (SAMs, Stingers, radar flak): seconds spent locking on to
-# the helicopter. While above zero the HUD's edge arrow pulses red.
+# Lock-on weapons (SAM trucks): seconds spent locking on to the helicopter.
+# While above zero the HUD's edge arrow pulses red.
 var lock_timer: float = 0.0
 
 
@@ -88,29 +89,15 @@ func update_health_bar() -> void:
 		health_bar.update_health(health, max_health)
 
 
-# Attacking the player's rig (false) or defending the enemy's own rig
-# against the player's assault (true).
-func is_assault() -> bool:
-	return mission != null and mission.is_assault()
-
-
-# What this enemy is after. Defending, that's the rig at the map centre;
-# in an assault there's no friendly rig, so it hunts the helicopter.
+# What this enemy is after: the helicopter, while it's alive.
 func objective() -> Node3D:
-	if mission == null:
-		return null
-	if is_assault():
-		var heli := mission.helicopter
-		if heli != null and not heli.dead:
-			return heli
-		return null
-	return mission.rig
+	return helicopter()
 
 
 # The objective's spot on the ground (the map centre if there is none).
 func objective_ground() -> Vector3:
 	var target := objective()
-	if target == null or not is_assault():
+	if target == null:
 		return Vector3.ZERO
 	return Vector3(target.global_position.x, 0.0, target.global_position.z)
 
@@ -134,7 +121,7 @@ func hit_objective(at: Vector3, amount: float, hit_radius: float = 3.0, target: 
 	target.take_damage(amount, display_name if display_name != "" else "INFANTRY")
 
 
-# The player's helicopter, if it's alive (AA always targets it).
+# The player's helicopter, if it's alive.
 func helicopter() -> Helicopter:
 	if mission == null or mission.helicopter == null or mission.helicopter.dead:
 		return null
@@ -154,18 +141,6 @@ func update_lock(heli: Helicopter, delta: float, lock_time: float) -> bool:
 		lock_timer = 0.0
 		return true
 	return false
-
-
-# Defending, gunners also turn on the helicopter when it comes within
-# `reach` (horizontal). Null in assaults (they always hunt it there) or
-# when it's out of reach.
-func defence_target(reach: float) -> Helicopter:
-	if is_assault():
-		return null
-	var heli := helicopter()
-	if heli == null or distance_to_heli(heli) > reach:
-		return null
-	return heli
 
 
 # Horizontal distance to the helicopter.

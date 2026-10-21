@@ -1,26 +1,19 @@
 [gd_scene format=3 uid="uid://5b5k2yrr0egx"]
 
 [ext_resource type="PackedScene" uid="uid://dgj7a65h2gdid" path="res://features/mission/camera/camera_rig.tscn" id="1_0wfyh"]
-[ext_resource type="PackedScene" uid="uid://dm23n74ym2rkg" path="res://features/mission/rig/mission_rig.tscn" id="3_sugp2"]
-[ext_resource type="Script" uid="uid://dsyc1byw7lu6m" path="res://features/mission/waves/enemy_generator.gd" id="4_tbgi4"]
-[ext_resource type="PackedScene" uid="uid://b6ug31vif04s7" path="res://features/mission/enemies/infantry.tscn" id="5_tefeu"]
 [ext_resource type="Script" uid="uid://dhhlxb54vofo8" path="res://features/mission/weapons/gun_controller.gd" id="6_o6xl0"]
 [ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="7_85g3d"]
 [ext_resource type="Texture2D" uid="uid://dcn4lsj5mnhfe" path="res://assets/ui/reticle.png" id="7_tipki"]
 [ext_resource type="AudioStream" uid="uid://321sn8sgrtnp" path="res://assets/audio/shooting.wav" id="8_85g3d"]
-[ext_resource type="PackedScene" path="res://features/mission/enemies/car.tscn" id="9_car"]
-[ext_resource type="PackedScene" path="res://features/mission/enemies/tank.tscn" id="10_tank"]
 [ext_resource type="Script" path="res://features/mission/environment/desert_environment.gd" id="11_desert"]
 [ext_resource type="Script" path="res://features/mission/camera/top_down_camera.gd" id="12_cam"]
 [ext_resource type="Script" path="res://features/mission/player/helicopter.gd" id="13_heli"]
-[ext_resource type="PackedScene" path="res://features/mission/enemies/aa_launcher.tscn" id="14_aa"]
 [ext_resource type="Script" path="res://features/mission/hud/game_hud.gd" id="15_hud"]
 [ext_resource type="Script" path="res://features/mission/mission_context.gd" id="16_ctx"]
-[ext_resource type="Resource" path="res://features/mission/waves/difficulty/normal.tres" id="17_diff"]
-[ext_resource type="PackedScene" path="res://features/mission/enemies/stinger.tscn" id="18_stinger"]
-[ext_resource type="PackedScene" path="res://features/mission/enemies/shilka.tscn" id="19_shilka"]
-[ext_resource type="PackedScene" path="res://features/mission/enemies/ripple_launcher.tscn" id="20_ripple"]
-[ext_resource type="Script" path="res://features/mission/pickups/pickup_dropper.gd" id="21_pickups"]
+[ext_resource type="Resource" path="res://features/loadout/content/helicopters/cobra.tres" id="22_cobra"]
+[ext_resource type="Script" uid="uid://c1127gnmw368" path="res://features/loadout/data/weapon_data.gd" id="23_weapon_data"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/minigun.tres" id="24_minigun"]
+[ext_resource type="Resource" path="res://features/loadout/content/weapons/rockets.tres" id="25_rockets"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(4000, 1, 4000)
@@ -72,18 +65,18 @@ adjustment_contrast = 1.12
 adjustment_saturation = 1.0
 fog_sky_affect = 0.3
 
-[node name="Mission" type="Node" node_paths=PackedStringArray("world", "camera_rig", "helicopter", "guns", "generator", "rig", "environment", "hud", "pickups")]
+[node name="Mission" type="Node" node_paths=PackedStringArray("world", "camera_rig", "helicopter", "guns", "environment", "hud")]
 process_mode = 3
 script = ExtResource("16_ctx")
 world = NodePath("World")
 camera_rig = NodePath("World/CameraController")
 helicopter = NodePath("World/Helicopter")
 guns = NodePath("World/GunController")
-generator = NodePath("World/EnemyGenerator")
-rig = NodePath("World/Rig")
 environment = NodePath("World/EnvironmentalMesh/DesertEnvironment")
 hud = NodePath("GameHUD")
-pickups = NodePath("World/Pickups")
+airframe = ExtResource("22_cobra")
+weapons = Array[ExtResource("23_weapon_data")]([ExtResource("24_minigun"), ExtResource("25_rockets")])
+loadout = PackedStringArray("minigun", "rockets", "rockets", "")
 
 [node name="World" type="Node3D" parent="."]
 process_mode = 1
@@ -116,29 +109,6 @@ directional_shadow_max_distance = 160.0
 [node name="WorldEnvironment" type="WorldEnvironment" parent="World/Atmosphere" unique_id=1249058794]
 environment = SubResource("Environment_0wfyh")
 
-[node name="Rig" parent="World" unique_id=357851406 instance=ExtResource("3_sugp2")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1253567, 0)
-zone_size = 7.64
-
-[node name="EnemyGenerator" type="Node3D" parent="World" unique_id=689687034]
-script = ExtResource("4_tbgi4")
-square_size = 100.0
-vertical_offset = 5.6899999999999995
-node_scene = ExtResource("5_tefeu")
-infantry_enabled = false
-car_scene = ExtResource("9_car")
-tank_enabled = false
-tank_scene = ExtResource("10_tank")
-aa_scene = ExtResource("14_aa")
-stinger_scene = ExtResource("18_stinger")
-shilka_scene = ExtResource("19_shilka")
-ripple_scene = ExtResource("20_ripple")
-spawn_interval = 5.2
-max_nodes = 10
-difficulty = ExtResource("17_diff")
-game_speed = 2.5
-difficulty_ramp_seconds = 5.0
-
 [node name="Helicopter" type="Node3D" parent="World" node_paths=PackedStringArray("camera")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, 25)
 script = ExtResource("13_heli")
@@ -151,17 +121,10 @@ camera = NodePath("../CameraController/Camera")
 explosion_scene = ExtResource("7_85g3d")
 cursor = NodePath("../CursorLayer/Cursor")
 shooter = NodePath("../Helicopter")
-rpm = 180.0
-impact_spread = 3.0
-explosion_radius = 7.0
-shake_strength = 2.835
 
 [node name="ShootSound" type="AudioStreamPlayer3D" parent="World/GunController" unique_id=2054740362]
 unit_size = 45.0
 stream = ExtResource("8_85g3d")
-
-[node name="Pickups" type="Node" parent="World"]
-script = ExtResource("21_pickups")
 
 [node name="CursorLayer" type="CanvasLayer" parent="World" unique_id=229169152]
 scale = Vector2(0.715, 0.715)

@@ -4,10 +4,9 @@ extends Node3D
 # Player helicopter: WASD / arrow keys fly it over the map at a fixed
 # altitude, and it turns to face the mouse cursor.
 #
-# The mission context sets its stats from the hangar loadout (see
-# Loadout.apply_to_helicopter) and then calls initialize() with the
-# airframe and the weapons mounted on its hardpoints, so nothing here reads
-# saved data directly.
+# The mission context sets its stats from the airframe (HelicopterData) and
+# then calls initialize() with the airframe and the weapons mounted on its
+# hardpoints.
 
 # Every hit: how much and who dealt it (e.g. "STINGER"), for stats.
 signal damage_taken(amount: float, source: String)
@@ -17,13 +16,11 @@ signal damage_taken(amount: float, source: String)
 # How quickly the helicopter spools up to full speed (see throttle_response).
 @export var acceleration: float = 5.0
 @export var altitude: float = 16.0
-# Radius of the area of operations around the rig. Past it a warning
-# shows and the helicopter is pushed back; it can't go more than
-# `bounds_overshoot` further. Campaign missions set their own radius.
+# Radius of the area of operations around the map centre. Past it a
+# warning shows and the helicopter is pushed back; it can't go more than
+# `bounds_overshoot` further.
 @export var bounds: float = 90.0
 @export var bounds_overshoot: float = 20.0
-# How far out an assault starts, flying in from friendly territory.
-@export var ingress_distance: float = 90.0
 # Agility: how fast the nose follows the cursor and the flight path bends
 # toward the steering direction.
 @export var turn_speed: float = 6.0
@@ -35,8 +32,8 @@ signal damage_taken(amount: float, source: String)
 # The helicopter has momentum: it spools up to full speed at a steady rate,
 # bends its flight path toward the steering direction while keeping its
 # speed, and glides to a stop when the keys are let go. These turn the
-# airframe's acceleration and turn_speed (which the loadout and upgrades
-# set) into those rates, so the hangar bars keep their ranges.
+# airframe's acceleration and turn_speed (set from the HelicopterData) into
+# those rates.
 #
 # Seconds from a hover to full speed = throttle_response / acceleration
 # (Little Bird ~0.2 s, Hind ~0.45 s).
@@ -68,8 +65,8 @@ var infinite_flares: bool = false
 
 @export_group("Flares")
 # Flares are unlimited but recharge: F drops a spread, then they
-# take this many seconds to be ready again. The loadout sets it from the
-# airframe and its "Flare rate" upgrade.
+# # take this many seconds to be ready again. The mission sets it from the
+# airframe.
 @export var flare_cooldown: float = 8.0
 # After a drop, nothing can lock on for this long.
 @export var flare_protection: float = 1.8
@@ -114,8 +111,6 @@ var dead: bool = false
 var lock_warning_timer: float = 0.0
 # Past the edge of the area of operations.
 var out_of_bounds: bool = false
-# 0 -> 1 while lifting off the rig's pad at the start of a defence.
-var takeoff: float = 1.0
 var flare_cooldown_left: float = 0.0
 var flare_protection_left: float = 0.0
 var dash_charges_left: int = 0
@@ -171,7 +166,6 @@ func initialize(mission_context: MissionContext, airframe: HelicopterData, weapo
 	build_hud()
 	build_sounds()
 	position.y = altitude
-	place_for_mission()
 
 
 # `source` names who fired, for the test range's damage stats.
@@ -261,24 +255,6 @@ func shot_down() -> void:
 
 	await get_tree().create_timer(restart_delay).timeout
 	mission.game_over("Your helicopter was shot down")
-
-
-# Assaults start far out on the friendly side and fly in; defences lift
-# off from the rig's own pad.
-# Free play keeps the position set in the scene.
-func place_for_mission() -> void:
-	var state := mission.state
-	if not state.is_campaign():
-		return
-	if state.is_assault:
-		var side: Vector2 = mission.services.campaign.approach_side(state.rig.id)
-		position = Vector3(side.x, 0.0, side.y) * ingress_distance + Vector3(0, altitude, 0)
-		rotation.y = atan2(side.x, side.y)
-		bounds = ingress_distance + 35.0
-	else:
-		position = Vector3(0, 2.5, 9.0)
-		takeoff = 0.0
-		bounds = 120.0
 
 
 # The nose: where hit marks are aimed from when no weapon muzzle applies.
@@ -379,9 +355,8 @@ func _physics_process(delta: float) -> void:
 		steer(delta)
 	keep_in_bounds(delta)
 
-	# Lift off the pad, then hold altitude with a gentle bob.
-	takeoff = minf(takeoff + delta / 2.5, 1.0)
-	position.y = lerpf(2.5, altitude, smoothstep(0.0, 1.0, takeoff)) + sin(time * 1.7) * 0.25
+	# Hold altitude with a gentle bob.
+	position.y = altitude + sin(time * 1.7) * 0.25
 
 	# Turn the nose toward the cursor.
 	var aim: Variant = get_mouse_ground_point()

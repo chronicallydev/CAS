@@ -65,8 +65,7 @@ func _physics_process(delta: float) -> void:
 
 
 func fire_at(base: Node3D) -> void:
-	var lift := 0.0 if is_assault() else 1.0
-	var target := base.global_position + Vector3(randf_range(-2.0, 2.0), lift, randf_range(-2.0, 2.0))
+	var target := base.global_position + Vector3(randf_range(-2.0, 2.0), 0.0, randf_range(-2.0, 2.0))
 
 	var shell := TankShell.new()
 	MissionContext.spawn_parent(self).add_child(shell)
@@ -79,8 +78,7 @@ func fire_at(base: Node3D) -> void:
 func shell_hit(position: Vector3) -> void:
 	spawn_explosion(position, 0.6)
 
-	# A shell bursting near the helicopter hurts more than a hit on the rig.
-	hit_objective(position, shell_damage * (2.0 if is_assault() else 1.0), 5.0)
+	hit_objective(position, shell_damage * 2.0, 5.0)
 
 
 func spawn_explosion(position: Vector3, vfx_scale: float) -> void:

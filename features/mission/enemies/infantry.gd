@@ -71,15 +71,8 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var direction := flat_direction_to_center()
-	if is_assault() and objective() != null and objective_distance() <= fire_range:
+	if objective() != null and objective_distance() <= fire_range:
 		face_direction(direction)
-		update_rifle(delta)
-		return
-	# Defending: stop and shoot at the helicopter when it comes close.
-	var heli := defence_target(fire_range + 6.0)
-	if heli != null:
-		var to_heli := heli.global_position - global_position
-		face_direction(Vector3(to_heli.x, 0.0, to_heli.z).normalized())
 		update_rifle(delta)
 		return
 	global_position += direction * speed * delta
@@ -96,7 +89,7 @@ func update_rifle(delta: float) -> void:
 	burst_left -= 1
 	fire_timer = 0.14 if burst_left > 0 else burst_cooldown * randf_range(0.8, 1.3)
 
-	var heli: Node3D = objective() if is_assault() else defence_target(fire_range + 6.0)
+	var heli := objective()
 	if heli == null:
 		return
 	var from := rifle.global_position

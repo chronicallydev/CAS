@@ -1,36 +1,34 @@
 class_name TestRangeContext
 extends Node
 
-## The test range: a sandbox for trying every enemy and weapon.
+## The test range: the game's main scene, a sandbox for working on flight
+## and shooting.
 ##
-## It runs a real mission (mission.tscn) in sandbox mode, so units behave
-## exactly as in a campaign, but with no waves, no payout and no saving. It
-## uses a throwaway copy of the services (GameServices.create_sandbox) that
-## owns every helicopter and weapon; nothing done here reaches the real
-## profile.
-##
-## The side panel (TestRangePanel) picks what to spawn and edits the
-## helicopter, loadout and upgrades. Middle-click or G drops the chosen unit
-## at the cursor. APPLY rebuilds the range with the new helicopter, and so
-## does losing the helicopter. Esc returns to the menu.
-
-signal request_menu
+## It runs a real mission (mission.tscn), so units behave exactly as they
+## would anywhere else, but enemies are spawned by hand. The side panel
+## (TestRangePanel) picks what to spawn and toggles cheats. Middle-click or
+## G drops the chosen unit at the cursor. Losing the helicopter resets the
+## range. Esc quits.
 
 @export var mission_scene: PackedScene
 @export var panel: TestRangePanel
 
+@export_group("Units")
+@export var infantry_scene: PackedScene
+@export var car_scene: PackedScene
+@export var tank_scene: PackedScene
+@export var aa_scene: PackedScene
+## Height enemies are dropped at; each settles to its own ride height.
+@export var spawn_height: float = 5.69
+
 ## How many seconds of damage the DPS readout averages over.
 const DPS_WINDOW := 5.0
 
-var services: GameServices
-var sandbox: GameServices
 var mission: MissionContext
 
 ## Cheats, kept across rebuilds.
 var god_mode: bool = true
 var infinite_ammo: bool = false
-## Enemies hunt the helicopter (true) or march on the rig (false).
-var hunt_helicopter: bool = true
 
 ## Stats since the last reset.
 var damage_taken_total: float = 0.0
@@ -40,16 +38,7 @@ var _dealt_log: Array = []  # [time, amount], for DPS
 var _time: float = 0.0
 
 
-## Called by the root context before the range enters the tree.
-func bind(game_services: GameServices) -> void:
-	services = game_services
-
-
 func _ready() -> void:
-	if services == null:
-		# Run directly from the editor.
-		services = GameServices.create_default()
-	sandbox = GameServices.create_sandbox(services)
 	panel.initialize(self)
 	rebuild()
 
@@ -61,6 +50,9 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		get_tree().quit()
+		return
 	var spawn_click: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE
 	var spawn_key: bool = event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_G
 	if spawn_click or spawn_key:
@@ -72,8 +64,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- The range ---------------------------------------------------------------
 
-## Starts the range over with the sandbox's current helicopter, loadout and
-## upgrades. Spawned enemies are cleared.
+## Starts the range over. Spawned enemies are cleared.
 func rebuild() -> void:
 	if mission != null:
 		remove_child(mission)
@@ -82,15 +73,12 @@ func rebuild() -> void:
 	Engine.time_scale = 1.0
 
 	mission = mission_scene.instantiate()
-	mission.bind(sandbox, "", true)
 	add_child(mission)
 
-	mission.request_menu.connect(request_menu.emit)
 	mission.request_retry.connect(rebuild, CONNECT_DEFERRED)
 	mission.helicopter.damage_taken.connect(_on_damage_taken)
 	mission.guns.damage_dealt.connect(_on_damage_dealt)
 	apply_cheats()
-	set_hunt(hunt_helicopter)
 	panel.refresh()
 
 
@@ -102,11 +90,6 @@ func apply_cheats() -> void:
 	mission.guns.infinite_ammo = infinite_ammo
 
 
-func set_hunt(hunt: bool) -> void:
-	hunt_helicopter = hunt
-	mission.state.is_assault = hunt
-
-
 func clear_enemies() -> void:
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.queue_free()
@@ -114,32 +97,31 @@ func clear_enemies() -> void:
 
 # --- Spawning ----------------------------------------------------------------
 
-## What the panel can spawn: [name, callable(at: Vector3)].
+## What the panel can spawn: [name, scene].
 func units() -> Array:
-	var gen := mission.generator
-	var wave := func(scene: PackedScene) -> Callable:
-		return func(at: Vector3) -> void: gen.spawn_enemy(scene, Vector3(at.x, gen.vertical_offset, at.z))
 	return [
-		["Infantry", wave.call(gen.node_scene)],
-		["Stinger", wave.call(gen.stinger_scene)],
-		["Car", wave.call(gen.car_scene)],
-		["Tank", wave.call(gen.tank_scene)],
-		["SAM truck", wave.call(gen.aa_scene)],
-		["Shilka", wave.call(gen.shilka_scene)],
-		["Ripple launcher", wave.call(gen.ripple_scene)],
-		["Boss tank", func(at: Vector3) -> void: gen.spawn_boss(Vector3(at.x, gen.vertical_offset, at.z))],
-		["Bunker", func(at: Vector3) -> void: gen.add_fort(EnemyGenerator.Bunker.new(), at)],
-		["Flak gun", func(at: Vector3) -> void: gen.add_fort(EnemyGenerator.FlakGun.new(), at)],
-		["SAM site", func(at: Vector3) -> void: gen.spawn_sam_site(at)],
+		["Infantry", infantry_scene],
+		["Car", car_scene],
+		["Tank", tank_scene],
+		["SAM truck", aa_scene],
 	]
 
 
 ## Spawns `count` of unit `index` around `at`.
 func spawn(index: int, count: int, at: Vector3) -> void:
-	var spawner: Callable = units()[index][1]
+	var scene: PackedScene = units()[index][1]
 	for i in count:
 		var spread := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * (0.0 if i == 0 else 5.0)
-		spawner.call(at + spread)
+		spawn_enemy(scene, at + spread)
+
+
+func spawn_enemy(scene: PackedScene, at: Vector3) -> Node3D:
+	var enemy := scene.instantiate() as Node3D
+	mission.world.add_child(enemy)
+	enemy.position = Vector3(at.x, spawn_height, at.z)
+	# Face away from the map centre, the way they'd be heading in.
+	enemy.rotation.y = atan2(at.x, at.z)
+	return enemy
 
 
 ## Where the mouse cursor meets the ground, or null.

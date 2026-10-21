@@ -42,7 +42,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	global_position.y = ride_height
 	# Hunting the helicopter, follow it once it's well out of reach.
-	if in_position and is_assault() and objective_distance() > engage_range * 0.8:
+	if in_position and objective_distance() > engage_range * 0.8:
 		in_position = false
 
 	if not in_position:
