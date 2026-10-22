@@ -22,6 +22,13 @@ const TARGET_KINDS := ["hq", "radar", "ammo_dump"]
 
 var targets: Array[Building] = []
 var buildings: Array[Building] = []
+# Asleep until the run director starts its arena: its buildings take no
+# damage, so it can't be fought from outside.
+var awake: bool = false:
+	set(value):
+		awake = value
+		for building in buildings:
+			building.dormant = not value
 
 
 func _ready() -> void:
@@ -116,6 +123,7 @@ func fill_block(centre: Vector3, block: Vector2) -> void:
 
 
 func add_building(building: Building, at: Vector3, yaw: float) -> Building:
+	building.dormant = not awake
 	building.ground_y = ground_y
 	building.position = at
 	building.rotation.y = yaw

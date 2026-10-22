@@ -23,9 +23,10 @@ const RATE := 22050
 const TARGET_RMS := 0.22
 const MIX := {
 	# Warnings and damage to the player: must cut through.
-	"inbound_tone": -4.0,
+	# A missile homing on you: quicker pips than the lock, still soft.
+	"inbound_tone": -15.0,
 	# Being locked on: a soft pip, under everything (it can go on a while).
-	"lock_tone": -17.0,
+	"lock_tone": -22.0,
 	"heli_hit": 0.0,
 	"missile_launch": -1.0,
 	"sam_launch": 0.0,
@@ -114,7 +115,7 @@ func _ready() -> void:
 	streams["base_hit"] = make_stream(synth_structure_hit())
 	streams["heli_hit"] = make_stream(synth_clang(0.45, [400.0, 1150.0, 2300.0], 10.0))
 	streams["lock_tone"] = make_stream(synth_pip_loop(1.0, 0.09, 660.0), true)
-	streams["inbound_tone"] = make_stream(synth_beep_loop(0.16, 0.08, 1500.0), true)
+	streams["inbound_tone"] = make_stream(synth_pip_loop(0.42, 0.07, 880.0), true)
 	streams["rotor_loop"] = make_stream(synth_rotor_loop(), true)
 	streams["ui_click"] = make_stream(synth_click())
 	streams["hit_tick"] = make_stream(synth_blips([2600.0], 0.03))
@@ -406,21 +407,6 @@ func synth_structure_hit() -> PackedFloat32Array:
 			* sin(PI * clampf((t - 0.1) / 0.9, 0.0, 1.0)) * 0.25
 
 		out[i] = thud * 1.2 + body + rattle * 0.35 + groan
-	return out
-
-
-# Warning tone: one beep per loop, with short fades to avoid clicks.
-func synth_beep_loop(period: float, beep: float, freq: float) -> PackedFloat32Array:
-	var n := int(period * RATE)
-	var out := PackedFloat32Array()
-	out.resize(n)
-	for i in n:
-		var t := float(i) / RATE
-		if t >= beep:
-			continue
-		var fade := minf(minf(t / 0.005, (beep - t) / 0.005), 1.0)
-		var tone := sin(TAU * freq * t) * 0.6 + signf(sin(TAU * freq * t)) * 0.25
-		out[i] = tone * fade
 	return out
 
 

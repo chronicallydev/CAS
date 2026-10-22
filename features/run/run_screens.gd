@@ -8,6 +8,7 @@ extends CanvasLayer
 #   go         - chevrons flashing at the top edge: the way ahead is open
 #   leftovers  - "2 LEFT" under the top edge while the last few enemies
 #                are marked
+#   boss bar   - the boss's name and health across the top
 #   picks      - pick one of three upgrades (click, or 1 / 2 / 3)
 #   end screen - shot down or run complete, with the run's numbers and
 #                retry (R) / test range (T)
@@ -17,6 +18,8 @@ const INK := Color.BLACK
 # How long a fresh overlay ignores input, and how long it takes to fade in.
 const ARM_MS := 600
 const FADE_IN := 0.35
+# The boss bar's frame.
+const BOSS_BAR_SIZE := Vector2(680.0, 56.0)
 # The go chevrons: each one's width and height, and the gap between their
 # centres, in pixels.
 const GO_SIZE := Vector2(84.0, 44.0)
@@ -28,6 +31,9 @@ var go_arrows: Control
 var go_tween: Tween
 var left_label: Label
 var left_tween: Tween
+var boss_bar: Control
+var boss_fill: ColorRect
+var boss_fill_width: float = 0.0
 var overlay: Control
 # The pick buttons' actions while the picks are up, for the number keys.
 var pick_actions: Array = []
@@ -125,6 +131,51 @@ func show_leftovers(count: int) -> void:
 	left_label.scale = Vector2.ONE * 1.5
 	left_tween = create_tween().set_ignore_time_scale(true)
 	left_tween.tween_property(left_label, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+
+## A boss health bar across the top: its name on a black plate over a
+## white frame with a white fill on black.
+func show_boss_bar(title: String) -> void:
+	hide_boss_bar()
+	boss_bar = Control.new()
+	boss_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_bar.size = Vector2(BOSS_BAR_SIZE.x, BOSS_BAR_SIZE.y + 90.0)
+	add_child(boss_bar)
+	var name_label := text_label(title, 34)
+	name_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
+	boss_bar.add_child(name_label)
+	name_label.reset_size()
+	name_label.position = Vector2((BOSS_BAR_SIZE.x - name_label.size.x) * 0.5, 0.0)
+	var frame := ColorRect.new()
+	frame.color = PAPER
+	frame.position = Vector2(0, 90.0)
+	frame.size = BOSS_BAR_SIZE
+	boss_bar.add_child(frame)
+	var inside := ColorRect.new()
+	inside.color = INK
+	inside.position = Vector2(8, 8)
+	inside.size = BOSS_BAR_SIZE - Vector2(16, 16)
+	frame.add_child(inside)
+	boss_fill = ColorRect.new()
+	boss_fill.color = PAPER
+	boss_fill.position = Vector2(8, 8)
+	boss_fill.size = inside.size - Vector2(16, 16)
+	inside.add_child(boss_fill)
+	boss_fill_width = boss_fill.size.x
+	var view := boss_bar.get_viewport_rect().size
+	boss_bar.position = Vector2((view.x - BOSS_BAR_SIZE.x) * 0.5, view.y * 0.015)
+
+
+func set_boss_health(fraction: float) -> void:
+	if boss_fill != null:
+		boss_fill.size.x = boss_fill_width * clampf(fraction, 0.0, 1.0)
+
+
+func hide_boss_bar() -> void:
+	if boss_bar != null:
+		boss_bar.queue_free()
+		boss_bar = null
+		boss_fill = null
 
 
 # Centres `label` across the screen, `fraction` of the height down.

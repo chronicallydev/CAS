@@ -36,6 +36,11 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   damages by footprint, and break in stages down to rubble. `City` and
   `TravelObjective` build from them plus the existing tanks, cars and
   infantry (`dug_in` holds those in place).
+- **The boss** (`features/mission/bosses/`): the last stretch's arena is a
+  `Fortress` instead of a city. Its weapons are `FortressPart`s (buildings
+  with guns, in `deflect_targets` so deflected missiles go for them); the
+  fortress schedules one big attack at a time and runs the phases.
+  `RunDirector.PLAN`'s `boss` flag places it.
   Terrain streams in ahead, a `DesertEnvironment` per stretch. The Cobra
   flies with the minigun only. Shot down or done, the end screen offers
   retry (R) or the test range (T); the test range's PLAY RUN comes back.

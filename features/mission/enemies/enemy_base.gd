@@ -22,6 +22,9 @@ const Debris := preload("res://features/mission/effects/debris.gd")
 @export var display_name: String = ""
 # Vehicles leave a burning wreck when destroyed.
 @export var leaves_wreck: bool = false
+# Each hit that doesn't kill shoves it this far (metres) away from the shot,
+# less the heavier its armour, and makes it pop in size for a moment.
+@export var hit_knockback: float = 0.14
 # Child nodes thrown off when destroyed (e.g. "Turret"). With several, each
 # has a chance to come off, so wrecks vary.
 @export var detach_parts: PackedStringArray = []
@@ -45,6 +48,10 @@ var mission: MissionContext
 # Lock-on weapons (SAM trucks): seconds spent locking on to the helicopter.
 # While above zero the HUD's edge arrow pulses red.
 var lock_timer: float = 0.0
+
+# Hit feedback (see register_hit): the size pop running, and the last puff.
+var hit_pop: Tween
+var last_puff_ms: int = -100000
 
 
 func _ready() -> void:
@@ -184,11 +191,24 @@ func face_direction(direction: Vector3) -> void:
 		look_at(global_position + direction, Vector3.UP)
 
 
-# Visible damage for a hit that didn't destroy this enemy. `from` is where
-# the shot came from.
+# Visible damage for a hit that didn't destroy this enemy, `from` where the
+# shot came from: battle damage (vehicles), a shove away from the gun, a
+# quick size pop and a puff on the side that was hit.
 func register_hit(from: Vector3, light_weapon: bool) -> void:
 	if damage_fx != null:
 		damage_fx.register_hit(from, light_weapon, light_weapon and light_armor >= 0.9)
+	var away := global_position - from
+	away.y = 0.0
+	away = away.normalized() if away.length() > 0.01 else Vector3.ZERO
+	global_position += away * hit_knockback / (1.0 + light_armor * 4.0)
+	if hit_pop == null or not hit_pop.is_running():
+		scale = Vector3.ONE * 1.12
+		hit_pop = create_tween()
+		hit_pop.tween_property(self, "scale", Vector3.ONE, 0.09).set_ease(Tween.EASE_OUT)
+	var now := Time.get_ticks_msec()
+	if now - last_puff_ms > 110:
+		last_puff_ms = now
+		Debris.spawn_dust(MissionContext.spawn_parent(self), global_position - away * 1.2 + Vector3.UP * 1.2, 0.45)
 
 
 func launch_parts() -> void:

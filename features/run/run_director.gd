@@ -35,6 +35,8 @@ signal leftovers_changed(count: int)
 signal arena_cleared(index: int)
 # A marked target in the city went down (or the city was built).
 signal targets_changed(left: int, total: int)
+# The last stretch's fortress was built (it wakes when the arena starts).
+signal boss_built(fortress: Fortress)
 signal run_complete
 
 const SamScene := preload("res://features/mission/enemies/aa_launcher.tscn")
@@ -54,13 +56,14 @@ const BIOMES := ["desert", "wadi", "oilfield", "saltflat", "refinery", "desert"]
 #   waves      - helicopter wave budgets: a scout costs 1, a gunship 2
 #   scouts     - how many helicopters may be up at once before more scouts
 #                trickle in, while targets still stand
+#   boss       - the arena is the fortress (fortress.gd) instead
 const PLAN := [
 	{"objectives": ["patrol"], "sams": 0, "heavy": 0, "city": [], "waves": [1.0], "scouts": 0},
 	{"objectives": ["armored_patrol"], "sams": 1, "heavy": 0, "city": [], "waves": [1.0, 1.0], "scouts": 0},
 	{"objectives": ["convoy"], "sams": 2, "heavy": 0, "city": [2, 2, 1], "waves": [1.0], "scouts": 1},
 	{"objectives": ["compound"], "sams": 2, "heavy": 1, "city": [3, 2, 2], "waves": [2.0], "scouts": 1},
 	{"objectives": ["depot", "tank_line"], "sams": 2, "heavy": 1, "city": [3, 3, 3], "waves": [2.0, 2.0], "scouts": 2},
-	{"objectives": ["convoy", "compound"], "sams": 3, "heavy": 2, "city": [4, 3, 4], "waves": [3.0, 3.0], "scouts": 3},
+	{"objectives": ["convoy", "compound"], "sams": 3, "heavy": 2, "city": [], "waves": [], "scouts": 0, "boss": true},
 ]
 
 enum State { TRAVEL, ARENA, CLEARED, DONE }
@@ -75,7 +78,16 @@ enum State { TRAVEL, ARENA, CLEARED, DONE }
 @export var view_back: float = 36.0
 @export var arena_half_depth: float = 34.0
 # SAM trucks spawn when the view centre comes this close to their spot.
-@export var spawn_ahead: float = 100.0
+@export var spawn_ahead: float = 80.0
+# The arena starts while the helicopter is still this far short of it, as
+# its city comes into view; the view slides on and the helicopter is eased
+# in (entry_near), so nothing there can be fought before it starts.
+@export var arena_approach: float = 44.0
+# Quiet ground at each end of a travel stretch: nothing is placed within
+# this of where it starts, or of where the arena takes over.
+@export var quiet_gap: float = 70.0
+# How fast the helicopter is eased into an arena it starts short of.
+@export var entry_speed: float = 30.0
 # Enemies this far behind the view centre are dropped.
 @export var despawn_behind: float = 75.0
 # A live SAM truck holds the view from scrolling on once it's this far
@@ -116,12 +128,17 @@ var wave_units: Array = []
 var wave_timer: float = 0.0
 # Counts down scout_interval before the next trickling scout.
 var scout_timer: float = 0.0
+# The arena corridor's near edge while easing in (see update_entry).
+var entry_near: float = 0.0
 # Leftovers last counted (see leftovers_changed).
 var leftover_count: int = 0
 var environments: Dictionary = {}
 # Each stretch's city (built with the stretch), and the ground they take
 # up, kept clear of terrain props.
 var cities: Dictionary = {}
+# The final arena's fortress, and whether its finale has played out.
+var boss: Fortress
+var boss_beaten: bool = false
 var clear_areas: Array[Rect2] = []
 # Every travel objective built, to free with its stretch: [index, node].
 var objective_nodes: Array = []
@@ -157,7 +174,7 @@ func start_stretch(index: int) -> void:
 
 # --- Each frame ----------------------------------------------------------------
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if mission == null or mission.helicopter == null:
 		return
 	var heli := mission.helicopter
@@ -185,9 +202,10 @@ func _physics_process(_delta: float) -> void:
 				held = false
 				path_cleared.emit()
 			spawn_pending(focus_z)
-			if sams.is_empty() and objectives.is_empty() and pending_objectives.is_empty() and heli.global_position.z < arena_z + arena_half_depth - 8.0:
+			if sams.is_empty() and objectives.is_empty() and pending_objectives.is_empty() and heli.global_position.z < arena_z + arena_half_depth + arena_approach:
 				start_arena()
 		State.ARENA:
+			update_entry(delta)
 			update_arena()
 
 	mark_leftovers()
@@ -208,6 +226,9 @@ func leftovers() -> Array:
 			for objective: TravelObjective in objectives:
 				left.append_array(objective.parts.filter(objective.alive))
 		State.ARENA:
+			# The fortress marks its own parts.
+			if boss != null:
+				return left
 			var city: City = cities.get(stretch)
 			if city != null and city.targets_left() > 0:
 				return left
@@ -247,7 +268,7 @@ func plan_travel(start: float) -> void:
 	var kinds: Array = plan().objectives
 	var count := kinds.size()
 	for i in count:
-		var z := start - travel_length * (i + 1.0) / (count + 1.0) - randf_range(-15.0, 15.0)
+		var z := clampf(start - travel_length * (i + 1.0) / (count + 1.0) - randf_range(-15.0, 15.0), travel_end(start), start - quiet_gap)
 		var x := randf_range(-14.0, 14.0)
 		pending_objectives.append([kinds[i], Vector3(x, 0.0, z)])
 		var side := 1.0 if x < 0.0 else -1.0
@@ -256,9 +277,15 @@ func plan_travel(start: float) -> void:
 	var heavy: int = plan().heavy
 	for i in light + heavy:
 		var scene: PackedScene = HeavySamScene if i < heavy else SamScene
-		var z := randf_range(start - 70.0, start - travel_length + 10.0)
+		var z := randf_range(travel_end(start), start - quiet_gap)
 		var x := randf_range(-corridor_half_width + 8.0, corridor_half_width - 8.0)
 		pending.append([scene, Vector3(x, 0.0, z)])
+
+
+# The last z anything is placed at on a travel stretch, a little short of
+# where the arena starts (see arena_approach).
+func travel_end(start: float) -> float:
+	return start - travel_length + arena_approach + quiet_gap * 0.4
 
 
 func spawn_pending(focus_z: float) -> void:
@@ -343,7 +370,12 @@ func start_arena() -> void:
 	var rig := mission.camera_rig
 	rig.min_focus_z = arena_z
 	rig.max_focus_z = arena_z
-	mission.helicopter.corridor = corridor(arena_z - arena_half_depth, arena_z + arena_half_depth)
+	# The helicopter is still short of the arena: its corridor's near edge
+	# starts just behind it and closes in (see update_entry).
+	entry_near = mission.helicopter.global_position.z + 6.0
+	update_entry(0.0)
+	if city_for_stretch() != null:
+		city_for_stretch().awake = true
 	# Trucks never reached still turn up, so nothing is skipped.
 	for entry in pending:
 		spawn(entry[0], entry[1])
@@ -357,7 +389,10 @@ func start_arena() -> void:
 			mission.world.add_child(vehicle)
 			vehicle.global_position = city.road_spot()
 		escaped.clear()
-	next_wave()
+	if boss != null:
+		boss.active = true
+	if not waves.is_empty():
+		next_wave()
 	scout_timer = scout_interval
 	arena_started.emit(stretch)
 
@@ -385,6 +420,17 @@ func trickle_scouts() -> void:
 	spawn(ScoutScene, Vector3(side * randf_range(20.0, 60.0), 0.0, arena_z - arena_half_depth - randf_range(25.0, 45.0)))
 
 
+# Eases the helicopter into the arena: the corridor's near edge moves up
+# to the arena's own at entry_speed, pushing it in rather than teleporting.
+func update_entry(delta: float) -> void:
+	entry_near = move_toward(entry_near, arena_z + arena_half_depth, entry_speed * delta)
+	mission.helicopter.corridor = corridor(arena_z - arena_half_depth, maxf(entry_near, arena_z + arena_half_depth))
+
+
+func city_for_stretch() -> City:
+	return cities.get(stretch)
+
+
 func update_arena() -> void:
 	wave_units = wave_units.filter(func(unit: Variant) -> bool:
 		return is_instance_valid(unit) and unit.is_in_group("enemies"))
@@ -401,6 +447,8 @@ func update_arena() -> void:
 		wave_timer -= get_physics_process_delta_time()
 		if wave_timer <= 0.0:
 			next_wave()
+		return
+	if boss != null and not boss_beaten:
 		return
 	if defending or not get_tree().get_nodes_in_group("air_enemies").is_empty():
 		return
@@ -458,6 +506,9 @@ func despawn_behind_view(focus_z: float) -> void:
 # to a town filling the arena. Open ground has none.
 func build_city(index: int) -> void:
 	var layout: Array = plan().city
+	if plan().get("boss", false):
+		build_boss()
+		return
 	if layout.is_empty():
 		targets_changed.emit(0, 0)
 		return
@@ -478,6 +529,21 @@ func build_city(index: int) -> void:
 	clear_areas.append(area)
 	for environment in terrain():
 		environment.clear_area(area)
+
+
+# The final arena's fortress, built with the stretch and asleep until the
+# arena starts.
+func build_boss() -> void:
+	boss = Fortress.new()
+	mission.world.add_child(boss)
+	boss.position = Vector3(0.0, 0.0, arena_z)
+	boss.defeated.connect(func() -> void: boss_beaten = true)
+	targets_changed.emit(0, 0)
+	var area := Rect2(-42.0, arena_z - 34.0, 84.0, 56.0)
+	clear_areas.append(area)
+	for environment in terrain():
+		environment.clear_area(area)
+	boss_built.emit(boss)
 
 
 # Every DesertEnvironment in play: the mission's own and the streamed ones.

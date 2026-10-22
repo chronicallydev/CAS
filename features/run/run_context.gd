@@ -59,6 +59,7 @@ func start_run() -> void:
 	over = false
 	screens.show_leftovers(0)
 	screens.hide_go()
+	screens.hide_boss_bar()
 
 	mission = mission_scene.instantiate()
 	# One weapon per helicopter: the Cobra flies with its chin minigun.
@@ -75,10 +76,8 @@ func start_run() -> void:
 	director.stretch_count = stretch_count
 	add_child(director)
 	director.stretch_started.connect(_on_stretch_started)
-	director.arena_started.connect(func(_index: int) -> void:
-		screens.hide_go()
-		Music.play("final_arena" if director.is_last_stretch() else "arena")
-		screens.show_banner("DESTROY THE TARGETS" if targets_total > 0 else "INTERCEPT"))
+	director.arena_started.connect(_on_arena_started)
+	director.boss_built.connect(_on_boss_built)
 	director.targets_changed.connect(_on_targets_changed)
 	director.held_by.connect(func(what: String) -> void:
 		screens.hide_go()
@@ -168,3 +167,22 @@ func update_title() -> void:
 	if targets_total > 0:
 		text += "    TARGETS %d / %d" % [targets_total - targets_left, targets_total]
 	mission.hud.title_label.text = text
+
+
+func _on_arena_started(_index: int) -> void:
+	screens.hide_go()
+	Music.play("final_arena" if director.is_last_stretch() else "arena")
+	if director.boss != null:
+		screens.show_banner("FORTRESS")
+		screens.show_boss_bar("FORTRESS")
+	else:
+		screens.show_banner("DESTROY THE TARGETS" if targets_total > 0 else "INTERCEPT")
+
+
+func _on_boss_built(fortress: Fortress) -> void:
+	fortress.health_changed.connect(screens.set_boss_health)
+	fortress.phase_changed.connect(func(phase: int) -> void:
+		screens.show_banner("KEEP EXPOSED" if phase >= 3 else "ALL GUNS FIRING"))
+	fortress.defeated.connect(func() -> void:
+		screens.hide_boss_bar()
+		screens.show_banner("FORTRESS DOWN"))

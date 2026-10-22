@@ -175,7 +175,14 @@ func units() -> Array:
 		["Target: HQ", func() -> Node3D: return Building.make("hq", Vector2(14.0, 12.0), true)],
 		["Target: ammo dump", func() -> Node3D: return Building.make("ammo_dump", Vector2(14.0, 12.0), true)],
 		["Fuel tank", func() -> Node3D: return Building.make("fuel_tank", Vector2(9.0, 9.0))],
-		["City", func() -> Node3D: return City.new()],
+		["City", func() -> Node3D:
+			var city := City.new()
+			city.awake = true
+			return city],
+		["Fortress (boss)", func() -> Node3D:
+			var fortress := Fortress.new()
+			fortress.active = true
+			return fortress],
 	]
 
 

@@ -339,7 +339,7 @@ func fly_deflected(delta: float) -> void:
 			deflect_target = pick_enemy()
 		if deflect_target != null:
 			# Lead a moving target (enemy helicopters) by where it will be.
-			var aim := deflect_target.global_position
+			var aim := aim_point(deflect_target)
 			var target_velocity: Variant = deflect_target.get("velocity")
 			if target_velocity is Vector3:
 				aim += target_velocity * aim.distance_to(global_position) / maxf(velocity.length(), 1.0)
@@ -358,12 +358,33 @@ func fly_deflected(delta: float) -> void:
 	face(nose)
 	update_motor(delta)
 
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if is_valid_enemy(enemy) and global_position.distance_to(enemy.global_position) <= deflect_contact:
+	for enemy in deflect_targets():
+		if is_valid_enemy(enemy) and reach(enemy) <= deflect_contact:
 			detonate()
 			return
 	if deflect_left <= 0.0 or global_position.y <= ground_y:
 		detonate()
+
+
+# What a deflected missile can go for: enemies, and structures that ask for
+# it (the fortress's parts, in "deflect_targets").
+func deflect_targets() -> Array:
+	return get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("deflect_targets")
+
+
+# Where to steer for: a building's middle, anything else's origin.
+func aim_point(node: Node3D) -> Vector3:
+	if node is Building:
+		return node.global_position + Vector3(0, node.size.y * 0.5, 0)
+	return node.global_position
+
+
+# How far the missile is from `node`: to a building's box, else its origin.
+func reach(node: Node3D) -> float:
+	if node is Building:
+		var above := maxf(global_position.y - (node.global_position.y + node.size.y), 0.0)
+		return Vector2(node.ground_distance(global_position), above).length()
+	return global_position.distance_to(node.global_position)
 
 
 # Untyped: `enemy` may already have been freed, and a typed argument
@@ -377,10 +398,10 @@ func pick_enemy() -> Node3D:
 	var best: Node3D = null
 	var best_score := INF
 	var forward := velocity.normalized()
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in deflect_targets():
 		if not is_valid_enemy(enemy):
 			continue
-		var offset: Vector3 = enemy.global_position - global_position
+		var offset: Vector3 = aim_point(enemy) - global_position
 		var score := offset.length() * (2.0 - forward.dot(offset.normalized()))
 		if score < best_score:
 			best = enemy
@@ -391,10 +412,10 @@ func pick_enemy() -> Node3D:
 # Every enemy in the blast takes the deflected missile's damage.
 func blast_enemies() -> int:
 	var kills := 0
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in deflect_targets():
 		if not is_valid_enemy(enemy):
 			continue
-		if global_position.distance_to(enemy.global_position) <= deflect_radius:
+		if reach(enemy) <= deflect_radius:
 			if enemy.take_damage(deflect_damage):
 				kills += 1
 	return kills

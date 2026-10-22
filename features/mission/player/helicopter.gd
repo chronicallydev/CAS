@@ -571,7 +571,7 @@ func update_hud(delta: float) -> void:
 	else:
 		warning_label.visible = false
 
-	# Warning tones: fast beeps for an incoming missile, slower for a lock.
+	# Warning tones: quicker pips for an incoming missile, slower for a lock.
 	set_loop_playing(inbound_sound, incoming and not dead)
 	set_loop_playing(lock_sound, lock_warning_timer > 0.0 and not incoming and not dead)
 

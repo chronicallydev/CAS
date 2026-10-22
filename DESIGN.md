@@ -119,6 +119,13 @@ Variety comes from **missile types**, not from many units.
   unless they earn a place.
 - **Bosses**: an ace helicopter (dogfight) and a fortress or carrier
   destroyed piece by piece (target fight).
+- **The fortress** (built, the final arena; about 90 s): a keep inside a
+  wall ring with five emplacements (two SAM batteries, two flak guns, a
+  heavy rocket rail). Deflected missiles home on the emplacements, so
+  chain dodging its readable salvos is the way in. Phase 1: SAM fans and
+  flak. Phase 2 (two emplacements down): keep rings, the rocket rail,
+  two scouts. Phase 3 (all down): the keep opens up and fires spirals
+  while scouts and riflemen pour out; it goes down in a chain of blasts.
 
 ## Juice
 

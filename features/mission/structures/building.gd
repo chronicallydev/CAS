@@ -52,6 +52,8 @@ static var materials: Dictionary = {}
 
 var health: float = 0.0
 var stage: Stage = Stage.INTACT
+# Not in play yet (its arena hasn't started): hits do nothing.
+var dormant: bool = false
 var mission: MissionContext
 # The standing building (sinks on collapse) and its roof clutter, thrown
 # off as it takes damage.
@@ -200,7 +202,7 @@ func set_last_hit(from: Vector3, _force: float, _light_weapon: bool) -> void:
 
 
 func take_damage(amount: float, light_weapon: bool = false) -> bool:
-	if stage == Stage.COLLAPSED:
+	if stage == Stage.COLLAPSED or dormant:
 		return false
 	if light_weapon:
 		amount *= 1.0 - light_armor
@@ -218,6 +220,8 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 
 # A chip off the side facing the shot (or the roof, from high up).
 func register_hit(from: Vector3, _light_weapon: bool) -> void:
+	if dormant:
+		return
 	var now := Time.get_ticks_msec()
 	if now - last_chip_ms < CHIP_INTERVAL_MS:
 		return
