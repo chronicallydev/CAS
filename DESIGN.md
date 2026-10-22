@@ -62,13 +62,28 @@ clothes, touch their hair, poke them, and they react.
 - Two **bosses** per run.
 - **Moving forward is progress.** The camera only scrolls forward; going
   back is blocked. Stretches alternate:
-  - **Travel**: scroll forward under fire from SAM sites.
-  - **Lock**: enemy helicopters intercept, or a defended target is
-    reached; the screen locks into an arena until it's cleared, then
-    "GO ->".
-- **Targets**: structures and convoys that enemies defend. Destroying
-  them is where most of the explosions go (chain reactions, collapses,
-  secondary blasts).
+  - **Travel**: scroll forward under fire from SAM sites, past small
+    **objectives** defended by SAMs. The view won't scroll past a live
+    objective (or SAM): they have to be destroyed to move on.
+  - **Lock**: a **city** defended by enemy helicopters. The screen locks
+    into an arena until its marked targets are destroyed and every
+    helicopter wave is shot down, then "GO ->".
+- **Travel objectives**, built from tanks and infantry:
+  - **Fortified compound**: a few buildings with tanks and infantry dug
+    in around them.
+  - **Moving convoy**: tanks and trucks crossing the screen. Any that
+    get off screen turn up again as extra defenders in the next city.
+  - **Fuel depot**: tank farms and derricks that set each other off in
+    chain explosions.
+  - **Artillery / tank line**: dug-in tanks and infantry in trenches.
+- **Cities**: every building can be destroyed; a few are marked targets
+  (HQ, radar, ammo dump). Destroying them is where most of the
+  explosions go (chain reactions, collapses, secondary blasts).
+- **Buildings break in stages**: hits chip chunks off, then it burns
+  and smokes, then it collapses into rubble with debris and dust, with
+  infantry pouring out as it goes.
+- **The minigun kills everything**, slowly against armour and
+  buildings: big targets mean holding position under fire.
 
 ## Enemies
 

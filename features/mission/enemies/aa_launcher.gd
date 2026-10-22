@@ -80,7 +80,7 @@ func _physics_process(delta: float) -> void:
 
 	reload_timer -= delta
 
-	if reload_timer > 0.0 or not can_fire():
+	if reload_timer > 0.0 or not can_fire() or not on_screen():
 		lock_timer = 0.0
 		return
 

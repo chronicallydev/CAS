@@ -14,6 +14,9 @@ const Tracer := preload("res://features/mission/enemies/projectiles/tank_shell.g
 @export var spiral_speed: float = 0.8
 # Height of the car's origin above the map origin (ground top is about -0.4).
 @export var ride_height: float = -0.4
+# Held in place (a convoy moves it along itself): no driving, but the
+# roof gun still fires at the helicopter.
+@export var dug_in: bool = false
 
 @export_group("Gun")
 # Damage per round that hits the base.
@@ -47,6 +50,10 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	global_position.y = ride_height
+	if dug_in:
+		if on_screen():
+			update_gun(delta)
+		return
 	# Orbit centre: the helicopter's ground spot.
 	var centre := objective_ground()
 

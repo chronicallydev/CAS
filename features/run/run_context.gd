@@ -19,6 +19,9 @@ var director: RunDirector
 var screens: RunScreens
 var best_chain: int = 0
 var over: bool = false
+# The current city's marked targets: still standing, and in all.
+var targets_left: int = 0
+var targets_total: int = 0
 
 
 func _ready() -> void:
@@ -68,14 +71,19 @@ func start_run() -> void:
 	director.stretch_started.connect(_on_stretch_started)
 	director.arena_started.connect(func(_index: int) -> void:
 		Music.play("final_arena" if director.is_last_stretch() else "arena")
-		screens.show_banner("INTERCEPT"))
+		screens.show_banner("DESTROY THE TARGETS"))
+	director.targets_changed.connect(_on_targets_changed)
+	director.held_by.connect(func(what: String) -> void:
+		screens.show_banner("CLEAR THE SAMS" if what == "SAMS" else "DESTROY THE " + what))
+	director.convoy_escaped.connect(func() -> void:
+		screens.show_banner("CONVOY ESCAPED"))
 	director.arena_cleared.connect(_on_arena_cleared)
 	director.run_complete.connect(_on_run_complete)
 	director.setup(mission)
 
 
 func _on_stretch_started(index: int) -> void:
-	mission.hud.title_label.text = "STRETCH %d / %d" % [index + 1, stretch_count]
+	update_title()
 	Music.play("final_travel" if index == stretch_count - 1 else "travel")
 	screens.show_banner("FINAL STRETCH" if index == stretch_count - 1 else "GO  ^")
 
@@ -119,3 +127,16 @@ func end_run(title: String) -> void:
 	screens.show_end(title, lines, start_run, func() -> void:
 		get_tree().paused = false
 		get_tree().change_scene_to_file(TEST_RANGE))
+
+
+func _on_targets_changed(left: int, total: int) -> void:
+	var fell := left < targets_left
+	targets_left = left
+	targets_total = total
+	update_title()
+	if fell and left == 0:
+		screens.show_banner("TARGETS DOWN")
+
+
+func update_title() -> void:
+	mission.hud.title_label.text = "STRETCH %d / %d    TARGETS %d / %d" % [director.stretch + 1, stretch_count, targets_total - targets_left, targets_total]

@@ -24,6 +24,10 @@ const Tracer := preload("res://features/mission/enemies/projectiles/tank_shell.g
 @export var fire_range_min: float = 12.0
 @export var fire_range_max: float = 20.0
 @export var burst_cooldown: float = 3.0
+# Dug in (a travel objective): holds its spot and fires at the helicopter
+# whenever it's within dug_in_range.
+@export var dug_in: bool = false
+@export var dug_in_range: float = 30.0
 
 var model: Node3D
 var body: Node3D
@@ -71,9 +75,13 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var direction := flat_direction_to_center()
-	if objective() != null and objective_distance() <= fire_range:
+	var reach := dug_in_range if dug_in else fire_range
+	if objective() != null and objective_distance() <= reach:
 		face_direction(direction)
-		update_rifle(delta)
+		if on_screen():
+			update_rifle(delta)
+		return
+	if dug_in:
 		return
 	global_position += direction * speed * delta
 	face_direction(direction)

@@ -95,12 +95,18 @@ func show_end(title: String, lines: Array, on_retry: Callable, on_test_range: Ca
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 28)
 	box.add_child(row)
-	var retry := card_button("RETRY  [R]", on_retry)
-	var test_range := card_button("TEST RANGE  [T]", on_test_range)
+	var close_then := func(action: Callable) -> Callable:
+		return func() -> void:
+			close_overlay()
+			action.call()
+	var retry_action: Callable = close_then.call(on_retry)
+	var test_range_action: Callable = close_then.call(on_test_range)
+	var retry := card_button("RETRY  [R]", retry_action)
+	var test_range := card_button("TEST RANGE  [T]", test_range_action)
 	for button in [retry, test_range]:
 		button.custom_minimum_size = Vector2(320, 80)
 		row.add_child(button)
-	end_actions = {KEY_R: on_retry, KEY_T: on_test_range}
+	end_actions = {KEY_R: retry_action, KEY_T: test_range_action}
 
 
 # --- Pieces --------------------------------------------------------------------

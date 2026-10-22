@@ -667,6 +667,14 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 			if enemy.get("max_health") != null and enemy.max_health >= HEAVY_KILL_HEALTH:
 				heavy_killed = true
 
+	# Buildings (building.gd) are hit anywhere on their footprint.
+	for node in get_tree().get_nodes_in_group("structures"):
+		var building := node as Building
+		if building == null or building.ground_distance(position) > radius:
+			continue
+		if damage_enemy(building, hit_damage, light_weapon, force, from):
+			heavy_killed = true
+
 	report_kills(killed, heavy_killed)
 
 

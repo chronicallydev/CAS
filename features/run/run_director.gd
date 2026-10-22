@@ -5,10 +5,14 @@ extends Node
 # (up the screen). Each stretch is:
 #   travel - fly forward: the view only ever scrolls forward and the bottom
 #            of the screen is a wall, so you have to keep moving. SAM trucks
-#            appear ahead as you reach them.
-#   arena  - reaching the end locks the view: enemy helicopters intercept in
-#            waves, generated from a budget that grows each stretch (two
-#            waves in the last one, the stand-in for a boss).
+#            appear ahead as you reach them, and the view won't scroll a
+#            live one off the bottom: they have to be destroyed, not
+#            flown past.
+#   arena  - reaching the end locks the view over a city (city.gd):
+#            enemy helicopters defend it in waves, generated from a budget
+#            that grows each stretch (two waves in the last one, the
+#            stand-in for a boss). It clears once every wave is shot down
+#            and the city's marked targets are destroyed.
 #   clear  - arena_cleared fires; the run context shows an upgrade pick,
 #            then calls next_stretch(). After the last, run_complete.
 # Terrain streams in ahead: a DesertEnvironment per stretch, each its own
@@ -16,7 +20,14 @@ extends Node
 
 signal stretch_started(index: int)
 signal arena_started(index: int)
+# The view first held up this stretch, by a live SAM truck or objective;
+# `what` names it ("SAMS", "CONVOY", ...).
+signal held_by(what: String)
+# A convoy vehicle got away (it turns up again in the city).
+signal convoy_escaped
 signal arena_cleared(index: int)
+# A marked target in the city went down (or the city was built).
+signal targets_changed(left: int, total: int)
 signal run_complete
 
 const SamScene := preload("res://features/mission/enemies/aa_launcher.tscn")
@@ -43,6 +54,9 @@ enum State { TRAVEL, ARENA, CLEARED, DONE }
 @export var spawn_ahead: float = 100.0
 # Enemies this far behind the view centre are dropped.
 @export var despawn_behind: float = 75.0
+# A live SAM truck holds the view from scrolling on once it's this far
+# behind the view centre, so it stays on screen above the bottom edge.
+@export var sam_hold: float = 26.0
 
 var mission: MissionContext
 var stretch: int = 0
@@ -50,11 +64,28 @@ var state: State = State.TRAVEL
 var arena_z: float = 0.0
 # SAM trucks still to appear this stretch: [scene, position].
 var pending: Array = []
+# SAM trucks spawned this stretch, while alive.
+var sams: Array = []
+var held: bool = false
+# Travel objectives still to appear: [kind, position]; and the ones in
+# play, until cleared.
+var pending_objectives: Array = []
+var objectives: Array = []
+# What holds the view right now (see gate()).
+var holder: String = ""
+# Scenes of convoy vehicles that got away, waiting for the next city.
+var escaped: Array[String] = []
 # Arena waves still to come (arrays of scenes), and the current wave's
 # units still alive.
 var waves: Array = []
 var wave_units: Array = []
 var environments: Dictionary = {}
+# Each stretch's city (built with the stretch), and the ground they take
+# up, kept clear of terrain props.
+var cities: Dictionary = {}
+var clear_areas: Array[Rect2] = []
+# Every travel objective built, to free with its stretch: [index, node].
+var objective_nodes: Array = []
 
 
 func setup(mission_context: MissionContext) -> void:
@@ -74,11 +105,13 @@ func stretch_start_z(index: int) -> float:
 func start_stretch(index: int) -> void:
 	stretch = index
 	state = State.TRAVEL
+	held = false
 	var start := stretch_start_z(index)
 	arena_z = start - travel_length - arena_half_depth
 	plan_travel(start)
 	waves = plan_waves()
 	stream_terrain()
+	build_city(index)
 	stretch_started.emit(index)
 
 
@@ -96,10 +129,15 @@ func _physics_process(_delta: float) -> void:
 			# The view never scrolls back, and the bottom of the screen is a
 			# wall; ahead, the corridor runs to the far side of the arena.
 			rig.max_focus_z = minf(rig.max_focus_z, focus_z)
-			rig.min_focus_z = -INF
-			heli.corridor = corridor(arena_z - arena_half_depth, minf(rig.max_focus_z, focus_z) + view_back)
+			rig.min_focus_z = minf(gate(), rig.max_focus_z)
+			# The helicopter can't fly on past the top of a held view.
+			var far_z := maxf(arena_z - arena_half_depth, rig.min_focus_z - arena_half_depth)
+			heli.corridor = corridor(far_z, minf(rig.max_focus_z, focus_z) + view_back)
+			if not held and heli.global_position.z < far_z + heli.corridor_margin and holder != "":
+				held = true
+				held_by.emit(holder)
 			spawn_pending(focus_z)
-			if heli.global_position.z < arena_z + arena_half_depth - 8.0:
+			if sams.is_empty() and objectives.is_empty() and pending_objectives.is_empty() and heli.global_position.z < arena_z + arena_half_depth - 8.0:
 				start_arena()
 		State.ARENA:
 			update_arena()
@@ -113,11 +151,22 @@ func corridor(far_z: float, near_z: float) -> Rect2:
 
 # --- Travel --------------------------------------------------------------------
 
-# SAM trucks along the travel stretch: more each stretch, heavy ones from
-# the third on.
+# Travel objectives spread along the stretch (one, two from the third
+# stretch on), each with a SAM truck beside it; then SAM trucks scattered
+# along the way: more each stretch, heavy ones from the third on.
 func plan_travel(start: float) -> void:
 	pending.clear()
-	var light := mini(2 + stretch, 5)
+	pending_objectives.clear()
+	var kinds := TravelObjective.KINDS.duplicate()
+	kinds.shuffle()
+	var count := 1 if stretch < 2 else 2
+	for i in count:
+		var z := start - travel_length * (i + 1.0) / (count + 1.0) - randf_range(-15.0, 15.0)
+		var x := randf_range(-14.0, 14.0)
+		pending_objectives.append([kinds[i], Vector3(x, 0.0, z)])
+		var side := 1.0 if x < 0.0 else -1.0
+		pending.append([SamScene, Vector3(x + side * randf_range(22.0, 30.0), 0.0, z - randf_range(8.0, 16.0))])
+	var light := mini(1 + stretch, 4)
 	var heavy := 0 if stretch < 2 else mini(1 + stretch / 3, 2)
 	for i in light + heavy:
 		var scene: PackedScene = HeavySamScene if i < heavy else SamScene
@@ -131,7 +180,51 @@ func spawn_pending(focus_z: float) -> void:
 		var at: Vector3 = entry[1]
 		if at.z > focus_z - spawn_ahead:
 			pending.erase(entry)
-			spawn(entry[0], at)
+			sams.append(spawn(entry[0], at))
+	for entry in pending_objectives.duplicate():
+		var at: Vector3 = entry[1]
+		if at.z > focus_z - spawn_ahead:
+			pending_objectives.erase(entry)
+			spawn_objective(entry[0], at)
+
+
+func spawn_objective(kind: String, at: Vector3) -> void:
+	var objective := TravelObjective.new()
+	objective.kind = kind
+	# Placed before it builds: a convoy lines up from its own position.
+	objective.position = Vector3(at.x, 0.0, at.z)
+	mission.world.add_child(objective)
+	objectives.append(objective)
+	objective_nodes.append([stretch, objective])
+	objective.cleared.connect(func() -> void: objectives.erase(objective))
+	objective.escaped.connect(func(scene_path: String) -> void:
+		escaped.append(scene_path)
+		convoy_escaped.emit())
+	var area := Rect2(at.x - 22.0, at.z - objective.depth * 0.5 - 4.0, 44.0, objective.depth + 8.0)
+	if kind == "convoy":
+		area = Rect2(-corridor_half_width, at.z - 6.0, corridor_half_width * 2.0, 12.0)
+	clear_areas.append(area)
+	for environment in terrain():
+		environment.clear_area(area)
+
+
+# How far forward the view may go: the rearmost live SAM truck stays
+# sam_hold behind its centre, and so does the back of each objective still
+# standing (-INF with none). Sets holder to what's holding it.
+func gate() -> float:
+	sams = sams.filter(func(unit: Variant) -> bool:
+		return is_instance_valid(unit) and unit.is_in_group("enemies"))
+	var limit := -INF
+	holder = ""
+	for sam: Node3D in sams:
+		if sam.global_position.z - sam_hold > limit:
+			limit = sam.global_position.z - sam_hold
+			holder = "SAMS"
+	for objective: TravelObjective in objectives:
+		if objective.rear_z() - sam_hold > limit:
+			limit = objective.rear_z() - sam_hold
+			holder = objective.display_name()
+	return limit
 
 
 # --- Arena -----------------------------------------------------------------------
@@ -167,6 +260,15 @@ func start_arena() -> void:
 	for entry in pending:
 		spawn(entry[0], entry[1])
 	pending.clear()
+	# Convoy vehicles that got away hold the city's crossroads.
+	var city: City = cities.get(stretch)
+	if city != null:
+		for scene_path in escaped:
+			var vehicle := (load(scene_path) as PackedScene).instantiate() as Node3D
+			vehicle.set("dug_in", true)
+			mission.world.add_child(vehicle)
+			vehicle.global_position = city.road_spot()
+		escaped.clear()
 	next_wave()
 	arena_started.emit(stretch)
 
@@ -182,12 +284,15 @@ func next_wave() -> void:
 
 
 func update_arena() -> void:
-	wave_units = wave_units.filter(func(unit: Node) -> bool:
+	wave_units = wave_units.filter(func(unit: Variant) -> bool:
 		return is_instance_valid(unit) and unit.is_in_group("enemies"))
 	if not wave_units.is_empty():
 		return
 	if not waves.is_empty():
 		next_wave()
+		return
+	var city: City = cities.get(stretch)
+	if city != null and city.targets_left() > 0:
 		return
 	state = State.CLEARED
 	if is_last_stretch():
@@ -225,6 +330,30 @@ func despawn_behind_view(focus_z: float) -> void:
 			enemy.queue_free()
 
 
+# The stretch's city, filling its arena. More targets further in.
+func build_city(index: int) -> void:
+	var city := City.new()
+	city.extent = Vector2(corridor_half_width * 2.0 - 8.0, arena_half_depth * 2.0 - 8.0)
+	city.target_count = 4 if is_last_stretch() else mini(2 + index / 2, 4)
+	mission.world.add_child(city)
+	city.position = Vector3(0.0, 0.0, arena_z)
+	cities[index] = city
+	city.targets_changed.connect(func(left: int, total: int) -> void:
+		if index == stretch:
+			targets_changed.emit(left, total))
+	targets_changed.emit(city.target_count, city.target_count)
+
+	var area := Rect2(-city.extent.x * 0.5, arena_z - city.extent.y * 0.5, city.extent.x, city.extent.y)
+	clear_areas.append(area)
+	for environment in terrain():
+		environment.clear_area(area)
+
+
+# Every DesertEnvironment in play: the mission's own and the streamed ones.
+func terrain() -> Array:
+	return mission.world.find_children("*", "DesertEnvironment", true, false)
+
+
 # The mission's own environment covers the start; each later stretch gets
 # its own, built a stretch ahead.
 func stream_terrain() -> void:
@@ -240,8 +369,18 @@ func stream_terrain() -> void:
 		environment.seed_value = randi()
 		mission.world.add_child(environment)
 		environment.position.z = stretch_start_z(index) - stretch_length * 0.5
+		for area in clear_areas:
+			environment.clear_area(area)
 		environments[index] = environment
 	for index in environments.keys():
 		if index < stretch - 1:
 			environments[index].queue_free()
 			environments.erase(index)
+	for index in cities.keys():
+		if index < stretch - 1:
+			cities[index].queue_free()
+			cities.erase(index)
+	for entry in objective_nodes.duplicate():
+		if entry[0] < stretch - 1:
+			entry[1].queue_free()
+			objective_nodes.erase(entry)

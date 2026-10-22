@@ -38,7 +38,7 @@ score_value = 50
 display_name = "TANK"
 leaves_wreck = true
 detach_parts = PackedStringArray("Turret")
-light_armor = 0.97
+light_armor = 0.88
 shell_explosion = ExtResource("2_boom")
 
 [node name="Hull" type="MeshInstance3D" parent="."]

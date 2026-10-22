@@ -1,7 +1,8 @@
 extends EnemyBase
 
 # Tank: rolls in to a firing position, stops, turns its turret toward the
-# base and shells it at a fixed interval.
+# helicopter and lobs a shell at where it is now, at a fixed interval, so
+# hovering in one spot gets you hit. Dug in, it holds its spot.
 
 const TankShell := preload("res://features/mission/enemies/projectiles/tank_shell.gd")
 
@@ -15,6 +16,10 @@ const TankShell := preload("res://features/mission/enemies/projectiles/tank_shel
 @export var turret_turn_speed: float = 2.0
 @export var shell_explosion: PackedScene
 @export var ride_height: float = -0.4
+# Dug in (a travel objective): never moves, fires at the helicopter
+# whenever it's within dug_in_range.
+@export var dug_in: bool = false
+@export var dug_in_range: float = 55.0
 
 @onready var turret: Node3D = $Turret
 @onready var muzzle: Marker3D = $Turret/Muzzle
@@ -35,10 +40,14 @@ func _physics_process(delta: float) -> void:
 	global_position.y = ride_height
 	var flat_distance := objective_distance()
 	# A helicopter can fly off; roll after it once it's well out of range.
-	if in_position and flat_distance > firing_range + 10.0:
+	if dug_in:
+		in_position = flat_distance <= dug_in_range
+	elif in_position and flat_distance > firing_range + 10.0:
 		in_position = false
 
 	if not in_position:
+		if dug_in:
+			return
 		var direction := flat_direction_to_center()
 		global_position += direction * speed * delta
 		face_direction(direction)
@@ -59,7 +68,7 @@ func _physics_process(delta: float) -> void:
 
 	fire_timer -= delta
 
-	if fire_timer <= 0.0 and absf(angle_difference(turret.rotation.y, desired_yaw)) < 0.1:
+	if fire_timer <= 0.0 and on_screen() and absf(angle_difference(turret.rotation.y, desired_yaw)) < 0.1:
 		fire_timer = fire_interval
 		fire_at(base)
 

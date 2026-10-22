@@ -151,13 +151,14 @@ func reset_movement() -> void:
 
 
 func clear_enemies() -> void:
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("structures") + get_tree().get_nodes_in_group("cities"):
 		enemy.queue_free()
 
 
 # --- Spawning ----------------------------------------------------------------
 
-## What the panel can spawn: [name, scene].
+## What the panel can spawn: [name, scene], or [name, callable] for
+## things built in code (buildings, a city block).
 func units() -> Array:
 	return [
 		["Scout heli", scout_scene],
@@ -169,21 +170,29 @@ func units() -> Array:
 		["Heavy SAM", heavy_aa_scene],
 		["Mortar team", mortar_scene],
 		["Shilka (flak)", shilka_scene],
+		["House", func() -> Node3D: return Building.make("house", Vector2(8.0, 8.0))],
+		["Apartment block", func() -> Node3D: return Building.make("block", Vector2(14.0, 10.0))],
+		["Target: HQ", func() -> Node3D: return Building.make("hq", Vector2(14.0, 12.0), true)],
+		["Target: ammo dump", func() -> Node3D: return Building.make("ammo_dump", Vector2(14.0, 12.0), true)],
+		["Fuel tank", func() -> Node3D: return Building.make("fuel_tank", Vector2(9.0, 9.0))],
+		["City", func() -> Node3D: return City.new()],
 	]
 
 
 ## Spawns `count` of unit `index` around `at`.
 func spawn(index: int, count: int, at: Vector3) -> void:
-	var scene: PackedScene = units()[index][1]
+	var scene: Variant = units()[index][1]
 	for i in count:
 		var spread := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * (0.0 if i == 0 else 5.0)
 		spawn_enemy(scene, at + spread)
 
 
-func spawn_enemy(scene: PackedScene, at: Vector3) -> Node3D:
-	var enemy := scene.instantiate() as Node3D
+func spawn_enemy(scene: Variant, at: Vector3) -> Node3D:
+	var enemy: Node3D = scene.call() if scene is Callable else scene.instantiate()
 	mission.world.add_child(enemy)
-	enemy.position = Vector3(at.x, spawn_height, at.z)
+	# Buildings and cities stand on the ground; units settle from above.
+	var height := spawn_height if enemy is EnemyBase else enemy.position.y
+	enemy.position = Vector3(at.x, height, at.z)
 	# Face away from the map centre, the way they'd be heading in.
 	enemy.rotation.y = atan2(at.x, at.z)
 	return enemy

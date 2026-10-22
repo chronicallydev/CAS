@@ -25,9 +25,17 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
 - **A run** (see DESIGN.md) is 6 stretches. `RunDirector` leads the
   mission through each: *travel* (the view only scrolls forward,
   `TopDownCamera.max_focus_z`, and the bottom of the screen is a wall,
-  `Helicopter.corridor`; SAM trucks appear ahead), then a *lock arena*
-  (view pinned, helicopter waves from a budget that grows each stretch),
-  then an upgrade pick (`RunUpgrades`, placeholders) with the game paused.
+  `Helicopter.corridor`; SAM trucks and `TravelObjective`s appear ahead,
+  and the view won't scroll past a live one), then a *lock arena* over a
+  `City` (view pinned, helicopter waves from a budget that grows each
+  stretch; it clears once the waves are down and the city's marked
+  targets are destroyed), then an upgrade pick (`RunUpgrades`,
+  placeholders) with the game paused.
+- **Buildings** (`features/mission/structures/building.gd`) aren't
+  enemies: they're in the `structures` group, which `GunController`
+  damages by footprint, and break in stages down to rubble. `City` and
+  `TravelObjective` build from them plus the existing tanks, cars and
+  infantry (`dug_in` holds those in place).
   Terrain streams in ahead, a `DesertEnvironment` per stretch. The Cobra
   flies with the minigun only. Shot down or done, the end screen offers
   retry (R) or the test range (T); the test range's PLAY RUN comes back.

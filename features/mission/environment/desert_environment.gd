@@ -56,6 +56,8 @@ var smoke: Array = [] # [node, base position, phase] - rising smoke puffs
 var time: float = 0.0
 # Props are kept west of this x (the terminal's sea is to the east).
 var land_max_x: float = INF
+# Areas kept clear of props (see clear_area), in local x, z.
+var clear_zones: Array[Rect2] = []
 
 var sand: StandardMaterial3D
 var dirt: StandardMaterial3D
@@ -95,6 +97,34 @@ func rebuild() -> void:
 	smoke.clear()
 	land_max_x = INF
 	build()
+	for zone in clear_zones:
+		clear_zone(zone)
+
+
+## Keeps props out of `area` (x, z on the ground, in world space), e.g.
+## where a city stands. Props already there are removed.
+func clear_area(area: Rect2) -> void:
+	var local := Rect2(area.position - Vector2(global_position.x, global_position.z), area.size)
+	clear_zones.append(local)
+	clear_zone(local)
+
+
+func clear_zone(zone: Rect2) -> void:
+	# Big props (tank farms) reach well past their centre.
+	var reach := zone.grow(18.0)
+	var doomed: Array[Node] = []
+	for child in get_children():
+		if child is Node3D and reach.has_point(Vector2(child.position.x, child.position.z)):
+			doomed.append(child)
+	if doomed.is_empty():
+		return
+	var gone := func(node: Node) -> bool:
+		return doomed.any(func(d: Node) -> bool: return d == node or d.is_ancestor_of(node))
+	pumpjacks = pumpjacks.filter(func(entry: Array) -> bool: return not gone.call(entry[0]))
+	flames = flames.filter(func(entry: Array) -> bool: return not gone.call(entry[0]))
+	smoke = smoke.filter(func(entry: Array) -> bool: return not gone.call(entry[0]))
+	for node in doomed:
+		node.queue_free()
 
 
 func build() -> void:

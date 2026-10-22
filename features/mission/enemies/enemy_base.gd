@@ -149,6 +149,19 @@ func update_lock(heli: Helicopter, delta: float, lock_time: float, ignore_flares
 	return false
 
 
+# Whether this enemy is in view, at least `margin` (a fraction of the
+# screen height) in from the edges. Ranged enemies only lock on while it
+# is, so nothing shoots at the player from off-screen.
+func on_screen(margin: float = 0.04) -> bool:
+	if mission == null or mission.camera_rig == null or mission.camera_rig.camera == null:
+		return true
+	var camera := mission.camera_rig.camera
+	if camera.is_position_behind(global_position):
+		return false
+	var view := get_viewport().get_visible_rect()
+	return view.grow(-view.size.y * margin).has_point(camera.unproject_position(global_position))
+
+
 # Horizontal distance to the helicopter.
 func distance_to_heli(heli: Node3D) -> float:
 	return Vector2(heli.global_position.x - global_position.x, heli.global_position.z - global_position.z).length()

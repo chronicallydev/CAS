@@ -200,6 +200,9 @@ func fly(heli: Helicopter, delta: float) -> void:
 		# -1 too close .. 1 too far, gently.
 		var range_error := clampf((distance - preferred_range) / 10.0, -1.0, 1.0)
 		desired = (around + toward * range_error * 1.5).normalized() * speed
+		# Off-screen it heads back in, so the dogfight stays in view.
+		if not on_screen(0.08):
+			desired = (toward + around * 0.3).normalized() * speed
 
 	for other in get_tree().get_nodes_in_group("air_enemies"):
 		if other == self or other.get("crashing"):
@@ -312,7 +315,7 @@ func update_missiles(heli: Helicopter, delta: float) -> void:
 	if reload_timer > 0.0:
 		reload_timer -= delta
 		return
-	if distance_to_heli(heli) > engage_range:
+	if distance_to_heli(heli) > engage_range or not on_screen():
 		lock_timer = 0.0
 		return
 	if update_lock(heli, delta, lock_time, heavy_rockets):
