@@ -4,16 +4,17 @@ extends Node3D
 
 # The battlefield around the rig, in one of several biomes so each rig on
 # the campaign map fights somewhere different:
-#   desert   - dunes, a tank farm, pumpjacks and a site camp (the home rig)
+#   desert   - dunes, pumpjacks and a site camp (the home rig)
 #   wadi     - a dry riverbed with boulders and date palms
 #   saltflat - blinding white salt crust, cracked, nearly bare
 #   ridge    - mountains along the north and rocky outcrops
-#   refinery - tank farms, distillation columns and burning flare stacks
+#   refinery - distillation columns and burning flare stacks
 #   terminal - the gulf coast: sea, a jetty and a moored tanker
 #   oilfield - pumpjacks everywhere, burning wells and oil spills
 # The mission context sets the biome from the rig (RigData.biome). Everything is
 # placed from a seed, so a biome looks the same every run. Props have no
-# collision, so they never block aiming.
+# collision, so they never block aiming. No storage tanks here: they'd
+# pass for a fuel depot (travel_objective.gd) that can't be shot.
 
 const P := preload("res://shared/props/prop_builder.gd")
 
@@ -46,8 +47,6 @@ const GROUND := {
 @export var shrub_count: int = 320
 @export var dune_count: int = 34
 @export var pumpjack_count: int = 7
-# Angle of the storage tank farm around the base, in degrees.
-@export var tank_farm_angle: float = 40.0
 
 var rng := RandomNumberGenerator.new()
 var pumpjacks: Array = [] # [beam pivot, crank pivot, phase]
@@ -63,7 +62,6 @@ var sand: StandardMaterial3D
 var dirt: StandardMaterial3D
 var concrete: StandardMaterial3D
 var steel: StandardMaterial3D
-var tank_white: StandardMaterial3D
 var pipe_mat: StandardMaterial3D
 var yellow: StandardMaterial3D
 
@@ -110,7 +108,7 @@ func clear_area(area: Rect2) -> void:
 
 
 func clear_zone(zone: Rect2) -> void:
-	# Big props (tank farms) reach well past their centre.
+	# Big props reach well past their centre.
 	var reach := zone.grow(18.0)
 	var doomed: Array[Node] = []
 	for child in get_children():
@@ -134,7 +132,6 @@ func build() -> void:
 	dirt = P.material(Color(0.62, 0.48, 0.33), 1.0)
 	concrete = P.material(Color(0.66, 0.64, 0.6), 0.95)
 	steel = P.material(Color(0.36, 0.38, 0.4), 0.5, 0.6)
-	tank_white = P.material(Color(0.88, 0.88, 0.85), 0.6, 0.2)
 	pipe_mat = P.material(Color(0.55, 0.55, 0.52), 0.4, 0.7)
 	yellow = P.material(Color(0.95, 0.72, 0.12), 0.6, 0.2)
 
@@ -163,15 +160,10 @@ func tint_ground(color: Color) -> void:
 # --- Biomes ----------------------------------------------------------------
 
 func build_desert() -> void:
-	var farm_pos := polar(deg_to_rad(tank_farm_angle), 85.0)
-	build_roads(farm_pos)
+	build_roads()
 	build_dunes()
 	build_rocks()
 	build_shrubs()
-	build_tank_farm(farm_pos)
-	# Pipeline from the rig to the tank farm, running beside the farm road.
-	var side := Vector3(-farm_pos.z, 0.0, farm_pos.x).normalized() * 6.0
-	build_pipeline(polar(deg_to_rad(tank_farm_angle), 7.0) + side, polar(deg_to_rad(tank_farm_angle), 72.0) + side)
 	build_pumpjacks()
 	build_camp()
 
@@ -273,9 +265,6 @@ func build_ridge() -> void:
 
 
 func build_refinery() -> void:
-	for angle in [40.0, 160.0, 290.0]:
-		build_tank_farm_at(polar(deg_to_rad(angle), rng.randf_range(52.0, 70.0)), deg_to_rad(angle))
-
 	# Distillation columns with ring platforms, linked by pipe racks.
 	var column_mat := P.material(Color(0.78, 0.78, 0.74), 0.5, 0.3)
 	var unit := polar(deg_to_rad(100.0), 36.0)
@@ -288,9 +277,7 @@ func build_refinery() -> void:
 			P.cylinder(self, radius + 0.6, 0.15, pos + Vector3(0, height * (0.3 + k * 0.25), 0), steel)
 		P.pipe(self, pos + Vector3(0, height * 0.8, 0), unit + Vector3(0, 3.0, 0), 0.25, pipe_mat)
 	P.box(self, Vector3(24, 0.2, 18), unit + Vector3(0, 0.1, 0), concrete)
-	build_pipeline(unit, polar(deg_to_rad(40.0), 55.0))
-	build_pipeline(unit, polar(deg_to_rad(160.0), 55.0))
-	build_pipeline(polar(deg_to_rad(250.0), 10.0), polar(deg_to_rad(290.0), 55.0))
+	build_pipeline(polar(deg_to_rad(100.0), 8.0), unit)
 
 	# Flare stacks burning off gas, out at the edge.
 	for angle in [75.0, 210.0, 330.0]:
@@ -346,10 +333,6 @@ func build_terminal() -> void:
 	for x in range(-18, 26, 6):
 		P.pipe(ship, Vector3(x, 5.6, -4), Vector3(x, 5.6, 4), 0.25, pipe_mat)
 
-	# Storage on the landward side.
-	build_tank_farm_at(polar(deg_to_rad(200.0), 72.0), deg_to_rad(200.0))
-	build_tank_farm_at(Vector3(20.0, ground_y, -55.0), deg_to_rad(280.0))
-
 	dune_count = 14
 	rock_count = 160
 	shrub_count = 120
@@ -375,8 +358,6 @@ func build_oilfield() -> void:
 	# Small lattice derricks among the pumpjacks.
 	for i in 6:
 		build_small_derrick(random_ground_point(35.0, 120.0))
-
-	build_tank_farm_at(polar(deg_to_rad(tank_farm_angle), 85.0), deg_to_rad(tank_farm_angle))
 
 	pumpjack_count = 18
 	dune_count = 10
@@ -431,13 +412,6 @@ func build_peak(pos: Vector3, radius: float, height: float, mat: Material) -> vo
 		peak.rotation.y = rng.randf() * TAU
 
 
-func build_tank_farm_at(center: Vector3, angle: float) -> void:
-	var saved := tank_farm_angle
-	tank_farm_angle = rad_to_deg(angle)
-	build_tank_farm(center)
-	tank_farm_angle = saved
-
-
 # A fire with smoke puffs that rise from it, animated in _process.
 func build_fire(pos: Vector3, size: float) -> void:
 	var flame := Node3D.new()
@@ -486,10 +460,9 @@ func random_ground_point(min_radius: float, max_radius: float) -> Vector3:
 	return point
 
 
-func build_roads(farm_pos: Vector3) -> void:
-	# Main access road and a track to the tank farm.
-	var road_ends := [polar(deg_to_rad(200.0), outer_radius), farm_pos]
-	for end in road_ends:
+func build_roads() -> void:
+	# The main access road.
+	for end in [polar(deg_to_rad(200.0), outer_radius)]:
 		var start: Vector3 = end.normalized() * 5.0
 		start.y = ground_y
 		var road := P.beam(self, start + Vector3(0, 0.02, 0), end + Vector3(0, 0.02, 0), 1.0, dirt)
@@ -570,35 +543,6 @@ func build_shrubs() -> void:
 	add_child(instance)
 
 
-func build_tank_farm(center: Vector3) -> void:
-	var farm := Node3D.new()
-	farm.position = center
-	farm.rotation.y = -deg_to_rad(tank_farm_angle) + PI / 2.0
-	add_child(farm)
-
-	var band := P.material(Color(0.75, 0.3, 0.15), 0.6, 0.2)
-
-	# Pad and containment berm.
-	P.box(farm, Vector3(34, 0.2, 24), Vector3(0, 0.1, 0), concrete)
-	for side in [-1, 1]:
-		P.box(farm, Vector3(34, 1.0, 0.8), Vector3(0, 0.5, side * 12.0), dirt)
-		P.box(farm, Vector3(0.8, 1.0, 24), Vector3(side * 17.0, 0.5, 0), dirt)
-
-	# Storage tanks.
-	for x in [-8.5, 8.5]:
-		for z in [-5.0, 5.0]:
-			P.cylinder(farm, 4.2, 6.5, Vector3(x, 3.45, z), tank_white, Vector3.ZERO, 28)
-			P.cylinder(farm, 4.25, 0.5, Vector3(x, 5.2, z), band, Vector3.ZERO, 28)
-			P.cylinder(farm, 3.8, 0.3, Vector3(x, 6.85, z), tank_white, Vector3.ZERO, 28)
-			# Spiral-ish stair up the side.
-			P.beam(farm, Vector3(x + 4.3, 0.2, z - 2.0), Vector3(x + 4.3, 6.7, z + 2.0), 0.4, steel)
-
-	# Manifold pipes between the tanks.
-	for z in [-5.0, 5.0]:
-		P.pipe(farm, Vector3(-8.5, 1.0, z), Vector3(8.5, 1.0, z), 0.3, pipe_mat)
-	P.pipe(farm, Vector3(0, 1.0, -5.0), Vector3(0, 1.0, 5.0), 0.3, pipe_mat)
-
-
 func build_pipeline(from: Vector3, to: Vector3) -> void:
 	var height := 1.0
 	var length := from.distance_to(to)
@@ -613,16 +557,13 @@ func build_pipeline(from: Vector3, to: Vector3) -> void:
 
 
 func build_pumpjacks() -> void:
-	var farm_angle := deg_to_rad(tank_farm_angle)
 	var placed := 0
 	var attempts := 0
 
 	while placed < pumpjack_count and attempts < 200:
 		attempts += 1
 		var angle := rng.randf() * TAU
-		# Keep clear of the tank farm and the main road.
-		if absf(angle_difference(angle, farm_angle)) < 0.35:
-			continue
+		# Keep clear of the main road.
 		if absf(angle_difference(angle, deg_to_rad(200.0))) < 0.15:
 			continue
 

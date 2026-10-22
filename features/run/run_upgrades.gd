@@ -49,7 +49,7 @@ const LIST := [
 	{"id": "overcharge", "name": "OVERCHARGE", "category": "deflect", "role": "lethality",
 		"text": "Each deflection\ngrows the\nmissile's blast"},
 	{"id": "grace", "name": "GRACE", "category": "deflect", "role": "survivability",
-		"text": "Just after a\nperfect dodge,\nhits deflect too"},
+		"text": "After a perfect\ndodge, missiles\ndeflect for 1.5s"},
 	{"id": "absorb", "name": "ABSORB", "category": "deflect", "role": "survivability",
 		"text": "Every deflected\nmissile patches\nhull"},
 	{"id": "decoy", "name": "DECOY", "category": "movement", "role": "utility",

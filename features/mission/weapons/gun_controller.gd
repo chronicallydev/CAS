@@ -138,12 +138,14 @@ var default_cursor_size := Vector2.ONE * RETICLE_SCALE
 var reticle_normal: ImageTexture
 var reticle_locked: ImageTexture
 # Air-aim reach of a round: it hits a helicopter whose hull is within this
-# many metres of where it lands, and air rounds scatter by this fraction
-# of the ground spread (there's no ground to splash on, so less forgiving
-# spread would mean near misses never count).
+# many metres of where it lands, and air rounds scatter by this multiple
+# of the ground spread. Scatter is even over a disc, so about
+# (air_hit_radius / scatter)^2 of the rounds connect: ~15% by default,
+# so the gun alone takes ~6s on a scout and ~18s on a gunship; deflected
+# missiles are what win a dogfight.
 @export_group("Air targets")
-@export var air_hit_radius: float = 3.2
-@export_range(0.0, 1.0, 0.05) var air_spread_scale: float = 0.45
+@export var air_hit_radius: float = 2.0
+@export_range(0.0, 5.0, 0.05) var air_spread_scale: float = 2.6
 
 
 func _ready() -> void:
@@ -422,7 +424,9 @@ func fire_minigun_round() -> void:
 	if air != null:
 		var from_air := take_muzzle(Weapon.MINIGUN)
 		play_shot_sound("gun_minigun", 1.4, 1.7, from_air)
-		fire_air_round(from_air, air, spread * air_spread_scale)
+		# Double The Gun only doubles the scatter's area up here, so the
+		# extra rounds make up for the misses rather than all going wide.
+		fire_air_round(from_air, air, minigun_spread * sqrt(gun_spread_scale()) * air_spread_scale)
 		return
 
 	var hit: Variant = get_mouse_world_position()

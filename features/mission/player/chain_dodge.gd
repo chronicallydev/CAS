@@ -67,12 +67,14 @@ var chain: int = 0
 var slow_left: float = 0.0
 # Game seconds left to keep the chain going.
 var chain_left: float = 0.0
-# Grace (an upgrade): real seconds left in which a hit is deflected anyway.
+# Grace (an upgrade): game seconds left in which a missile hit is deflected
+# anyway. Game time, so it barely runs down in the slow motion and still
+# covers the missiles that arrive once the world speeds up again.
 var grace_left: float = 0.0
 
-# Grace's window after a perfect dodge (real seconds), and Time Bank's
+# Grace's window after a perfect dodge (game seconds), and Time Bank's
 # extra slow motion per missile dodged (it also stops the shrinking).
-const GRACE_TIME := 1.0
+const GRACE_TIME := 1.5
 const TIME_BANK_PER_MISSILE := 0.35
 
 
@@ -89,7 +91,7 @@ func is_slowed() -> bool:
 func _process(delta: float) -> void:
 	if get_tree().paused:
 		return
-	grace_left = maxf(grace_left - delta / maxf(Engine.time_scale, 0.001), 0.0)
+	grace_left = maxf(grace_left - delta, 0.0)
 	if slow_left > 0.0:
 		# Engine.time_scale scales delta; count the slow motion in real time.
 		slow_left -= delta / maxf(Engine.time_scale, 0.001)

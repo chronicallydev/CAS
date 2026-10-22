@@ -84,6 +84,7 @@ const DASH_STEER_RATE := 14.0
 # Autorotate: slow motion on a save (real seconds), longer with Second Wind.
 const AUTOROTATE_SLOW := 1.2
 const SECOND_WIND_SLOW := 2.0
+# Second Wind's grace (game seconds, like Grace's own).
 const SECOND_WIND_GRACE := 2.5
 
 var autorotate_ready: bool = false

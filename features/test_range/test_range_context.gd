@@ -168,6 +168,7 @@ func units() -> Array:
 	return [
 		["Scout heli", scout_scene],
 		["Gunship heli", gunship_scene],
+		["Ace heli", preload("res://features/mission/enemies/enemy_ace.tscn")],
 		["Infantry", infantry_scene],
 		["Car", car_scene],
 		["Tank", tank_scene],

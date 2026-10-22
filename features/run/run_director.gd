@@ -37,12 +37,15 @@ signal arena_cleared(index: int)
 signal targets_changed(left: int, total: int)
 # The last stretch's fortress was built (it wakes when the arena starts).
 signal boss_built(fortress: Fortress)
+# The mini boss flew in (see PLAN's "ace").
+signal ace_arrived(ace: Node3D)
 signal run_complete
 
 const SamScene := preload("res://features/mission/enemies/aa_launcher.tscn")
 const HeavySamScene := preload("res://features/mission/enemies/heavy_launcher.tscn")
 const ScoutScene := preload("res://features/mission/enemies/enemy_scout.tscn")
 const GunshipScene := preload("res://features/mission/enemies/enemy_gunship.tscn")
+const AceScene := preload("res://features/mission/enemies/enemy_ace.tscn")
 
 # Biomes along the run (the ridge is left out: its mountains would sit on
 # the route).
@@ -57,10 +60,14 @@ const BIOMES := ["desert", "wadi", "oilfield", "saltflat", "refinery", "desert"]
 #   scouts     - how many helicopters may be up at once before more scouts
 #                trickle in, while targets still stand
 #   boss       - the arena is the fortress (fortress.gd) instead
+#   ace        - the mini boss flies in with the waves (enemy_ace.tscn):
+#                armoured against the gun, so it's brought down with its
+#                own missiles, deflected. Beating it gives all three
+#                upgrades on offer (see RunContext).
 const PLAN := [
 	{"objectives": ["patrol"], "sams": 0, "heavy": 0, "city": [], "waves": [1.0], "scouts": 0},
 	{"objectives": ["armored_patrol"], "sams": 1, "heavy": 0, "city": [], "waves": [1.0, 1.0], "scouts": 0},
-	{"objectives": ["convoy"], "sams": 2, "heavy": 0, "city": [2, 2, 1], "waves": [1.0], "scouts": 1},
+	{"objectives": ["convoy"], "sams": 2, "heavy": 0, "city": [], "waves": [1.0], "scouts": 0, "ace": true},
 	{"objectives": ["compound"], "sams": 2, "heavy": 1, "city": [3, 2, 2], "waves": [2.0], "scouts": 1},
 	{"objectives": ["depot", "tank_line"], "sams": 2, "heavy": 1, "city": [3, 3, 3], "waves": [2.0, 2.0], "scouts": 2},
 	{"objectives": ["convoy", "compound"], "sams": 3, "heavy": 2, "city": [], "waves": [], "scouts": 0, "boss": true},
@@ -260,6 +267,10 @@ func plan() -> Dictionary:
 	return PLAN[mini(stretch, PLAN.size() - 1)]
 
 
+func has_ace() -> bool:
+	return plan().get("ace", false)
+
+
 # The stretch's travel objectives (see PLAN) spread along it, each with a
 # SAM truck beside it, and its SAM trucks scattered along the way.
 func plan_travel(start: float) -> void:
@@ -393,6 +404,12 @@ func start_arena() -> void:
 		boss.active = true
 	if not waves.is_empty():
 		next_wave()
+	if has_ace():
+		# Straight in from the top, with its escort (the first wave). Part
+		# of that wave, so no other comes in while it's up.
+		var ace := spawn(AceScene, Vector3(0.0, 0.0, arena_z - arena_half_depth - 30.0))
+		wave_units.append(ace)
+		ace_arrived.emit(ace)
 	scout_timer = scout_interval
 	arena_started.emit(stretch)
 

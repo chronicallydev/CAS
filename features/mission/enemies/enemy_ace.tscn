@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/enemy_helicopter.gd" id="1_heli"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+[ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
+
+[node name="EnemyAce" type="Node3D"]
+script = ExtResource("1_heli")
+max_health = 300.0
+light_armor = 0.85
+score_value = 1000
+display_name = "ACE"
+fuselage = Vector3(1.4, 1.2, 2.9)
+tail_length = 7.2
+rotor_radius = 5.2
+wing_span = 4.6
+model_scale = 1.2
+speed = 24.0
+acceleration = 20.0
+range_min = 28.0
+range_max = 40.0
+orbit_swap_min = 2.0
+orbit_swap_max = 4.0
+turn_rate = 4.5
+engage_range = 85.0
+lock_time = 1.2
+reload_time = 3.5
+salvo_size = 5
+salvo_spacing = 0.3
+missile_damage = 30.0
+missile_explosion = ExtResource("2_boom")
+dash_charges = 2
+dash_cooldown = 4.0
+dash_chance = 0.4
+reflect_chance = 0.3
+reflect_falloff = 0.5
+jink_damage = 2.0
+crash_explosion_scale = 4.0
+crash_spin = 7.0
+
+[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 5.2, 0)

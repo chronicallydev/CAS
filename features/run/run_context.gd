@@ -26,6 +26,8 @@ var over: bool = false
 # The current city's marked targets: still standing, and in all.
 var targets_left: int = 0
 var targets_total: int = 0
+# The mini boss while it's up (its health drives the boss bar).
+var ace: Node3D
 
 
 func _ready() -> void:
@@ -37,6 +39,16 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+
+
+func _process(_delta: float) -> void:
+	if ace == null:
+		return
+	if not is_instance_valid(ace) or ace.crashing:
+		ace = null
+		screens.hide_boss_bar()
+		return
+	screens.set_boss_health(ace.health / ace.max_health)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -54,6 +66,7 @@ func start_run() -> void:
 	Engine.time_scale = 1.0
 	best_chain = 0
 	over = false
+	ace = null
 	screens.show_leftovers(0)
 	screens.hide_go()
 	screens.hide_boss_bar()
@@ -75,6 +88,9 @@ func start_run() -> void:
 	director.stretch_started.connect(_on_stretch_started)
 	director.arena_started.connect(_on_arena_started)
 	director.boss_built.connect(_on_boss_built)
+	director.ace_arrived.connect(func(unit: Node3D) -> void:
+		ace = unit
+		screens.show_boss_bar("ACE"))
 	director.targets_changed.connect(_on_targets_changed)
 	director.held_by.connect(func(what: String) -> void:
 		screens.hide_go()
@@ -109,7 +125,7 @@ func _on_path_cleared() -> void:
 func _on_arena_cleared(_index: int) -> void:
 	# A beat to take in the win (the last wreck coming down, the patch-up)
 	# before the pick fades in with the game paused.
-	screens.show_banner("ARENA CLEAR")
+	screens.show_banner("ACE DOWN" if director.has_ace() else "ARENA CLEAR")
 	Sfx.play_2d("combo")
 	mission.helicopter.repair(STRETCH_HEAL)
 	mission.hud.spawn_popup("+%d HULL" % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true)
@@ -124,15 +140,21 @@ func _on_arena_cleared(_index: int) -> void:
 	for i in cards.size():
 		cards[i] = cards[i].duplicate()
 		cards[i].card = RunUpgrades.card_text(i + 1, cards[i], mission)
+	# Beating the ace: every card on offer, not just one.
+	var take_all := director.has_ace()
 	get_tree().paused = true
 	Music.duck(true)
-	screens.show_picks("CLEARED - PICK ONE", cards, func(id: String) -> void:
-		var completed := RunUpgrades.apply(id, mission)
+	var title := "ACE DOWN - TAKE ALL THREE" if take_all else "CLEARED - PICK ONE"
+	screens.show_picks(title, cards, func(id: String) -> void:
+		var completed: Array = []
+		for card: Dictionary in cards:
+			if take_all or card.id == id:
+				completed.append_array(RunUpgrades.apply(card.id, mission))
 		mission.hud.show_upgrades(RunUpgrades.held_names(mission))
 		Music.duck(false)
 		get_tree().paused = false
-		for combo: Dictionary in completed:
-			screens.show_banner("COMBO: " + combo.name)
+		if not completed.is_empty():
+			screens.show_banner("COMBO: " + " + ".join(completed.map(func(combo: Dictionary) -> String: return combo.name)))
 		director.next_stretch())
 
 
@@ -185,6 +207,8 @@ func _on_arena_started(_index: int) -> void:
 	if director.boss != null:
 		screens.show_banner("FORTRESS")
 		screens.show_boss_bar("FORTRESS")
+	elif director.has_ace():
+		screens.show_banner("ACE INBOUND")
 	else:
 		screens.show_banner("DESTROY THE TARGETS" if targets_total > 0 else "INTERCEPT")
 
