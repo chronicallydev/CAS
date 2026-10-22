@@ -7,8 +7,8 @@ extends RefCounted
 # brightness only, for monochrome palettes (colours listed dark to light),
 # and "curve" darkens the image first so the bright sand isn't all white.
 #
-# The game is designed as 1-bit: Black & White comes first, as the default
-# (PixelArt.palette = 0). The rest are for comparison.
+# The game is designed as 1-bit: Black & White comes first. PICO-8 is the
+# default for now (PixelArt.palette = 4); the rest are for comparison.
 
 const LIST := [
 	{"name": "Black & White", "mode": 1, "lightness": true, "curve": 1.4, "colors": [

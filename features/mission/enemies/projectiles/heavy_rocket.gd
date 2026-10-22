@@ -51,6 +51,7 @@ func _init() -> void:
 	lifetime = 25.0
 	body_color = Color(0.22, 0.24, 0.2)
 	trail_color = Color(0.32, 0.3, 0.28, 0.65)
+	body_role = "heavy_fire"
 	source_name = "HEAVY ROCKET"
 
 

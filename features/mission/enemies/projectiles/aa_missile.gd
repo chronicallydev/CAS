@@ -58,6 +58,8 @@ var harmless: bool = false
 # A darker body and smoke tell rockets apart at a glance.
 var body_color: Color = Color(0.92, 0.92, 0.9)
 var trail_color: Color = Color(0.92, 0.92, 0.9, 0.5)
+# The body's colour with a colour palette (see OneBit.ROLES).
+var body_role: String = "enemy_fire"
 
 # Passing the target this close counts as a near miss for feedback;
 # closer than close_call_radius the game slows for a moment.
@@ -114,6 +116,8 @@ var model: Node3D
 var flame: MeshInstance3D
 var motor_light: OmniLight3D
 var trail: CPUParticles3D
+# The trail's own puff, put back when an enemy sends it back (see whiten).
+var trail_mesh: Mesh
 var motor_sound: AudioStreamPlayer3D
 var wobble_phase: float = 0.0
 
@@ -348,14 +352,16 @@ func split_off(direction: Vector3) -> Node3D:
 	return half
 
 
-# Deflected: white, the player's colour.
+# Deflected: the player's colour, and the trail goes yellow with a colour
+# palette so a sent-back shot can be followed to its target.
 func whiten() -> void:
 	var white := StandardMaterial3D.new()
 	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	white.albedo_color = Color.WHITE
+	white.albedo_color = OneBit.fill("player_fire")
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", false, false):
 		if mesh != flame:
 			mesh.material_override = white
+	trail.mesh = OneBit.role_puff("deflect_trail", 0.25)
 
 
 ## Sent back at `at` (the player) by an enemy helicopter's own perfect
@@ -389,6 +395,7 @@ func reflect(at: Node3D) -> void:
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", false, false):
 		if mesh != flame:
 			mesh.material_override = null
+	trail.mesh = trail_mesh
 
 
 func fly_deflected(delta: float) -> void:
@@ -674,11 +681,11 @@ func make_smoke(amount: int, life: float, color: Color) -> CPUParticles3D:
 	smoke.gravity = Vector3(0, 0.5, 0)
 	smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	# 1-bit: solid puffs, white with a black rim for light smoke and black
-	# with a white rim for dark, instead of see-through ones that would only
+	# Solid puffs with a rim, light for light smoke and dark for dark
+	# (see OneBit.ROLES), instead of see-through ones that would only
 	# dither into the sand.
 	var light := color.get_luminance() > 0.5
-	smoke.mesh = OneBit.puff(Color.WHITE if light else Color.BLACK, Color.BLACK if light else Color.WHITE, 0.25)
+	smoke.mesh = OneBit.role_puff("trail" if light else "smoke", 0.25)
 
 	# Puffs swell off the nozzle, then shrink away and pop out.
 	var grow := Curve.new()
@@ -694,10 +701,10 @@ func build_visuals() -> void:
 	model = Node3D.new()
 	add_child(model)
 
-	# 1-bit: a solid black body (enemy fire is ink), drawn bigger than life
-	# so it's more than a pixel wide; `body_color` only tints the colour
-	# palettes.
-	var white := OneBit.solid(body_color.darkened(0.85))
+	# A solid body in enemy colours: black in 1-bit (enemy fire is ink), red
+	# with a colour palette (see body_role). Drawn bigger than life so it's
+	# more than a pixel wide.
+	var paint := OneBit.solid(body_color.darkened(0.85) if OneBit.mono() else OneBit.fill(body_role))
 
 	# Body (forward is -Z).
 	var body := MeshInstance3D.new()
@@ -705,7 +712,7 @@ func build_visuals() -> void:
 	body_mesh.top_radius = 0.18
 	body_mesh.bottom_radius = 0.18
 	body_mesh.height = 1.6
-	body_mesh.material = white
+	body_mesh.material = paint
 	body.mesh = body_mesh
 	body.rotation_degrees.x = 90.0
 	model.add_child(body)
@@ -716,7 +723,7 @@ func build_visuals() -> void:
 	nose_mesh.top_radius = 0.0
 	nose_mesh.bottom_radius = 0.18
 	nose_mesh.height = 0.4
-	nose_mesh.material = white
+	nose_mesh.material = paint
 	nose.mesh = nose_mesh
 	nose.rotation_degrees.x = -90.0
 	nose.position = Vector3(0, 0, -1.0)
@@ -724,7 +731,7 @@ func build_visuals() -> void:
 
 	# Motor glow: big in the boost, goes out at burnout.
 	flame = MeshInstance3D.new()
-	flame.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.35)
+	flame.mesh = OneBit.role_puff("fire", 0.35)
 	flame.position = Vector3(0, 0, 1.0)
 	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	model.add_child(flame)
@@ -737,6 +744,7 @@ func build_visuals() -> void:
 
 	# Thick smoke trail in world space.
 	trail = make_smoke(170, 2.6, trail_color)
+	trail_mesh = trail.mesh
 	trail.position = Vector3(0, 0, 1.1)
 	trail.direction = Vector3(0, 0, 1)
 	trail.spread = 6.0

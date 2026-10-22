@@ -1,9 +1,9 @@
 extends Node3D
 
 # Tank shell: flies along an arc from start to target, then calls on_hit.
-# Also the tracer round for every gun. The defaults are enemy fire in the
-# 1-bit look: a black round with a white rim. The player's minigun sets
-# white with a black rim.
+# Also the tracer round for every gun. The defaults are enemy fire (see
+# OneBit.ROLES): a black round with a white rim in 1-bit, red in colour.
+# The player's minigun sets its own.
 
 var start: Vector3
 var target: Vector3
@@ -12,7 +12,7 @@ var arc_height: float = 4.0
 var on_hit: Callable
 # Set before adding to the tree.
 var radius: float = 0.3
-var color: Color = Color.BLACK
+var color: Color = OneBit.fill("enemy_fire")
 # Above zero, drawn as a streak this long along its flight instead of a
 # ball, so fast fire reads as a stream (for straight shots, arc_height 0).
 var length: float = 0.0
@@ -20,7 +20,7 @@ var length: float = 0.0
 # the opposite colour, so the round reads on both bright sand and dark
 # shapes.
 var outline: float = 0.3
-var outline_color: Color = Color.WHITE
+var outline_color: Color = OneBit.rim_color("enemy_fire")
 
 var elapsed: float = 0.0
 

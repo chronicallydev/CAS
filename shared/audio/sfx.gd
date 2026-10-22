@@ -68,6 +68,8 @@ const MIX := {
 	# Chain dodge: time stopping on a perfect dodge, and starting again.
 	"time_stop": -2.0,
 	"time_resume": -9.0,
+	# A perfect dodge knocking the missile away: a bright metal ring.
+	"deflect_clang": -5.0,
 	# Minigun rounds glancing off the ground or armour.
 	"ricochet": -16.0,
 }
@@ -132,6 +134,7 @@ func _ready() -> void:
 	streams["missile_flyby"] = streams["dash_whoosh"]
 	streams["time_stop"] = make_stream(synth_time_stop())
 	streams["time_resume"] = make_stream(synth_time_resume())
+	streams["deflect_clang"] = make_stream(synth_clang(0.5, [1250.0, 2900.0, 4300.0], 7.0))
 	streams["ricochet"] = make_stream(synth_ricochet())
 
 

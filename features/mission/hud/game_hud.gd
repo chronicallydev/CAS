@@ -36,6 +36,7 @@ var combo_tween: Tween
 
 var indicators: Control
 var dodge_fx: DodgeFx
+var missile_warning: MissileWarning
 
 
 func _ready() -> void:
@@ -53,6 +54,11 @@ func initialize(mission_context: MissionContext) -> void:
 	indicators = Indicators.new()
 	indicators.helicopter = mission.helicopter
 	add_child(indicators)
+
+	# Chevrons round the helicopter for missiles homing on it.
+	missile_warning = MissileWarning.new()
+	missile_warning.helicopter = mission.helicopter
+	add_child(missile_warning)
 
 	# Chain dodge feedback, over the arrows and under the readouts.
 	dodge_fx = DodgeFx.new()

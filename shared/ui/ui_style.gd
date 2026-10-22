@@ -43,9 +43,9 @@ static func plate(margin: float = 10.0) -> StyleBoxFlat:
 
 
 # For full-resolution UI (the test range's dev panel): Monogram on its 8px
-# grid, scaled up a little as it reads small.
+# grid, scaled up well past the game UI's sizes as it reads small.
 static func crisp_px(size: float) -> int:
-	return maxi(16, roundi(size * 1.3 / 8.0) * 8)
+	return maxi(24, roundi(size * 2.4 / 8.0) * 8)
 
 
 static var _panel_textures: Dictionary = {}

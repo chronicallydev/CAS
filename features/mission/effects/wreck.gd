@@ -46,12 +46,12 @@ static func create_from(source: Node3D) -> Node3D:
 
 func _ready() -> void:
 	start_y = position.y
-	# 1-bit: white fire with black rims, black smoke with white rims.
-	fire = make_particles(Color.WHITE, Color.BLACK, 24, 0.7, 1.2, 0.35, 2.0)
-	smoke = make_particles(Color.BLACK, Color.WHITE, 30, 2.5, 0.8, 0.6, 4.0)
+	# Solid fire and smoke puffs with rims (see OneBit.ROLES).
+	fire = make_particles("fire", 24, 0.7, 1.2, 0.35, 2.0)
+	smoke = make_particles("smoke", 30, 2.5, 0.8, 0.6, 4.0)
 
 
-func make_particles(fill: Color, rim: Color, amount: int, life: float, size: float, radius: float, rise: float) -> CPUParticles3D:
+func make_particles(role: String, amount: int, life: float, size: float, radius: float, rise: float) -> CPUParticles3D:
 	var particles := CPUParticles3D.new()
 	particles.amount = amount
 	particles.lifetime = life
@@ -74,7 +74,7 @@ func make_particles(fill: Color, rim: Color, amount: int, life: float, size: flo
 	curve.add_point(Vector2(0.3, 1.0))
 	curve.add_point(Vector2(1, 0.2))
 	particles.scale_amount_curve = curve
-	particles.mesh = OneBit.puff(fill, rim, size * 0.5)
+	particles.mesh = OneBit.role_puff(role, size * 0.5)
 
 	add_child(particles)
 	return particles

@@ -81,6 +81,8 @@ const GUARD_COOLDOWN := 14.0
 const REGEN_GUARD_REPAIR := 3.0
 # Steer Dash: how fast the dash turns toward the steering.
 const DASH_STEER_RATE := 14.0
+# Below this share of the hull the bar blinks and the helicopter smokes.
+const LOW_HULL := 0.3
 # Autorotate: slow motion on a save (real seconds), longer with Second Wind.
 const AUTOROTATE_SLOW := 1.2
 const SECOND_WIND_SLOW := 2.0
@@ -170,6 +172,9 @@ var weapon_muzzles: Dictionary = {}
 var bomb_bay: Marker3D
 
 var health_bar: ProgressBar
+# The hull bar's fill (blinks when low) and the smoke trailed when low.
+var hull_fill: StyleBoxFlat
+var low_smoke: CPUParticles3D
 var warning_label: Label
 var ability_label: Label
 var hit_flash: ColorRect
@@ -194,6 +199,7 @@ func initialize(mission_context: MissionContext, airframe: HelicopterData, weapo
 	build_model(airframe, weapons)
 	build_hud()
 	build_sounds()
+	build_low_smoke()
 	position.y = altitude
 
 
@@ -229,8 +235,8 @@ func take_damage(amount: float, source: String = "") -> void:
 			PixelArt.invert_flash(0.06 if amount < 25.0 else 0.12)
 	else:
 		hit_flash.color.a = maxf(hit_flash.color.a, clampf(0.06 + amount / 55.0, 0.06, 0.45))
-	# Black: the 1-bit helicopter is already white.
-	HitFlash.trigger(body, Color.BLACK)
+	# Black in 1-bit, where the helicopter is already white.
+	HitFlash.trigger(body, Color.BLACK if PixelArt.is_monochrome() else Color.WHITE)
 	Sfx.play_2d("heli_hit")
 	# Rifle rounds rattle the cabin; missiles throw it about.
 	mission.shake(clampf(0.12 + amount / 40.0, 0.12, 0.55))
@@ -442,6 +448,8 @@ func dash() -> bool:
 	# The last charge sounds a little higher, so you hear you're out.
 	var pitch := 1.15 if dash_charges_left == 0 else 1.0
 	Sfx.play_3d("dash_whoosh", global_position, 0.0, pitch, 0.12)
+	# The rotor wash kicks up the sand under it.
+	Debris.spawn_dust(MissionContext.spawn_parent(self), ground_under(), 1.8)
 	chain_dodge.on_dash(velocity_before)
 	dash_hits.clear()
 	if mission.upgraded("decoy"):
@@ -552,6 +560,7 @@ func _process(delta: float) -> void:
 func update_hud(delta: float) -> void:
 	hit_flash.color.a = maxf(hit_flash.color.a - delta * 1.5, 0.0)
 	lock_warning_timer = maxf(lock_warning_timer - delta, 0.0)
+	update_low_hull()
 	# Dash charges come back one at a time.
 	if dash_charges_left < dash_charges:
 		dash_recharge_left -= delta
@@ -577,7 +586,7 @@ func update_hud(delta: float) -> void:
 		warning_label.visible = false
 	elif incoming:
 		warning_label.text = "MISSILE INBOUND"
-		warning_label.add_theme_color_override("font_color", Color.WHITE)
+		warning_label.add_theme_color_override("font_color", Color.WHITE if OneBit.mono() else OneBit.PICO.red)
 		warning_label.visible = fmod(time, 0.25) < 0.15
 	elif lock_warning_timer > 0.0:
 		warning_label.text = "MISSILE LOCK"
@@ -608,6 +617,41 @@ func make_loop_player(sound: String) -> AudioStreamPlayer:
 	player.volume_db = Sfx.mix_db(sound)
 	add_child(player)
 	return player
+
+
+# Low on hull: the bar's fill blinks (red with a colour palette) and the
+# helicopter trails smoke.
+func update_low_hull() -> void:
+	var low := not dead and health < max_health * LOW_HULL
+	low_smoke.emitting = low
+	var normal := Color.WHITE if OneBit.mono() else OneBit.PICO.green
+	if not low:
+		hull_fill.bg_color = normal
+		return
+	var lit := fmod(time, 0.5) < 0.3
+	if OneBit.mono():
+		hull_fill.bg_color = Color.WHITE if lit else Color.BLACK
+	else:
+		hull_fill.bg_color = OneBit.PICO.red if lit else OneBit.PICO.dark_purple
+
+
+func build_low_smoke() -> void:
+	low_smoke = CPUParticles3D.new()
+	low_smoke.emitting = false
+	low_smoke.amount = 18
+	low_smoke.lifetime = 1.1
+	low_smoke.local_coords = false
+	low_smoke.direction = Vector3.UP
+	low_smoke.spread = 25.0
+	low_smoke.initial_velocity_min = 1.0
+	low_smoke.initial_velocity_max = 2.5
+	low_smoke.gravity = Vector3(0, 1.5, 0)
+	low_smoke.scale_amount_min = 1.0
+	low_smoke.scale_amount_max = 1.8
+	low_smoke.scale_amount_curve = Debris.shrink_curve()
+	low_smoke.mesh = OneBit.role_puff("smoke", 0.35)
+	low_smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(low_smoke)
 
 
 func build_sounds() -> void:
@@ -653,8 +697,8 @@ func build_hud() -> void:
 	health_bar.max_value = max_health
 	health_bar.value = health
 	health_bar.show_percentage = false
-	# Solid white on black inside a white frame: it has to read in 1-bit at
-	# the low-res HUD's pixel size.
+	# Solid white (green with a colour palette) on black inside a white frame:
+	# it has to read in 1-bit at the low-res HUD's pixel size.
 	health_bar.custom_minimum_size = Vector2(440, 40)
 	health_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var bg := StyleBoxFlat.new()
@@ -662,7 +706,8 @@ func build_hud() -> void:
 	bg.border_color = Color.WHITE
 	bg.set_border_width_all(8)
 	var fill := StyleBoxFlat.new()
-	fill.bg_color = Color.WHITE
+	hull_fill = fill
+	fill.bg_color = Color.WHITE if OneBit.mono() else OneBit.PICO.green
 	fill.border_color = Color.BLACK
 	fill.set_border_width_all(8)
 	health_bar.add_theme_stylebox_override("background", bg)
@@ -684,14 +729,16 @@ func build_hud() -> void:
 	# Lock / missile warning above the hull bar.
 	warning_label = Label.new()
 	warning_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	warning_label.offset_left = -500
-	warning_label.offset_right = 500
+	# Sized to the text and centred, on a solid plate: an outline alone
+	# dithers into a broken pattern at the HUD's pixel size.
 	warning_label.offset_top = -330
 	warning_label.offset_bottom = -250
+	warning_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	warning_label.add_theme_font_size_override("font_size", UiStyle.px(30))
 	warning_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	warning_label.add_theme_constant_override("outline_size", 12)
+	warning_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
 	warning_label.visible = false
 	layer.add_child(warning_label)
 

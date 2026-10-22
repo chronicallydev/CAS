@@ -20,21 +20,21 @@ func launch(from: Vector3, to: Vector3, rocket_speed: float, hit_callback: Calla
 
 
 func _ready() -> void:
-	# 1-bit: the player's fire is white with black rims, and drawn about
+	# The player's fire (see OneBit.ROLES), drawn about
 	# twice life size so it's more than a pixel wide.
 	var body := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = 0.2
 	mesh.bottom_radius = 0.2
 	mesh.height = 1.6
-	mesh.material = OneBit.solid(Color.WHITE)
+	mesh.material = OneBit.solid(OneBit.fill("player_fire"))
 	body.mesh = mesh
 	body.rotation_degrees.x = 90.0
 	add_child(body)
-	OneBit.rim(self, Color.BLACK, 0.25)
+	OneBit.rim(self, OneBit.rim_color("player_fire"), 0.25)
 
 	var flame := MeshInstance3D.new()
-	flame.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.3)
+	flame.mesh = OneBit.role_puff("fire", 0.3)
 	flame.position = Vector3(0, 0, 0.95)
 	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(flame)
@@ -50,7 +50,7 @@ func _ready() -> void:
 	trail.initial_velocity_max = 0.6
 	trail.gravity = Vector3(0, 0.3, 0)
 	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	trail.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.28)
+	trail.mesh = OneBit.role_puff("trail", 0.28)
 	# Puffs shrink away and pop out rather than fading.
 	var shrink := Curve.new()
 	shrink.add_point(Vector2(0.0, 1.0))

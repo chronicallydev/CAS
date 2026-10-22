@@ -65,11 +65,11 @@ func register_hit(from: Vector3, light_weapon: bool, armored: bool) -> void:
 
 
 func update_damage_state(fraction: float) -> void:
-	# 1-bit: black smoke with white rims, then white fire with black rims.
+	# Smoke puffs, then fire puffs (see OneBit.ROLES).
 	if fraction < 0.5 and smoke == null:
-		smoke = make_emitter(Color.BLACK, Color.WHITE, 20, 1.8, 1.0, 3.0)
+		smoke = make_emitter("smoke", 20, 1.8, 1.0, 3.0)
 	if fraction < 0.25 and fire == null:
-		fire = make_emitter(Color.WHITE, Color.BLACK, 18, 0.6, 0.9, 2.0)
+		fire = make_emitter("fire", 18, 0.6, 0.9, 2.0)
 
 
 # --- Hit placement ------------------------------------------------------
@@ -175,10 +175,10 @@ static func make_mark_texture(heavy: bool) -> ImageTexture:
 
 # --- Sparks -------------------------------------------------------------
 
-# 1-bit: white with a black rim, so sparks show over the black vehicle and
+# Light with a dark rim, so sparks show over the dark vehicle and
 # the bright sand alike; big enough to be a pixel or two.
 static func make_spark_mesh() -> Mesh:
-	return OneBit.puff(Color.WHITE, Color.BLACK, 0.16, 0.6)
+	return OneBit.role_puff("spark", 0.16, 0.6)
 
 
 func spawn_sparks(at: Vector3, normal: Vector3, ricochet: bool) -> void:
@@ -209,7 +209,7 @@ func spawn_sparks(at: Vector3, normal: Vector3, ricochet: bool) -> void:
 
 # --- Smoke and fire -----------------------------------------------------
 
-func make_emitter(fill: Color, rim: Color, amount: int, life: float, size: float, rise: float) -> CPUParticles3D:
+func make_emitter(role: String, amount: int, life: float, size: float, rise: float) -> CPUParticles3D:
 	var box := get_bounds()
 	var particles := CPUParticles3D.new()
 	particles.amount = amount
@@ -231,7 +231,7 @@ func make_emitter(fill: Color, rim: Color, amount: int, life: float, size: float
 	curve.add_point(Vector2(0.4, 1.0))
 	curve.add_point(Vector2(1, 0.3))
 	particles.scale_amount_curve = curve
-	particles.mesh = OneBit.puff(fill, rim, size * 0.5)
+	particles.mesh = OneBit.role_puff(role, size * 0.5)
 
 	vehicle.add_child(particles)
 	return particles

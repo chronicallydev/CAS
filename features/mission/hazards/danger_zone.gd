@@ -47,9 +47,9 @@ var explosion_scale: float = 1.0
 var airburst: bool = true
 # The helicopter counts as inside a little beyond the edge (its rotor).
 var heli_margin: float = 1.0
-# The fill's colour. In 1-bit, see-through black over the sand comes out as
-# a darker dither that thickens as impact nears.
-var color: Color = Color.BLACK
+# The fill's colour (red with a colour palette). In 1-bit, see-through black
+# over the sand comes out as a darker dither that thickens as impact nears.
+var color: Color = OneBit.fill("warning")
 
 var time_left: float = 0.0
 var active_left: float = 0.0
@@ -104,11 +104,12 @@ func _physics_process(delta: float) -> void:
 	fill.scale = Vector3(grow, 1.0, grow)
 	fill_material.albedo_color.a = lerpf(0.15, 0.4, progress)
 
-	# Outline blinks black and white, faster and faster, solid black for the
-	# last moment. Swapping colours reads on bright sand and dark ground.
+	# Outline blinks between the warning colours (see OneBit.ROLES), faster
+	# and faster, solid for the last moment. Swapping colours reads on
+	# bright sand and dark ground.
 	var rate := lerpf(2.5, 12.0, progress)
 	var lit := time_left < 0.25 or fmod(progress * warning_time * rate, 1.0) < 0.6
-	outline_material.albedo_color = Color.BLACK if lit else Color.WHITE
+	outline_material.albedo_color = OneBit.fill("warning") if lit else OneBit.rim_color("warning")
 
 	if time_left <= 0.0:
 		detonate()
@@ -205,7 +206,7 @@ func detonate() -> void:
 		# Stays live; the first tick lands at once.
 		active_left = active_time
 		tick_left = 0.0
-		outline_material.albedo_color = Color.BLACK
+		outline_material.albedo_color = OneBit.fill("warning")
 		return
 
 	hurt_helicopter()
@@ -228,9 +229,9 @@ func finish() -> void:
 # hit; from the camera it sits over the marker.
 func spawn_airburst() -> void:
 	var radius := minf(size, length) * 0.4
-	# 1-bit: a solid white ball with a black rim that swells, then pops.
+	# A solid fire ball with a rim that swells, then pops.
 	var burst := MeshInstance3D.new()
-	burst.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 1.0, 0.15)
+	burst.mesh = OneBit.role_puff("fire", 1.0, 0.15)
 	burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	burst.scale = Vector3.ONE * 0.4 * radius
 	add_child(burst)
@@ -260,8 +261,8 @@ func build_visuals() -> void:
 	fill_material.albedo_color = Color(color.r, color.g, color.b, 0.15)
 	fill_material.render_priority = 1
 
-	# Solid, so it stays pure black or white through the palette pass.
-	outline_material = OneBit.solid(Color.BLACK)
+	# Solid, so it stays a clean palette colour through the palette pass.
+	outline_material = OneBit.solid(OneBit.fill("warning"))
 	outline_material.render_priority = 2
 
 	fill = MeshInstance3D.new()

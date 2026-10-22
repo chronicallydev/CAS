@@ -4,7 +4,8 @@ extends Control
 # Feedback for the chain dodge (ChainDodge), on the HUD and in the world.
 # Everything animates in real time, so it stays lively while the world
 # crawls in slow motion. Black and white only, to match the 1-bit game.
-#   perfect dodge - a time-stop thump and ring, a frame of inverted screen,
+#   perfect dodge - a time-stop thump and a clang, sparks off each
+#                   dodged missile, a frame of inverted screen (1-bit),
 #                   a shockwave ring from the helicopter, letterbox bars
 #                   sliding in, and a "PERFECT" callout over the helicopter
 #                   that punches in bigger with every link
@@ -21,9 +22,14 @@ const PAPER := Color.WHITE
 const INK := Color.BLACK
 # Letterbox bars, as a fraction of the screen height each.
 const BAR_HEIGHT := 0.09
+# Thickness of the bars' bright inner edge in slow motion (canvas units).
+const EDGE_WIDTH := 8.0
 # How far the shockwave ring spreads (metres) and for how long (real seconds).
 const RING_RADIUS := 16.0
 const RING_TIME := 0.45
+# How far the deflect sparks fly (metres) and for how long (real seconds).
+const SPARK_REACH := 6.0
+const SPARK_TIME := 0.3
 
 var mission: MissionContext
 var chain_dodge: ChainDodge
@@ -72,6 +78,7 @@ func _process(_delta: float) -> void:
 func _on_perfect_dodge(chain: int, missiles: Array) -> void:
 	var heli := mission.helicopter
 	Sfx.play_2d("time_stop", 0.0, 1.0 + minf(chain - 1, 6) * 0.07)
+	Sfx.play_2d("deflect_clang", 0.0, 1.0 + minf(chain - 1, 6) * 0.05)
 	mission.shake(0.3)
 	# A frame of inverted screen. The flash counts game time, so scale it
 	# to last 0.06 real seconds.
@@ -79,6 +86,7 @@ func _on_perfect_dodge(chain: int, missiles: Array) -> void:
 		PixelArt.invert_flash(0.06 * Engine.time_scale)
 	for missile in missiles:
 		whiten(missile)
+		spawn_sparks(missile.global_position)
 	spawn_ring(heli.global_position, chain)
 	slide_bars(1.0, 0.12)
 
@@ -170,7 +178,8 @@ func deflect_kill(at: Vector3, kills: int) -> void:
 
 func make_bar() -> ColorRect:
 	var bar := ColorRect.new()
-	bar.color = INK
+	# Dark blue with a colour palette: time has gone cold.
+	bar.color = INK if OneBit.mono() else OneBit.PICO.dark_blue
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bar)
 	return bar
@@ -258,6 +267,25 @@ func spawn_ring(at: Vector3, chain: int, ink_first: bool = false) -> void:
 		tween.tween_callback(ring.queue_free)
 
 
+# Sparks bursting off each dodged missile, in real time like the ring: the
+# deflect's own hit, apart from the time stop.
+func spawn_sparks(at: Vector3) -> void:
+	var mesh := OneBit.role_puff("spark", 0.5, 0.35)
+	var count := 6
+	for i in count:
+		var spark := MeshInstance3D.new()
+		spark.mesh = mesh
+		spark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mission.world.add_child(spark)
+		spark.global_position = at
+		var angle := TAU * (i + randf_range(-0.3, 0.3)) / count
+		var out := Vector3(cos(angle), randf_range(0.0, 0.4), sin(angle)) * randf_range(SPARK_REACH * 0.6, SPARK_REACH)
+		var tween := spark.create_tween().set_ignore_time_scale(true).set_parallel()
+		tween.tween_property(spark, "global_position", at + out, SPARK_TIME).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+		tween.tween_property(spark, "scale", Vector3.ONE * 0.2, SPARK_TIME).from(Vector3.ONE * 1.4)
+		tween.chain().tween_callback(spark.queue_free)
+
+
 # Dodged missiles turn white: they're the player's now.
 func whiten(missile: Node3D) -> void:
 	var white := StandardMaterial3D.new()
@@ -268,10 +296,15 @@ func whiten(missile: Node3D) -> void:
 			mesh.material_override = white
 
 
-# Brackets blinking round the next missile coming in, while time is slowed.
+# Brackets blinking round the next missile coming in, while time is slowed,
+# and with a colour palette a bright edge on the letterbox bars, so slow
+# motion reads even out of the corner of the eye.
 func _draw() -> void:
 	if chain_dodge == null or not chain_dodge.is_slowed():
 		return
+	if not OneBit.mono() and top_bar.offset_bottom > 1.0:
+		draw_rect(Rect2(0, top_bar.offset_bottom, size.x, EDGE_WIDTH), OneBit.PICO.blue)
+		draw_rect(Rect2(0, size.y + bottom_bar.offset_top - EDGE_WIDTH, size.x, EDGE_WIDTH), OneBit.PICO.blue)
 	var missile := chain_dodge.next_missile()
 	var camera := get_viewport().get_camera_3d()
 	if missile == null or camera == null:

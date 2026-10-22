@@ -247,7 +247,7 @@ func register_hit(from: Vector3, _light_weapon: bool) -> void:
 func enter_damaged() -> void:
 	stage = Stage.DAMAGED
 	throw_loose(ceili(loose.size() * 0.5))
-	smoke = make_emitter(Color.BLACK, Color.WHITE, 14, 2.2, 0.9, 3.0)
+	smoke = make_emitter("smoke", 14, 2.2, 0.9, 3.0)
 	Sfx.play_3d("base_hit", global_position, -4.0)
 
 
@@ -256,7 +256,7 @@ func enter_burning() -> void:
 	throw_loose(loose.size())
 	if smoke != null:
 		smoke.amount = 30
-	fire = make_emitter(Color.WHITE, Color.BLACK, 18, 0.7, 1.1, 2.0)
+	fire = make_emitter("fire", 18, 0.7, 1.1, 2.0)
 	Sfx.play_3d("explosion_small", global_position + Vector3(0, size.y, 0))
 
 
@@ -274,7 +274,7 @@ func throw_loose(count: int) -> void:
 
 
 # Smoke or fire puffs rising off the roof, spread over the footprint.
-func make_emitter(fill: Color, rim: Color, amount: int, life: float, puff_size: float, rise: float) -> CPUParticles3D:
+func make_emitter(role: String, amount: int, life: float, puff_size: float, rise: float) -> CPUParticles3D:
 	var particles := CPUParticles3D.new()
 	particles.amount = amount
 	particles.lifetime = life
@@ -290,7 +290,7 @@ func make_emitter(fill: Color, rim: Color, amount: int, life: float, puff_size: 
 	particles.scale_amount_min = puff_size * 0.8
 	particles.scale_amount_max = puff_size * 1.6
 	particles.scale_amount_curve = Debris.shrink_curve()
-	particles.mesh = OneBit.puff(fill, rim, 0.6)
+	particles.mesh = OneBit.role_puff(role, 0.6)
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	particles.emitting = true
 	add_child(particles)
@@ -328,7 +328,7 @@ func collapse() -> void:
 		build_rubble())
 
 	if smoke == null:
-		smoke = make_emitter(Color.BLACK, Color.WHITE, 30, 2.2, 0.9, 3.0)
+		smoke = make_emitter("smoke", 30, 2.2, 0.9, 3.0)
 	smoke.position.y = 1.0
 	if fire != null:
 		fire.position.y = 0.8

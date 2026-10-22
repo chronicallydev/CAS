@@ -18,23 +18,8 @@
 [sub_resource type="BoxMesh" id="BoxMesh_1pgxc"]
 size = Vector3(4000, 1, 4000)
 
-[sub_resource type="Gradient" id="Gradient_sand"]
-colors = PackedColorArray(0.78, 0.76, 0.74, 1, 1, 1, 1, 1)
-
-[sub_resource type="FastNoiseLite" id="Noise_sand"]
-frequency = 0.008
-fractal_octaves = 4
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture_sand"]
-noise = SubResource("Noise_sand")
-color_ramp = SubResource("Gradient_sand")
-seamless = true
-
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_abo30"]
-albedo_color = Color(0.72, 0.6, 0.46, 1)
-albedo_texture = SubResource("NoiseTexture_sand")
-uv1_scale = Vector3(0.02, 0.02, 0.02)
-uv1_triplanar = true
+albedo_color = Color(0.84, 0.76, 0.68, 1)
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
 sky_top_color = Color(0.3, 0.5, 0.78, 1)

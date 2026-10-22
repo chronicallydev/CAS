@@ -18,8 +18,8 @@ extends Node
 # The 2D UI goes the same way: every CanvasLayer that appears draws into a
 # low-res viewport (its custom_viewport) at the same pixel size as the 3D,
 # laid out in the window's usual coordinates (size_2d_override), and is
-# shown scaled up with nearest filtering through a 1-bit pass
-# (ui_1bit.gdshader). Input still goes through the window as before: only
+# shown scaled up with nearest filtering through the palette pass
+# (ui_palette.gdshader). Input still goes through the window as before: only
 # the drawing moves. Layers with the "crisp_ui" meta (the test range's dev panel) stay
 # full resolution.
 #
@@ -33,24 +33,27 @@ const OUTLINE_SHADER_COMPAT := "res://shared/pixelart/pixel_outline_compat.gdsha
 # Forward+; this darkens it back (retro_palette.gdshader's source_gamma).
 const COMPAT_GAMMA := 2.6
 const PALETTE_SHADER := preload("res://shared/pixelart/retro_palette.gdshader")
-const UI_SHADER := preload("res://shared/pixelart/ui_1bit.gdshader")
+const UI_SHADER := preload("res://shared/pixelart/ui_palette.gdshader")
 
 # Set by the root context from GameSettings.pixel_art.
 @export var enabled: bool = true
 # Height of the low-res image; the pixel size is window height / this.
-@export var target_height: float = 240.0
+@export var target_height: float = 288.0
 # Draw the UI at the low resolution, in black and white (see above).
 @export var pixel_ui: bool = true
 # Convert every StandardMaterial3D to toon shading as it appears.
 @export var toon_shading: bool = true
-# Index into RetroPalettes.LIST (0 = black & white, the game's look).
-@export var palette: int = 0:
+# Index into RetroPalettes.LIST (0 = black & white; 4 = PICO-8, the look for
+# now).
+@export var palette: int = 4:
 	set(value):
 		palette = posmod(value, RetroPalettes.LIST.size())
 		if palette_material != null:
 			RetroPalettes.apply(palette_material, palette)
+		if ui_material != null:
+			RetroPalettes.apply(ui_material, palette)
 # Ordered dither amount for the palette: 0 = hard bands, 1 = full step.
-@export_range(0.0, 1.0) var dither: float = 0.5:
+@export_range(0.0, 1.0) var dither: float = 0.35:
 	set(value):
 		dither = value
 		if palette_material != null:
@@ -58,6 +61,8 @@ const UI_SHADER := preload("res://shared/pixelart/ui_1bit.gdshader")
 
 var viewport: SubViewport
 var palette_material: ShaderMaterial
+# The UI's own palette pass (ui_palette.gdshader), on the same palette.
+var ui_material: ShaderMaterial
 var pixel_camera: Camera3D
 var outline: MeshInstance3D
 var layer: CanvasLayer
@@ -260,6 +265,8 @@ func build_ui() -> void:
 	var material := ShaderMaterial.new()
 	material.shader = UI_SHADER
 	ui_display.material = material
+	ui_material = material
+	RetroPalettes.apply(ui_material, palette)
 	ui_layer.add_child(ui_display)
 
 

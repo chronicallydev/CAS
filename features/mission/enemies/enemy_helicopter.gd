@@ -15,6 +15,8 @@ extends EnemyBase
 
 const Missile := preload("res://features/mission/enemies/projectiles/aa_missile.gd")
 const HeavyRocket := preload("res://features/mission/enemies/projectiles/heavy_rocket.gd")
+# Ground height for the drop shadow (Helicopter.ground_y).
+const GROUND_Y := -0.4
 
 @export_group("Look")
 @export var color: Color = Color(0.4, 0.38, 0.3)
@@ -109,6 +111,9 @@ var body: Node3D
 var main_rotor: Node3D
 var tail_rotor: Node3D
 var muzzle: Marker3D
+# A solid blob on the ground straight below, so its place over the map
+# reads at a glance even through explosions and smoke.
+var shadow_blob: MeshInstance3D
 var time: float = 0.0
 
 
@@ -148,6 +153,34 @@ func build_model() -> void:
 	main_rotor = parts["main_rotor"]
 	tail_rotor = parts["tail_rotor"]
 	muzzle = parts["muzzle"]
+	for mesh: MeshInstance3D in find_children("*", "MeshInstance3D", true, false):
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	build_shadow_blob()
+
+
+# An oval about the size of the fuselage, flat on the ground. Top level, so
+# it stays flat and below while the helicopter leans. It stands in for the
+# helicopter's lit shadow (switched off), so there's one per helicopter.
+func build_shadow_blob() -> void:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 1.0
+	mesh.bottom_radius = 1.0
+	mesh.height = 0.02
+	mesh.radial_segments = 16
+	mesh.material = OneBit.solid(OneBit.fill("shadow"))
+	shadow_blob = MeshInstance3D.new()
+	shadow_blob.mesh = mesh
+	shadow_blob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shadow_blob.top_level = true
+	shadow_blob.set_meta("no_hit_flash", true)
+	add_child(shadow_blob)
+
+
+func place_shadow_blob() -> void:
+	var hull := fuselage * model_scale
+	shadow_blob.global_transform = Transform3D(
+		Basis(Vector3.UP, global_rotation.y).scaled(Vector3(hull.x * 1.3, 1.0, hull.z * 0.9)),
+		Vector3(global_position.x, GROUND_Y + 0.05, global_position.z))
 
 
 func _process(delta: float) -> void:
@@ -155,6 +188,7 @@ func _process(delta: float) -> void:
 	var spin := 0.35 if crashing else 1.0
 	main_rotor.rotate_y(28.0 * spin * delta)
 	tail_rotor.rotate_x(40.0 * spin * delta)
+	place_shadow_blob()
 
 
 func _physics_process(delta: float) -> void:
@@ -438,8 +472,8 @@ func make_crash_smoke() -> CPUParticles3D:
 	particles.initial_velocity_max = 3.0
 	particles.scale_amount_min = 1.2
 	particles.scale_amount_max = 2.2
-	# Black smoke with a white rim: it's an enemy going down.
-	particles.mesh = OneBit.puff(Color.BLACK, Color.WHITE, 0.3)
+	# Smoke puffs: it's an enemy going down.
+	particles.mesh = OneBit.role_puff("smoke", 0.3)
 	var grow := Curve.new()
 	grow.add_point(Vector2(0.0, 0.4))
 	grow.add_point(Vector2(0.3, 1.0))

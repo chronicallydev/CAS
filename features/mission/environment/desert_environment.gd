@@ -18,15 +18,17 @@ extends Node3D
 
 const P := preload("res://shared/props/prop_builder.gd")
 
-# Ground colour for each biome (tints the ground mesh beside this node).
+# Ground colour for each biome (tints the ground mesh beside this node),
+# tuned to land on a flat PICO-8 colour once lit: peach for most, white
+# salt, orange for the oilfield.
 const GROUND := {
-	"desert": Color(0.72, 0.6, 0.46),
-	"wadi": Color(0.74, 0.62, 0.47),
-	"saltflat": Color(0.9, 0.87, 0.8),
+	"desert": Color(0.84, 0.76, 0.68),
+	"wadi": Color(0.84, 0.76, 0.66),
+	"saltflat": Color(0.9, 0.88, 0.84),
 	"ridge": Color(0.56, 0.5, 0.44),
-	"refinery": Color(0.64, 0.55, 0.43),
-	"terminal": Color(0.8, 0.7, 0.52),
-	"oilfield": Color(0.64, 0.52, 0.39),
+	"refinery": Color(0.8, 0.74, 0.68),
+	"terminal": Color(0.84, 0.76, 0.66),
+	"oilfield": Color(0.72, 0.6, 0.46),
 }
 
 @export_enum("desert", "wadi", "saltflat", "ridge", "refinery", "terminal", "oilfield") var biome: String = "desert":
@@ -47,6 +49,9 @@ const GROUND := {
 @export var shrub_count: int = 320
 @export var dune_count: int = 34
 @export var pumpjack_count: int = 7
+# Share of the biome's rocks and shrubs actually placed: scatter turns into
+# noise after the 1-bit pass, so it's kept sparse (see ground_material).
+@export var scatter_density: float = 0.35
 
 var rng := RandomNumberGenerator.new()
 var pumpjacks: Array = [] # [beam pivot, crank pivot, phase]
@@ -129,7 +134,7 @@ func build() -> void:
 	rng.seed = seed_value
 
 	sand = P.material(Color(0.72, 0.6, 0.46), 1.0)
-	dirt = P.material(Color(0.62, 0.48, 0.33), 1.0)
+	dirt = P.material(Color(0.8, 0.7, 0.6), 1.0)
 	concrete = P.material(Color(0.66, 0.64, 0.6), 0.95)
 	steel = P.material(Color(0.36, 0.38, 0.4), 0.5, 0.6)
 	pipe_mat = P.material(Color(0.55, 0.55, 0.52), 0.4, 0.7)
@@ -172,26 +177,24 @@ func build_wadi() -> void:
 	# The dry riverbed winds past the rig to the south.
 	var bed := [Vector3(-260, 0, -70), Vector3(-120, 0, -10), Vector3(-45, 0, 22), Vector3(0, 0, 26),
 		Vector3(45, 0, 16), Vector3(110, 0, 40), Vector3(260, 0, 110)]
-	var gravel := P.material(Color(0.62, 0.56, 0.46), 1.0)
-	var damp := P.material(Color(0.5, 0.44, 0.35), 1.0)
+	var gravel := P.material(Color(0.8, 0.71, 0.6), 1.0)
+	var damp := P.material(Color(0.76, 0.66, 0.56), 1.0)
 	for i in bed.size() - 1:
 		var a: Vector3 = bed[i] + Vector3(0, ground_y, 0)
 		var b: Vector3 = bed[i + 1] + Vector3(0, ground_y, 0)
 		flat_strip(a, b, 14.0, 0.03, gravel)
 		flat_strip(a, b, 5.0, 0.05, damp)
 		# Boulders washed down along the banks.
-		for k in 10:
+		for k in 4:
 			var t := rng.randf()
 			var side := 1.0 if rng.randf() < 0.5 else -1.0
 			var across := (b - a).cross(Vector3.UP).normalized() * side * rng.randf_range(4.0, 8.0)
 			var s := rng.randf_range(0.6, 2.0)
-			P.sphere(self, 1.0, a.lerp(b, t) + across + Vector3(0, s * 0.2, 0), P.material(Color(0.42, 0.38, 0.33), 1.0), Vector3(s * 1.3, s * 0.7, s))
-		# Date palms growing where the water was.
-		for k in 3:
-			var t := rng.randf()
-			var side := 1.0 if rng.randf() < 0.5 else -1.0
-			var across := (b - a).cross(Vector3.UP).normalized() * side * rng.randf_range(8.0, 13.0)
-			build_palm(a.lerp(b, t) + across)
+			P.sphere(self, 1.0, a.lerp(b, t) + across + Vector3(0, s * 0.2, 0), ground_material(Color(0.6, 0.55, 0.48)), Vector3(s * 1.3, s * 0.7, s))
+		# A date palm growing where the water was.
+		var side := 1.0 if rng.randf() < 0.5 else -1.0
+		var across := (b - a).cross(Vector3.UP).normalized() * side * rng.randf_range(8.0, 13.0)
+		build_palm(a.lerp(b, rng.randf()) + across)
 
 	dune_count = 16
 	shrub_count = 520
@@ -205,8 +208,8 @@ func build_wadi() -> void:
 
 func build_saltflat() -> void:
 	# Cracks in the salt crust: short, thin, slightly darker lines.
-	var crack := P.material(Color(0.74, 0.7, 0.62), 1.0)
-	for i in 320:
+	var crack := P.material(Color(0.84, 0.8, 0.74), 1.0)
+	for i in 90:
 		var pos := random_ground_point(6.0, 150.0)
 		var angle := rng.randf() * TAU
 		var length := rng.randf_range(3.0, 9.0)
@@ -214,14 +217,14 @@ func build_saltflat() -> void:
 		flat_strip(pos - dir, pos + dir, rng.randf_range(0.12, 0.25), 0.02, crack)
 
 	# Low salt mounds, bleached white.
-	var salt := P.material(Color(0.96, 0.95, 0.9), 1.0)
+	var salt := ground_material(Color(0.96, 0.95, 0.9))
 	for i in 26:
 		var pos := random_ground_point(20.0, 160.0)
 		var size := Vector3(rng.randf_range(3.0, 7.0), rng.randf_range(0.6, 1.4), rng.randf_range(2.5, 6.0))
 		P.sphere(self, 1.0, pos - Vector3(0, size.y * 0.3, 0), salt, size)
 
 	# Dunes only far out on the edge of the flat.
-	var dune_mat := P.material(Color(0.8, 0.7, 0.55), 1.0)
+	var dune_mat := ground_material(GROUND["saltflat"])
 	for i in 22:
 		var pos := random_ground_point(150.0, outer_radius)
 		var size := Vector3(rng.randf_range(18.0, 40.0), rng.randf_range(2.5, 7.0), rng.randf_range(10.0, 22.0))
@@ -342,9 +345,10 @@ func build_terminal() -> void:
 
 
 func build_oilfield() -> void:
-	# Black oil spills soaking into the sand.
-	var oil := P.material(Color(0.07, 0.06, 0.05), 0.2)
-	for i in 30:
+	# Oil spills soaking into the sand: mid-grey, not black, so they never
+	# pass for an enemy.
+	var oil := P.material(Color(0.5, 0.44, 0.37), 1.0)
+	for i in 12:
 		var pos := random_ground_point(15.0, 150.0)
 		var size := Vector3(rng.randf_range(3.0, 9.0), 0.06, rng.randf_range(2.0, 7.0))
 		P.sphere(self, 1.0, pos, oil, size).rotation.y = rng.randf() * TAU
@@ -382,8 +386,8 @@ func flat_strip(a: Vector3, b: Vector3, width: float, lift: float, mat: Material
 
 
 func build_palm(pos: Vector3) -> void:
-	var trunk := P.material(Color(0.42, 0.33, 0.22), 1.0)
-	var frond := P.material(Color(0.32, 0.45, 0.2), 0.9)
+	var trunk := P.material(Color(0.62, 0.53, 0.42), 1.0)
+	var frond := P.material(Color(0.58, 0.62, 0.45), 0.9)
 	var lean := Vector3(rng.randf_range(-1.5, 1.5), 0, rng.randf_range(-1.5, 1.5))
 	var height := rng.randf_range(6.0, 9.0)
 	var top := pos + Vector3(0, height, 0) + lean
@@ -472,12 +476,22 @@ func build_roads() -> void:
 		road.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+# Raised ground cover (dunes, rocks, shrubs) stays light and unoutlined:
+# after the 1-bit pass the only dark shapes on the ground should be enemies
+# and what they fire. Roughness 0 opts out of the outline pass; no specular
+# keeps it from mirroring the sky at that roughness.
+func ground_material(color: Color) -> StandardMaterial3D:
+	var mat := P.material(color, 0.0)
+	mat.metallic_specular = 0.0
+	return mat
+
+
 func build_dunes() -> void:
-	var dune_mat := P.material(Color(0.7, 0.58, 0.44), 1.0)
+	var dune_mat := ground_material(GROUND.get(biome, GROUND["desert"]))
 
 	for i in dune_count:
 		var pos := random_ground_point(80.0, outer_radius)
-		var size := Vector3(rng.randf_range(18.0, 40.0), rng.randf_range(2.5, 7.0), rng.randf_range(10.0, 22.0))
+		var size := Vector3(rng.randf_range(18.0, 40.0), rng.randf_range(1.0, 2.5), rng.randf_range(10.0, 22.0))
 		var dune := P.sphere(self, 1.0, pos - Vector3(0, size.y * 0.35, 0), dune_mat, size)
 		dune.rotation.y = rng.randf() * TAU
 
@@ -488,24 +502,25 @@ func build_rocks() -> void:
 	mesh.height = 1.0
 	mesh.radial_segments = 6
 	mesh.rings = 3
-	var mat := P.material(Color(1, 1, 1), 1.0)
+	var mat := ground_material(Color(1, 1, 1))
 	mat.vertex_color_use_as_albedo = true
 	mesh.material = mat
 
+	var count := int(rock_count * scatter_density)
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.use_colors = true
 	multimesh.mesh = mesh
-	multimesh.instance_count = rock_count
+	multimesh.instance_count = count
 
-	for i in rock_count:
+	for i in count:
 		var pos := random_ground_point(9.0, outer_radius)
 		var s := rng.randf_range(0.4, 2.4)
 		var scale := Vector3(s * rng.randf_range(0.8, 1.4), s * rng.randf_range(0.4, 0.8), s * rng.randf_range(0.8, 1.4))
 		var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled_local(scale)
 		pos.y += scale.y * 0.2
 		multimesh.set_instance_transform(i, Transform3D(basis, pos))
-		var shade := rng.randf_range(0.22, 0.36)
+		var shade := rng.randf_range(0.5, 0.6)
 		multimesh.set_instance_color(i, Color(shade * 1.1, shade * 0.95, shade * 0.8))
 
 	var instance := MultiMeshInstance3D.new()
@@ -519,17 +534,18 @@ func build_shrubs() -> void:
 	mesh.height = 1.0
 	mesh.radial_segments = 7
 	mesh.rings = 4
-	var mat := P.material(Color(1, 1, 1), 1.0)
+	var mat := ground_material(Color(1, 1, 1))
 	mat.vertex_color_use_as_albedo = true
 	mesh.material = mat
 
+	var count := int(shrub_count * scatter_density)
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.use_colors = true
 	multimesh.mesh = mesh
-	multimesh.instance_count = shrub_count
+	multimesh.instance_count = count
 
-	for i in shrub_count:
+	for i in count:
 		var pos := random_ground_point(9.0, outer_radius)
 		var s := rng.randf_range(0.5, 1.5)
 		var basis := Basis.IDENTITY.scaled(Vector3(s, s * 0.6, s))
@@ -569,10 +585,6 @@ func build_pumpjacks() -> void:
 
 		var pos := polar(angle, rng.randf_range(58.0, 120.0))
 		build_pumpjack(pos, rng.randf() * TAU)
-
-		# Flowline back toward the rig, lying on the ground.
-		var inner := polar(angle, 9.0)
-		P.pipe(self, pos + Vector3(0, 0.15, 0), inner + Vector3(0, 0.15, 0), 0.12, pipe_mat)
 		placed += 1
 
 

@@ -48,8 +48,8 @@ func _ready() -> void:
 	fire.initial_velocity_max = 2.5
 	fire.scale_amount_min = 0.7
 	fire.scale_amount_max = 1.3
-	# 1-bit fire: white with black rims.
-	fire.mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.5)
+	# Solid fire puffs (see OneBit).
+	fire.mesh = OneBit.role_puff("fire", 0.5)
 	fire.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(fire)
 	if is_instance_valid(target):

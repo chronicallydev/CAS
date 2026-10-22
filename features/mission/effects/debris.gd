@@ -119,8 +119,8 @@ static func spawn_dust(scene: Node, at: Vector3, size: float = 1.0) -> void:
 	if scene == null:
 		return
 	if dust_mesh == null:
-		# 1-bit: solid white puffs with black rims, so they show on sand.
-		dust_mesh = OneBit.puff(Color.WHITE, Color.BLACK, 0.35)
+		# Solid puffs with a rim, so they show on sand (see OneBit).
+		dust_mesh = OneBit.role_puff("dust", 0.35)
 
 	var dust := CPUParticles3D.new()
 	dust.one_shot = true
@@ -184,8 +184,8 @@ func add_smoke_trail() -> void:
 	trail.initial_velocity_max = 1.5
 	trail.gravity = Vector3(0, 0.5, 0)
 	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# 1-bit: solid black puffs with white rims.
-	trail.mesh = OneBit.puff(Color.BLACK, Color.WHITE, 0.4)
+	# Solid smoke puffs with a rim (see OneBit).
+	trail.mesh = OneBit.role_puff("smoke", 0.4)
 	trail.scale_amount_curve = shrink_curve()
 	add_child(trail)
 

@@ -20,16 +20,16 @@ func _ready() -> void:
 	model = Node3D.new()
 	add_child(model)
 	var body := MeshInstance3D.new()
-	# 1-bit: solid black with a white rim like all enemy fire, and about
+	# Solid, with a rim, in enemy fire's colours (see OneBit.ROLES), and about
 	# twice life size so it's more than a pixel or two.
 	var mesh := SphereMesh.new()
 	mesh.radius = 0.4
 	mesh.height = 1.5
-	mesh.material = OneBit.solid(Color.BLACK)
+	mesh.material = OneBit.solid(OneBit.fill("enemy_fire"))
 	body.mesh = mesh
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	model.add_child(body)
-	OneBit.rim(model, Color.WHITE, 0.2)
+	OneBit.rim(model, OneBit.rim_color("enemy_fire"), 0.2)
 
 
 func _physics_process(delta: float) -> void:

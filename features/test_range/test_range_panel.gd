@@ -188,7 +188,7 @@ func section(title: String) -> Control:
 
 
 # "Name   < value >" with arrows that call `step` with -1 / +1.
-func stepper(name: String, value: String, step: Callable, name_width: float = 110.0) -> HBoxContainer:
+func stepper(name: String, value: String, step: Callable, name_width: float = 180.0) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	var name_label := label(name, 14, MUTED)
@@ -209,7 +209,7 @@ func slider(name: String, value: float, original: float, min_value: float, max_v
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	var name_label := label(name, 13, GOLD if not is_equal_approx(value, original) else MUTED)
-	name_label.custom_minimum_size = Vector2(130, 0)
+	name_label.custom_minimum_size = Vector2(210, 0)
 	row.add_child(name_label)
 
 	var bar := HSlider.new()
@@ -225,7 +225,7 @@ func slider(name: String, value: float, original: float, min_value: float, max_v
 	row.add_child(bar)
 
 	var value_label := label(format_value(value, step), 13)
-	value_label.custom_minimum_size = Vector2(46, 0)
+	value_label.custom_minimum_size = Vector2(76, 0)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(value_label)
 
@@ -255,7 +255,7 @@ func clear(node: Node) -> void:
 func build_ui() -> void:
 	panel = PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
-	panel.offset_left = -380
+	panel.offset_left = -600
 	panel.offset_right = -10
 	panel.offset_top = 10
 	# Leave the weapon readout in the bottom-right corner visible.
@@ -282,6 +282,7 @@ func build_ui() -> void:
 	title_row.add_child(button("X", set_open.bind(false), 16))
 	var hint := label("MMB/G: spawn   |   H: salvo   |   Tab: panel   |   Esc: quit", 13, MUTED)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(hint)
 
 	# Live stats first, so they stay in view without scrolling.
@@ -304,10 +305,10 @@ func build_ui() -> void:
 	# Top-right corner, where the panel was.
 	open_button = button("PANEL  [Tab]", set_open.bind(true), 16)
 	open_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	open_button.offset_left = -150
+	open_button.offset_left = -240
 	open_button.offset_right = -10
 	open_button.offset_top = 10
-	open_button.offset_bottom = 44
+	open_button.offset_bottom = 60
 	open_button.visible = false
 	add_child(open_button)
 
@@ -404,13 +405,13 @@ func build_look(box: VBoxContainer) -> void:
 	box.add_child(stepper("Palette", RetroPalettes.LIST[PixelArt.palette].name, func(step: int) -> void:
 		PixelArt.palette += step
 		refresh()))
-	box.add_child(slider("Dither", PixelArt.dither, 0.5, 0.0, 1.0, 0.05, func(value: float) -> void:
+	box.add_child(slider("Dither", PixelArt.dither, 0.35, 0.0, 1.0, 0.05, func(value: float) -> void:
 		PixelArt.dither = value))
 	var height := PixelArt.target_height
 	box.add_child(stepper("Resolution", "%dp" % roundi(height), func(step: int) -> void:
 		var index := RESOLUTIONS.find(height)
 		if index == -1:
-			index = RESOLUTIONS.find(240.0)
+			index = RESOLUTIONS.find(288.0)
 		PixelArt.target_height = RESOLUTIONS[clampi(index + step, 0, RESOLUTIONS.size() - 1)]
 		refresh()))
 	box.add_child(check("White hit flash", HitFlash.enabled, func(on: bool) -> void:

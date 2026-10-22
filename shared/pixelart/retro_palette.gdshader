@@ -10,13 +10,9 @@
 // stays stuck to the ground as the view scrolls instead of crawling.
 shader_type canvas_item;
 
-const int MAX_COLORS = 32;
+#include "res://shared/pixelart/palette_match.gdshaderinc"
 
 uniform int mode = 0;
-// The palette in OKLab (for matching) and in sRGB (for output).
-uniform vec3 palette_lab[MAX_COLORS];
-uniform vec3 palette_rgb[MAX_COLORS];
-uniform int palette_size = 0;
 // Monochrome palettes (Game Boy, black & white): pick by lightness alone,
 // dithering between the two shades either side. Their colours must be
 // listed dark to light. The curve darkens (> 1) or lightens (< 1) the
@@ -41,45 +37,6 @@ const float BAYER[16] = float[](
 	12.0, 4.0, 14.0, 6.0,
 	3.0, 11.0, 1.0, 9.0,
 	15.0, 7.0, 13.0, 5.0);
-
-
-vec3 to_linear(vec3 c) {
-	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
-}
-
-
-// sRGB to OKLab (Björn Ottosson).
-vec3 to_oklab(vec3 srgb) {
-	vec3 c = to_linear(clamp(srgb, 0.0, 1.0));
-	vec3 lms = vec3(
-		0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b,
-		0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b,
-		0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b);
-	lms = pow(lms, vec3(1.0 / 3.0));
-	return vec3(
-		0.2104542553 * lms.x + 0.7936177850 * lms.y - 0.0040720468 * lms.z,
-		1.9779984951 * lms.x - 2.4285922050 * lms.y + 0.4505937099 * lms.z,
-		0.0259040371 * lms.x + 0.7827717662 * lms.y - 0.8086757660 * lms.z);
-}
-
-
-vec3 nearest(vec3 srgb) {
-	vec3 lab = to_oklab(srgb);
-	float best = 1e9;
-	vec3 pick = srgb;
-	for (int i = 0; i < MAX_COLORS; i++) {
-		if (i >= palette_size) {
-			break;
-		}
-		vec3 d = lab - palette_lab[i];
-		float dist = dot(d, d);
-		if (dist < best) {
-			best = dist;
-			pick = palette_rgb[i];
-		}
-	}
-	return pick;
-}
 
 
 vec3 shade(vec3 srgb, float threshold) {

@@ -575,8 +575,8 @@ func spawn_ricochet(at: Vector3, incoming: Vector3, normal: Vector3) -> void:
 	streak.radius = 0.16
 	streak.length = 2.2
 	streak.outline = 0.28
-	streak.color = Color.WHITE
-	streak.outline_color = Color.BLACK
+	streak.color = OneBit.fill("player_fire")
+	streak.outline_color = OneBit.rim_color("player_fire")
 	MissionContext.spawn_parent(self).add_child(streak)
 	streak.setup(at, to, randf_range(0.1, 0.18), 0.0, Callable())
 	Sfx.play_3d("ricochet", at, 0.0, randf_range(0.85, 1.25), 0.0)
@@ -587,14 +587,15 @@ func spawn_tracer(from: Vector3, target: Vector3, flight_time: float, vfx_scale:
 	if shooter == null or flight_time <= 0.0:
 		return
 
-	# A white streak with a black rim, each at least a low-res pixel wide
-	# (about 0.5 m at the default zoom), so it reads in 1-bit on any ground.
+	# A light streak with a dark rim (see OneBit.ROLES), each at least a
+	# low-res pixel wide (about 0.5 m at the default zoom), so it reads on
+	# any ground.
 	var tracer := Tracer.new()
 	tracer.radius = 0.22 + 0.13 * clampf(vfx_scale, 0.0, 1.0)
 	tracer.length = 3.5
 	tracer.outline = 0.4
-	tracer.color = Color.WHITE
-	tracer.outline_color = Color.BLACK
+	tracer.color = OneBit.fill("player_fire")
+	tracer.outline_color = OneBit.rim_color("player_fire")
 	MissionContext.spawn_parent(self).add_child(tracer)
 	tracer.setup(from, target, flight_time, 0.0, Callable())
 
@@ -800,8 +801,8 @@ func ricochet(at: Vector3) -> void:
 	streak.radius = 0.18
 	streak.length = 2.0
 	streak.outline = 0.3
-	streak.color = Color.WHITE
-	streak.outline_color = Color.BLACK
+	streak.color = OneBit.fill("player_fire")
+	streak.outline_color = OneBit.rim_color("player_fire")
 	MissionContext.spawn_parent(self).add_child(streak)
 	streak.setup(at, target.global_position, 0.12, 0.0, func(_where: Vector3) -> void:
 		if not is_instance_valid(target) or not target.is_in_group("enemies"):
