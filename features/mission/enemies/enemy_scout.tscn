@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/enemy_helicopter.gd" id="1_heli"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+[ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
+
+[node name="EnemyScout" type="Node3D"]
+script = ExtResource("1_heli")
+max_health = 20.0
+light_armor = 0.2
+score_value = 80
+display_name = "SCOUT"
+fuselage = Vector3(1.0, 0.95, 1.9)
+tail_length = 5.2
+rotor_radius = 4.0
+blades = 3
+wing_span = 2.4
+tandem = false
+model_scale = 0.9
+speed = 26.0
+acceleration = 24.0
+range_min = 22.0
+range_max = 34.0
+turn_rate = 5.0
+salvo_size = 2
+salvo_spacing = 0.35
+reload_time = 4.5
+missile_damage = 34.0
+missile_explosion = ExtResource("2_boom")
+dash_charges = 2
+dash_cooldown = 3.5
+dash_chance = 0.7
+
+[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 3.6, 0)

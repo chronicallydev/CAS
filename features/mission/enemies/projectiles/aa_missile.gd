@@ -43,7 +43,7 @@ var lifetime: float = 8.0
 var fuze_radius: float = 4.5
 var hit_radius: float = 1.5
 # Damage at hit_radius; at the edge of the fuze it falls to this fraction.
-var damage: float = 25.0
+var damage: float = 34.0
 var edge_damage: float = 0.35
 var explosion_scene: PackedScene
 var ground_y: float = -0.4
@@ -292,10 +292,18 @@ func fly_deflected(delta: float) -> void:
 		if not is_valid_enemy(deflect_target):
 			deflect_target = pick_enemy()
 		if deflect_target != null:
-			var desired := (deflect_target.global_position - global_position).normalized()
+			# Lead a moving target (enemy helicopters) by where it will be.
+			var aim := deflect_target.global_position
+			var target_velocity: Variant = deflect_target.get("velocity")
+			if target_velocity is Vector3:
+				aim += target_velocity * aim.distance_to(global_position) / maxf(velocity.length(), 1.0)
+			var desired := (aim - global_position).normalized()
 			var current := velocity.normalized()
 			var angle := current.angle_to(desired)
-			var step := deflect_turn_rate * delta
+			# Turns tighter the longer it's been deflected, so it comes round
+			# after overshooting the player and doesn't orbit a dodging target.
+			var tighten := 1.0 + 1.5 * clampf((deflect_time - deflect_left) / 0.8, 0.0, 1.0)
+			var step := deflect_turn_rate * tighten * delta
 			var direction := desired if angle <= step else current.slerp(desired, step / angle).normalized()
 			velocity = direction * velocity.length()
 	velocity = velocity.normalized() * move_toward(velocity.length(), deflect_speed, 40.0 * delta)

@@ -21,6 +21,8 @@ extends Node
 @export var heavy_aa_scene: PackedScene = preload("res://features/mission/enemies/heavy_launcher.tscn")
 @export var mortar_scene: PackedScene = preload("res://features/mission/enemies/mortar_team.tscn")
 @export var shilka_scene: PackedScene = preload("res://features/mission/enemies/shilka.tscn")
+@export var scout_scene: PackedScene = preload("res://features/mission/enemies/enemy_scout.tscn")
+@export var gunship_scene: PackedScene = preload("res://features/mission/enemies/enemy_gunship.tscn")
 ## Height enemies are dropped at; each settles to its own ride height.
 @export var spawn_height: float = 5.69
 
@@ -157,6 +159,8 @@ func clear_enemies() -> void:
 ## What the panel can spawn: [name, scene].
 func units() -> Array:
 	return [
+		["Scout heli", scout_scene],
+		["Gunship heli", gunship_scene],
 		["Infantry", infantry_scene],
 		["Car", car_scene],
 		["Tank", tank_scene],

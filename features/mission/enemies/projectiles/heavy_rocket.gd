@@ -37,7 +37,7 @@ var break_offs: int = 0
 func _init() -> void:
 	ignores_flares = true
 	size = 1.8
-	damage = 40.0
+	damage = 50.0
 	fuze_radius = 5.0
 	hit_radius = 2.0
 	# A slower, heavier pop out of the tube.

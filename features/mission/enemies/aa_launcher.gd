@@ -18,7 +18,7 @@ const Missile := preload("res://features/mission/enemies/projectiles/aa_missile.
 @export var engage_range: float = 80.0
 @export var lock_time: float = 1.5
 @export var reload_time: float = 6.0
-@export var missile_damage: float = 25.0
+@export var missile_damage: float = 34.0
 # See aa_missile.gd: it boosts, settles to a sustain speed above the
 # helicopter's, and turns no harder than turn_rate (radians per second).
 @export var missile_boost_speed: float = 62.0

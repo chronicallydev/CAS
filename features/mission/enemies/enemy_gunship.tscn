@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://features/mission/enemies/enemy_helicopter.gd" id="1_heli"]
+[ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
+[ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
+
+[node name="EnemyGunship" type="Node3D"]
+script = ExtResource("1_heli")
+max_health = 50.0
+light_armor = 0.5
+score_value = 200
+display_name = "GUNSHIP"
+fuselage = Vector3(1.55, 1.35, 3.2)
+tail_length = 7.6
+rotor_radius = 5.6
+blades = 5
+wing_span = 5.8
+wheels = true
+speed = 16.0
+acceleration = 10.0
+range_min = 32.0
+range_max = 46.0
+orbit_swap_min = 4.0
+orbit_swap_max = 8.0
+turn_rate = 2.5
+max_tilt_degrees = 20.0
+engage_range = 80.0
+lock_time = 1.8
+reload_time = 6.5
+salvo_size = 4
+salvo_spacing = 0.28
+missile_damage = 34.0
+missile_explosion = ExtResource("2_boom")
+dash_charges = 1
+dash_cooldown = 6.0
+dash_chance = 0.35
+jink_damage = 10.0
+crash_explosion_scale = 3.2
+crash_spin = 6.0
+
+[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 4.6, 0)

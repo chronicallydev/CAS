@@ -79,6 +79,10 @@ const Rocket := preload("res://features/mission/weapons/rocket.gd")
 @export_group("Targeting")
 @export_flags_3d_physics var collision_mask: int = 1
 @export_range(10.0, 10000.0, 10.0) var ray_length: float = 5000.0
+# Enemy helicopters fly at the player's altitude, so the ground under the
+# cursor is well off from where they are on screen. With the cursor this
+# close to one on screen (in pixels), shots go to the helicopter itself.
+@export var air_aim_radius: float = 150.0
 
 # Equipped weapons: slot 0 fires with LMB, slot 1 with RMB.
 var equipped: Array[Weapon] = []
@@ -108,16 +112,35 @@ var rocket_shot_timer: float = 0.0
 var rocket_reload_timer: float = 0.0
 var weapon_label: Label
 var mission: MissionContext
+# The enemy helicopter the reticle is locked on (see locked_air_target).
+var locked_target: Node3D
 # Test range cheat: no reloads, no minigun heat.
 var infinite_ammo: bool = false
 
-@onready var default_cursor_size = cursor.scale
+# Pixels of the reticle image per canvas pixel (see Reticle).
+const RETICLE_SCALE := 3.0
+var default_cursor_size := Vector2.ONE * RETICLE_SCALE
+var reticle_normal: ImageTexture
+var reticle_locked: ImageTexture
+# Air-aim reach of a round: it hits a helicopter whose hull is within this
+# many metres of where it lands, and air rounds scatter by this fraction
+# of the ground spread (there's no ground to splash on, so less forgiving
+# spread would mean near misses never count).
+@export_group("Air targets")
+@export var air_hit_radius: float = 3.2
+@export_range(0.0, 1.0, 0.05) var air_spread_scale: float = 0.45
 
 
 func _ready() -> void:
 	mission = MissionContext.of(self)
 	# The reticle follows the mouse; it must never swallow clicks.
 	cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	reticle_normal = Reticle.make(false)
+	reticle_locked = Reticle.make(true)
+	cursor.texture = reticle_normal
+	cursor.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	cursor.size = Vector2(Reticle.SIZE, Reticle.SIZE)
+	cursor.scale = default_cursor_size
 
 	# Equipped weapons, bottom right.
 	weapon_label = Label.new()
@@ -238,6 +261,13 @@ func update_cursor(delta: float) -> void:
 		cursor.scale *= 1.2 if hit_was_kill else 1.08
 
 	var mouse_pos := cursor.get_global_mouse_position()
+	# Snaps onto an enemy helicopter it's aiming at (see air_target), and
+	# switches to the locked reticle. The cursor's layer is scaled, so the
+	# screen point is mapped into it the way the mouse is.
+	var air := locked_air_target()
+	cursor.texture = reticle_locked if air != null else reticle_normal
+	if air != null:
+		mouse_pos = cursor.get_canvas_transform().affine_inverse() * camera.unproject_position(air.global_position)
 	var cursor_size := cursor.size * cursor.scale
 	var shake_offset := Vector2.ZERO
 
@@ -303,6 +333,10 @@ func get_reload_left(weapon: Weapon) -> float:
 func get_mouse_world_position() -> Variant:
 	var mouse_pos := get_viewport().get_mouse_position()
 
+	var air := locked_air_target()
+	if air != null:
+		return air.global_position
+
 	var ray_origin := camera.project_ray_origin(mouse_pos)
 	var ray_direction := camera.project_ray_normal(mouse_pos)
 
@@ -320,6 +354,34 @@ func get_mouse_world_position() -> Variant:
 		return null
 
 	return result["position"]
+
+
+# The enemy helicopter being aimed at, or null. While a trigger is held
+# the lock sticks to the same helicopter wherever the cursor goes, until
+# it's shot down; if it jinks the reticle follows it, and the rounds
+# already in the air (aimed where it was heading) miss.
+func locked_air_target() -> Node3D:
+	var holding: bool = trigger.values().has(true)
+	if holding and locked_target != null and is_instance_valid(locked_target) and locked_target.is_in_group("air_enemies"):
+		return locked_target
+	locked_target = air_target(get_viewport().get_mouse_position())
+	return locked_target
+
+
+# The enemy helicopter closest to `mouse_pos` on screen, within
+# air_aim_radius, or null.
+func air_target(mouse_pos: Vector2) -> Node3D:
+	var best: Node3D = null
+	var best_distance := air_aim_radius
+	for node in get_tree().get_nodes_in_group("air_enemies"):
+		var enemy := node as Node3D
+		if enemy == null or camera.is_position_behind(enemy.global_position):
+			continue
+		var distance := camera.unproject_position(enemy.global_position).distance_to(mouse_pos)
+		if distance < best_distance:
+			best = enemy
+			best_distance = distance
+	return best
 
 
 func play_shot_sound(mix: String, pitch_min: float, pitch_max: float, from: Vector3) -> void:
@@ -345,17 +407,51 @@ func random_spread(spread: float) -> Vector3:
 
 # Minigun rounds land wherever the cursor currently points.
 func fire_minigun_round() -> void:
+	# Rounds scatter around the reticle, wider the hotter the barrels get.
+	var spread := minigun_spread + minigun_bloom * minigun_heat
+	var air := locked_air_target()
+	if air != null:
+		var from_air := take_muzzle(Weapon.MINIGUN)
+		play_shot_sound("gun_minigun", 1.4, 1.7, from_air)
+		fire_air_round(from_air, air, spread * air_spread_scale)
+		return
+
 	var hit: Variant = get_mouse_world_position()
 
 	if hit == null:
 		return
 
-	# Rounds scatter around the reticle, wider the hotter the barrels get.
-	var spread := minigun_spread + minigun_bloom * minigun_heat
 	var from := take_muzzle(Weapon.MINIGUN)
 
 	play_shot_sound("gun_minigun", 1.4, 1.7, from)
 	schedule_explosion(from, hit + random_spread(spread), minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
+
+
+# A round at an enemy helicopter: aimed where it will be when the round
+# arrives (its velocity times the flight time), scattered by `spread`.
+# It hits if the hull is within air_hit_radius of that point on arrival,
+# so a helicopter that dashes or jinks hard can slip the burst.
+func fire_air_round(from: Vector3, target: Node3D, spread: float) -> void:
+	var lead := target.global_position
+	var target_velocity: Variant = target.get("velocity")
+	if target_velocity is Vector3:
+		lead += target_velocity * minigun_impact_delay
+	var aim := lead + random_spread(spread)
+	spawn_tracer(from, aim, minigun_impact_delay, minigun_explosion_scale)
+
+	await get_tree().create_timer(minigun_impact_delay).timeout
+	if not is_inside_tree():
+		return
+	# Mid-jink (dashing) it's out of the burst whatever the distance.
+	var jinking: bool = is_instance_valid(target) and target.get("dash_time_left") > 0.0
+	if is_instance_valid(target) and target.is_in_group("air_enemies") and not jinking and target.global_position.distance_to(aim) <= air_hit_radius:
+		# On the hull: a burst there and the damage on this target alone.
+		spawn_impact(target.global_position, minigun_explosion_scale)
+		if damage_enemy(target, minigun_damage, true):
+			report_kills(1, target.get("max_health") >= HEAVY_KILL_HEALTH)
+	else:
+		# A miss: a smaller puff where it passed.
+		spawn_impact(aim, minigun_explosion_scale * 0.6)
 
 
 # Spin-up, heat build-up while firing, cooling, and the overheat lockout.
@@ -501,15 +597,18 @@ func spawn_tracer(from: Vector3, target: Vector3, flight_time: float, vfx_scale:
 
 
 func explode_at(position: Vector3, radius: float, hit_damage: float, vfx_scale: float, light_weapon: bool = false) -> void:
-	if explosion_scene != null:
-		var explosion := explosion_scene.instantiate() as Node3D
-
-		if explosion != null:
-			MissionContext.spawn_parent(self).add_child(explosion)
-			explosion.global_position = position
-			explosion.scale = Vector3.ONE * vfx_scale
-
+	spawn_impact(position, vfx_scale)
 	damage_enemies(position, radius, hit_damage, light_weapon)
+
+
+func spawn_impact(position: Vector3, vfx_scale: float) -> void:
+	if explosion_scene == null:
+		return
+	var explosion := explosion_scene.instantiate() as Node3D
+	if explosion != null:
+		MissionContext.spawn_parent(self).add_child(explosion)
+		explosion.global_position = position
+		explosion.scale = Vector3.ONE * vfx_scale
 
 
 func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_weapon: bool = false) -> void:
@@ -535,30 +634,41 @@ func damage_enemies(position: Vector3, radius: float, hit_damage: float, light_w
 		if distance > radius:
 			continue
 
-		if enemy.has_method("set_last_hit"):
-			enemy.set_last_hit(from, force, light_weapon)
-
-		if enemy.has_method("take_damage"):
-			var health_before: float = enemy.get("health") if enemy.get("health") != null else 0.0
-			var killed_now: bool = enemy.take_damage(hit_damage, light_weapon)
-			if enemy.get("health") != null:
-				damage_dealt.emit(health_before - maxf(enemy.health, 0.0))
-			if killed_now:
-				register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
-				killed += 1
-				if enemy.get("max_health") != null and enemy.max_health >= HEAVY_KILL_HEALTH:
-					heavy_killed = true
-			else:
-				register_hit()
-				if enemy.has_method("register_hit"):
-					enemy.register_hit(get_shot_origin(), light_weapon)
-		else:
-			enemy.queue_free()
-			register_kill(enemy, 10)
+		if damage_enemy(enemy, hit_damage, light_weapon, force, from):
 			killed += 1
+			if enemy.get("max_health") != null and enemy.max_health >= HEAVY_KILL_HEALTH:
+				heavy_killed = true
 
-	# A tiny freeze on big multi-kills, or on killing something big, makes
-	# them land harder.
+	report_kills(killed, heavy_killed)
+
+
+# Hits one enemy, counting the damage and the hit or kill. `force` and
+# `from` are for its death effects. True if it died.
+func damage_enemy(enemy: Node3D, hit_damage: float, light_weapon: bool, force: float = 0.0, from: Variant = null) -> bool:
+	if enemy.has_method("set_last_hit"):
+		enemy.set_last_hit(from if from is Vector3 else get_shot_origin(), force, light_weapon)
+
+	if not enemy.has_method("take_damage"):
+		enemy.queue_free()
+		register_kill(enemy, 10)
+		return true
+
+	var health_before: float = enemy.get("health") if enemy.get("health") != null else 0.0
+	var killed_now: bool = enemy.take_damage(hit_damage, light_weapon)
+	if enemy.get("health") != null:
+		damage_dealt.emit(health_before - maxf(enemy.health, 0.0))
+	if killed_now:
+		register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
+	else:
+		register_hit()
+		if enemy.has_method("register_hit"):
+			enemy.register_hit(get_shot_origin(), light_weapon)
+	return killed_now
+
+
+# A tiny freeze on big multi-kills, or on killing something big, makes
+# them land harder.
+func report_kills(killed: int, heavy_killed: bool) -> void:
 	if killed >= 3:
 		mission.hit_stop(0.05 + minf(killed, 8) * 0.01)
 	elif heavy_killed:

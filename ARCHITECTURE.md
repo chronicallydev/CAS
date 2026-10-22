@@ -90,6 +90,19 @@ Every enemy hunts the helicopter (`EnemyBase.objective()`).
 | Car (`car`) | circles the helicopter, roof gun bursts | keep moving, dash |
 | Tank (`tank`) | slow turret, heavy shells; armoured | rockets, keep moving |
 | SAM truck (`aa_launcher`) | locks on, single homing missile | turn hard, flares |
+| Scout (`enemy_scout`) | fast helicopter, circles close, 2-missile salvos, jinks often | chain dodge, deflect |
+| Gunship (`enemy_gunship`) | slow armoured helicopter, 4-missile salvos | chain dodge, deflect, rockets |
+
+Enemy helicopters (`enemy_helicopter.gd`, one script, a scene per type)
+fly at the player's altitude in the `air_enemies` group. They circle at a
+preferred range, lock on and fire salvos spaced for chain dodges, dash
+aside from deflected missiles, jink (swap direction and dash) after
+`jink_damage` of sustained fire, and spin down and crash when killed.
+`GunController.air_target()` picks a helicopter when the cursor is over it
+on screen (the ground under it is far off with the camera's angle): the
+reticle (`Reticle`, drawn in code) snaps onto it in its locked form, and
+minigun rounds lead it and hit if its hull is within `air_hit_radius` on
+arrival (`fire_air_round`).
 
 ## Test range panel
 
