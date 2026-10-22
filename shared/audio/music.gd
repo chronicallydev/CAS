@@ -1,7 +1,8 @@
 extends Node
 
 # Background music: playlists from the Ideologies soundtrack
-# (assets/music/), crossfaded on its own "Music" bus.
+# (assets/music/), crossfaded on its own "Music" bus. The tracks aren't in
+# the repo (see .gitignore): without them the game just runs silent.
 #
 # Autoloaded as "Music", like Sfx: it holds no game state and keeps
 # playing through pauses, slow motion and scene changes.
@@ -89,7 +90,9 @@ func take_track(list: String) -> AudioStream:
 	var tracks: Array = PLAYLISTS[list]
 	var index: int = next_track.get(list, 0)
 	next_track[list] = (index + 1) % tracks.size()
-	return load(DIR + tracks[index] + ".mp3")
+	var path: String = DIR + tracks[index] + ".mp3"
+	# Null (silence) when the track isn't there.
+	return load(path) if ResourceLoader.exists(path) else null
 
 
 # Fades the playing track out and the new one in on the other player.
@@ -115,4 +118,5 @@ func _on_finished(player: AudioStreamPlayer) -> void:
 	if player != players[front] or playlist == "":
 		return
 	player.stream = take_track(playlist)
-	player.play()
+	if player.stream != null:
+		player.play()

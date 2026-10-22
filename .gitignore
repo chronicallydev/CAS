@@ -1,3 +1,6 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Music: kept locally, not in the repo (too big for the GitHub zip).
+/assets/music/
