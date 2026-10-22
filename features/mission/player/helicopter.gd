@@ -408,6 +408,7 @@ func try_dash() -> void:
 func dash() -> bool:
 	# In a chain dodge's slow motion a new dash cuts the current one short.
 	var cancel := chain_dodge.is_slowed()
+	var velocity_before := velocity
 	if dead or dash_charges_left <= 0 or (dash_time_left > 0.0 and not cancel):
 		return false
 	var direction := get_input_direction()
@@ -436,7 +437,7 @@ func dash() -> bool:
 	# The last charge sounds a little higher, so you hear you're out.
 	var pitch := 1.15 if dash_charges_left == 0 else 1.0
 	Sfx.play_3d("dash_whoosh", global_position, 0.0, pitch, 0.12)
-	chain_dodge.on_dash()
+	chain_dodge.on_dash(velocity_before)
 	return true
 
 

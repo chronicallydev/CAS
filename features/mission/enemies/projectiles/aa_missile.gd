@@ -98,6 +98,11 @@ var deflect_target: Node3D
 var rallies: int = 0
 # Each rally sends it back this much faster.
 var rally_speedup: float = 1.12
+# Sent back, it drifts unlit for this long at this speed, its nose
+# swinging round at reflect_turn_rate (radians per second), then re-lights.
+var reflect_drift: float = 1.0
+var reflect_drift_speed: float = 8.0
+var reflect_turn_rate: float = 4.0
 
 var model: Node3D
 var flame: MeshInstance3D
@@ -291,9 +296,11 @@ func deflect(homing: bool) -> void:
 
 
 ## Sent back at `at` (the player) by an enemy helicopter's own perfect
-## dodge: guided again, its motor re-lit as if just fired, a little faster
-## each rally, and black again (the enemy's). The player can deflect it
-## once more, so a missile can go back and forth.
+## dodge, black again (the enemy's). Like a fresh SAM launch: its motor
+## cuts and it drifts, losing momentum, for reflect_drift seconds while
+## its nose swings round, then the motor re-lights with the full boost, a
+## little faster each rally. The player can deflect it once more, so a
+## missile can go back and forth.
 func reflect(at: Node3D) -> void:
 	deflected = false
 	deflect_target = null
@@ -301,22 +308,21 @@ func reflect(at: Node3D) -> void:
 	target = at
 	lost = false
 	tracked = null
-	ignited = true
 	burned_out = false
-	# Back in the boost phase with a full motor.
-	age = eject_time
 	boost_speed *= rally_speedup
 	sustain_speed *= rally_speedup
-	var toward := (at.global_position - global_position).normalized()
-	velocity = toward * maxf(velocity.length(), sustain_speed)
-	nose = toward
-	face(nose)
-	flame.visible = true
-	motor_light.visible = true
-	trail.emitting = true
-	motor_sound.volume_db = Sfx.mix_db("missile_motor")
-	if not motor_sound.playing:
-		motor_sound.play()
+
+	# Back to the unlit drift (see update_speed and point_nose).
+	ignited = false
+	age = 0.0
+	eject_time = reflect_drift
+	eject_turn_rate = reflect_turn_rate
+	eject_gravity = 2.0
+	velocity = velocity.normalized() * reflect_drift_speed
+	flame.visible = false
+	motor_light.visible = false
+	trail.emitting = false
+	motor_sound.stop()
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", false, false):
 		if mesh != flame:
 			mesh.material_override = null

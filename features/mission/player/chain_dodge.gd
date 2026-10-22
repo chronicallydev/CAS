@@ -93,9 +93,11 @@ func _process(delta: float) -> void:
 			end_chain()
 
 
-## Called by the helicopter as it starts a dash. True if it was perfect.
-func on_dash() -> bool:
-	var dodged := incoming_missiles()
+## Called by the helicopter as it starts a dash, with its velocity from
+## just before (the dash's own velocity would make a dash straight away
+## from a missile look like it was never going to hit). True if perfect.
+func on_dash(velocity_before: Vector3) -> bool:
+	var dodged := incoming_missiles(velocity_before)
 	if dodged.is_empty():
 		# Dashed out of the slow motion without a missile to dodge.
 		if is_slowed():
@@ -113,8 +115,10 @@ func on_dash() -> bool:
 	return true
 
 
-## Missiles chasing the helicopter that would hit within perfect_window.
-func incoming_missiles() -> Array:
+## Missiles chasing the helicopter that would hit within perfect_window,
+## with the helicopter moving at `heli_velocity` (default: as it is now).
+func incoming_missiles(heli_velocity: Variant = null) -> Array:
+	var velocity: Vector3 = heli_velocity if heli_velocity is Vector3 else helicopter.velocity
 	var found: Array = []
 	var heli_position := helicopter.global_position
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
@@ -123,7 +127,7 @@ func incoming_missiles() -> Array:
 		var offset: Vector3 = heli_position - missile.global_position
 		var distance := offset.length()
 		# How fast the gap is closing.
-		var closing: float = (missile.velocity - helicopter.velocity).dot(offset / maxf(distance, 0.01))
+		var closing: float = (missile.velocity - velocity).dot(offset / maxf(distance, 0.01))
 		if closing <= 0.0:
 			continue
 		# A fast missile (a rallied one) covers more than max_distance
