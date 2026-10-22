@@ -58,18 +58,41 @@ signal damage_taken(amount: float, source: String)
 @export var explosion_scene: PackedScene
 # Seconds between being shot down and the round restarting.
 @export var restart_delay: float = 2.0
-# Test range cheats: hits still count but do no harm, and flares and dash
-# charges recharge instantly.
+# Test range cheats: hits still count but do no harm, and dash charges
+# recharge instantly.
 var invulnerable: bool = false
-var infinite_flares: bool = false
+var infinite_dashes: bool = false
 
-@export_group("Flares")
-# Flares are unlimited but recharge: F drops a spread, then they
-# # take this many seconds to be ready again. The mission sets it from the
-# airframe.
-@export var flare_cooldown: float = 8.0
-# After a drop, nothing can lock on for this long.
-@export var flare_protection: float = 1.8
+const Debris := preload("res://features/mission/effects/debris.gd")
+
+# Movement upgrades (see RunUpgrades and the end of this file).
+# Ram: helicopters this close during a dash take RAM_DAMAGE.
+const RAM_RADIUS := 6.0
+const RAM_DAMAGE := 30.0
+# Rotor Wash: ground units this close to the point the helicopter appears
+# over (ground_under) during a dash.
+const WASH_RADIUS := 9.0
+# Rotor Guard: missiles this close are blasted away; then nothing lands
+# for GUARD_SHIELD seconds; it's ready again after GUARD_COOLDOWN.
+const GUARD_RADIUS := 22.0
+const GUARD_SHIELD := 0.8
+const GUARD_COOLDOWN := 14.0
+# Regen Guard (Rotor Guard + Absorb): hull per missile blasted away.
+const REGEN_GUARD_REPAIR := 3.0
+# Steer Dash: how fast the dash turns toward the steering.
+const DASH_STEER_RATE := 14.0
+# Autorotate: slow motion on a save (real seconds), longer with Second Wind.
+const AUTOROTATE_SLOW := 1.2
+const SECOND_WIND_SLOW := 2.0
+const SECOND_WIND_GRACE := 2.5
+
+var autorotate_ready: bool = false
+# Double The Gun: how many times the minigun has been doubled so far.
+var gun_doublings: int = 0
+var guard_cooldown_left: float = 0.0
+var guard_left: float = 0.0
+# Units already rammed or washed this dash.
+var dash_hits: Dictionary = {}
 
 @export_group("Dash")
 # Space or Shift, at any altitude: a quick burst in the steering direction (or straight ahead). It
@@ -101,8 +124,6 @@ var infinite_flares: bool = false
 # charges) fires as soon as it can.
 @export var input_buffer: float = 0.15
 
-const Flare := preload("res://features/mission/player/flare.gd")
-
 var velocity: Vector3 = Vector3.ZERO
 var time: float = 0.0
 var health: float = 0.0
@@ -116,8 +137,6 @@ var out_of_bounds: bool = false
 var use_corridor: bool = false
 var corridor: Rect2 = Rect2()
 var corridor_margin: float = 6.0
-var flare_cooldown_left: float = 0.0
-var flare_protection_left: float = 0.0
 var dash_charges_left: int = 0
 # Time until the next charge is back (counts only while one is missing).
 var dash_recharge_left: float = 0.0
@@ -151,7 +170,7 @@ var bomb_bay: Marker3D
 
 var health_bar: ProgressBar
 var warning_label: Label
-var flare_label: Label
+var ability_label: Label
 var hit_flash: ColorRect
 
 var rotor_sound: AudioStreamPlayer
@@ -181,6 +200,9 @@ func initialize(mission_context: MissionContext, airframe: HelicopterData, weapo
 func take_damage(amount: float, source: String = "") -> void:
 	if dead:
 		return
+	# Rotor Guard (an upgrade) has just blasted everything away.
+	if guard_left > 0.0:
+		return
 	# Dashing through fire: nothing lands, and the first dodge says so.
 	if dodge_left > 0.0:
 		if not dodged_this_dash:
@@ -189,6 +211,11 @@ func take_damage(amount: float, source: String = "") -> void:
 		return
 
 	damage_taken.emit(amount, source)
+	# Autorotate (an upgrade): once a stretch, a killing hit leaves 1 hull.
+	var saved := not invulnerable and amount >= health and autorotate_ready and mission.upgraded("autorotate")
+	if saved:
+		amount = health - 1.0
+		autorotate_ready = false
 	chain_dodge.break_chain()
 	if not invulnerable:
 		health = maxf(health - amount, 0.0)
@@ -207,6 +234,8 @@ func take_damage(amount: float, source: String = "") -> void:
 	# Rifle rounds rattle the cabin; missiles throw it about.
 	mission.shake(clampf(0.12 + amount / 40.0, 0.12, 0.55))
 
+	if saved:
+		autorotate()
 	if health <= 0.0:
 		shot_down()
 
@@ -216,43 +245,13 @@ func warn_lock() -> void:
 	lock_warning_timer = 0.2
 
 
-# False for a moment after dropping flares: lock-on weapons (SAMs, Stingers,
-# radar flak) must break their lock and start over.
-func can_be_locked() -> bool:
-	return not dead and flare_protection_left <= 0.0
-
-
 func _unhandled_input(event: InputEvent) -> void:
 	# Physical keys, so this works on any keyboard layout.
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
-			KEY_F:
-				deploy_flares()
 			KEY_SPACE, KEY_SHIFT:
 				dash_buffer_left = input_buffer
 				try_dash()
-
-
-# Drops a spread of decoys. Missiles already homing on the helicopter
-# switch to one of them, and new locks are blocked for flare_protection.
-func deploy_flares() -> void:
-	if dead or flare_cooldown_left > 0.0:
-		return
-	flare_cooldown_left = 0.0 if infinite_flares else flare_cooldown
-	flare_protection_left = flare_protection
-
-	var decoys: Array = []
-	for i in 4:
-		var flare := Flare.new()
-		MissionContext.spawn_parent(self).add_child(flare)
-		var throw := Vector3(randf_range(-7.0, 7.0), randf_range(0.5, 3.0), randf_range(-7.0, 7.0))
-		flare.launch(global_position + Vector3.DOWN * 1.2, velocity * 0.4 + throw)
-		decoys.append(flare)
-
-	for missile in get_tree().get_nodes_in_group("aa_missiles"):
-		if missile.get("target") == self and not missile.get("ignores_flares"):
-			missile.target = decoys.pick_random()
-	Sfx.play_3d("flare", global_position)
 
 
 func shot_down() -> void:
@@ -425,7 +424,7 @@ func dash() -> bool:
 	dash_time_left = dash_time
 	dodge_left = dash_time + dash_grace
 	dodged_this_dash = false
-	if not infinite_flares:
+	if not infinite_dashes:
 		if dash_charges_left == dash_charges:
 			dash_recharge_left = dash_cooldown
 		dash_charges_left -= 1
@@ -443,6 +442,11 @@ func dash() -> bool:
 	var pitch := 1.15 if dash_charges_left == 0 else 1.0
 	Sfx.play_3d("dash_whoosh", global_position, 0.0, pitch, 0.12)
 	chain_dodge.on_dash(velocity_before)
+	dash_hits.clear()
+	if mission.upgraded("decoy"):
+		Decoy.drop(self)
+	if mission.upgraded("rotor_guard") and guard_cooldown_left <= 0.0:
+		rotor_guard()
 	return true
 
 
@@ -453,7 +457,20 @@ func update_dash(delta: float) -> void:
 	var before := dash_ease(1.0 - dash_time_left / duration)
 	dash_time_left = maxf(dash_time_left - delta, 0.0)
 	var after := dash_ease(1.0 - dash_time_left / duration)
-	position += dash_direction * dash_distance * (after - before)
+	# Steer Dash (an upgrade): the dash bends toward the steering.
+	if mission.upgraded("steer_dash"):
+		var input := get_input_direction()
+		if input != Vector3.ZERO:
+			dash_direction = dash_direction.slerp(input, clampf(DASH_STEER_RATE * delta, 0.0, 1.0)).normalized()
+	# Long Drift (Time Bank + Steer Dash): twice as far in slow motion.
+	var distance := dash_distance
+	if mission.combo("time_bank", "steer_dash") and chain_dodge.is_slowed():
+		distance *= 2.0
+	position += dash_direction * distance * (after - before)
+	if mission.upgraded("ram"):
+		ram()
+	if mission.upgraded("rotor_wash"):
+		rotor_wash()
 
 
 static func dash_ease(t: float) -> float:
@@ -534,19 +551,20 @@ func _process(delta: float) -> void:
 func update_hud(delta: float) -> void:
 	hit_flash.color.a = maxf(hit_flash.color.a - delta * 1.5, 0.0)
 	lock_warning_timer = maxf(lock_warning_timer - delta, 0.0)
-	flare_cooldown_left = maxf(flare_cooldown_left - delta, 0.0)
-	flare_protection_left = maxf(flare_protection_left - delta, 0.0)
 	# Dash charges come back one at a time.
 	if dash_charges_left < dash_charges:
 		dash_recharge_left -= delta
 		if dash_recharge_left <= 0.0:
 			dash_charges_left += 1
 			dash_recharge_left = dash_cooldown
-	var flares := "FLARES [F]" if flare_cooldown_left <= 0.0 else "FLARES %.1fs" % flare_cooldown_left
 	var dash_text := "DASH %d/%d [SPACE]" % [dash_charges_left, dash_charges]
 	if dash_charges_left < dash_charges:
 		dash_text = "DASH %d/%d %.1fs" % [dash_charges_left, dash_charges, dash_recharge_left]
-	flare_label.text = "%s     %s" % [flares, dash_text]
+	guard_cooldown_left = maxf(guard_cooldown_left - delta, 0.0)
+	guard_left = maxf(guard_left - delta, 0.0)
+	if mission.upgraded("rotor_guard"):
+		dash_text += "\nGUARD " + ("READY" if guard_cooldown_left <= 0.0 else "%.0fs" % guard_cooldown_left)
+	ability_label.text = dash_text
 
 	var incoming := false
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
@@ -650,16 +668,16 @@ func build_hud() -> void:
 	health_bar.add_theme_stylebox_override("fill", fill)
 	box.add_child(health_bar)
 
-	# Flares left, under the hull bar.
-	flare_label = Label.new()
-	flare_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	flare_label.add_theme_font_size_override("font_size", UiStyle.px(16))
-	flare_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5))
-	flare_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	flare_label.add_theme_constant_override("outline_size", 12)
-	flare_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
-	flare_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(flare_label)
+	# Dash charges, under the hull bar.
+	ability_label = Label.new()
+	ability_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ability_label.add_theme_font_size_override("font_size", UiStyle.px(16))
+	ability_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5))
+	ability_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	ability_label.add_theme_constant_override("outline_size", 12)
+	ability_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
+	ability_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(ability_label)
 
 	# Lock / missile warning above the hull bar.
 	warning_label = Label.new()
@@ -690,3 +708,129 @@ func build_model(airframe: HelicopterData, weapons: Array) -> void:
 	# Near-white with black outlines in 1-bit, against near-black enemies.
 	OneBit.paper(body)
 	OneBit.rim(body)
+
+
+## Patches up to `amount` hull.
+func repair(amount: float) -> void:
+	if dead:
+		return
+	health = minf(health + amount, max_health)
+	health_bar.value = health
+
+
+# --- Movement upgrades (see RunUpgrades) -------------------------------------
+
+# Ram: an enemy helicopter the dash runs into takes a heavy hit, once a
+# dash. Finisher (with Shredder) adds the shred built up on it.
+func ram() -> void:
+	for node in get_tree().get_nodes_in_group("air_enemies"):
+		var enemy := node as Node3D
+		if enemy == null or dash_hits.has(enemy) or enemy.global_position.distance_to(global_position) > RAM_RADIUS:
+			continue
+		dash_hits[enemy] = true
+		var damage := RAM_DAMAGE
+		if mission.combo("shredder", "ram"):
+			damage *= 1.0 + mission.guns.cash_in_shred(enemy)
+		mission.guns.damage_enemy(enemy, damage, false, 1.0, global_position)
+		mission.hud.spawn_popup("RAM", enemy.global_position, Color.WHITE, true)
+		mission.shake(0.4, enemy.global_position)
+		mission.hit_stop(0.05)
+		Sfx.play_3d("heli_hit", enemy.global_position, 2.0, 0.7)
+
+
+## The point on the ground the helicopter appears to be over. The view
+## looks down at an angle, so that's well off the point straight below
+## (16 m at the default altitude): what's "under" it on screen is here.
+func ground_under() -> Vector3:
+	if camera == null:
+		return Vector3(global_position.x, ground_y, global_position.z)
+	var forward := -camera.global_basis.z
+	if absf(forward.y) < 0.01:
+		return Vector3(global_position.x, ground_y, global_position.z)
+	return global_position + forward * ((ground_y - global_position.y) / forward.y)
+
+
+# Rotor Wash: infantry under the dash are flattened, vehicles rocked and
+# shoved. Scavenger (with Salvage) drops scrap from the infantry.
+func rotor_wash() -> void:
+	var under := ground_under()
+	# The downwash itself: a ring of dust where it hits the ground.
+	if Engine.get_physics_frames() % 3 == 0:
+		var angle := randf() * TAU
+		Debris.spawn_dust(MissionContext.spawn_parent(self), under + Vector3(cos(angle), 0.0, sin(angle)) * WASH_RADIUS * 0.7 + Vector3.UP * 0.3, 1.8)
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or dash_hits.has(enemy) or enemy.is_in_group("air_enemies"):
+			continue
+		var away := enemy.global_position - under
+		away.y = 0.0
+		if away.length() > WASH_RADIUS:
+			continue
+		dash_hits[enemy] = true
+		if enemy.has_method("react_to_blast"):
+			var at := enemy.global_position
+			mission.guns.damage_enemy(enemy, 999.0, false, 1.0, global_position)
+			mission.hud.spawn_popup("FLATTENED", at, Color.WHITE)
+			if mission.combo("salvage", "rotor_wash"):
+				Scrap.drop(at, mission, 0.5)
+		else:
+			enemy.global_position += away.normalized() * 1.2
+			mission.guns.damage_enemy(enemy, 2.0, false, 0.5, global_position)
+			mission.shake(0.15, enemy.global_position)
+		Debris.spawn_dust(MissionContext.spawn_parent(self), Vector3(enemy.global_position.x, 0.2, enemy.global_position.z), 1.5)
+
+
+# Rotor Guard: a blast round the helicopter knocks every enemy missile
+# nearby off course (they burst harmlessly) and nothing lands for a
+# moment. Regen Guard (with Absorb) patches hull for each.
+func rotor_guard() -> void:
+	guard_cooldown_left = GUARD_COOLDOWN
+	guard_left = GUARD_SHIELD
+	for missile in get_tree().get_nodes_in_group("aa_missiles"):
+		if missile.deflected or missile.global_position.distance_to(global_position) > GUARD_RADIUS:
+			continue
+		var away: Vector3 = (missile.global_position - global_position).normalized()
+		missile.target = null
+		missile.lost = true
+		missile.harmless = true
+		missile.velocity = away * 40.0 + Vector3.UP * 8.0
+		if mission.combo("rotor_guard", "absorb"):
+			repair(REGEN_GUARD_REPAIR)
+	mission.hud.dodge_fx.spawn_ring(global_position, 3, true)
+	mission.shake(0.35)
+	Sfx.play_2d("time_stop", -4.0)
+
+
+# Autorotate: the save itself. Slow motion to recover in; Second Wind
+# (with Grace) makes it longer and deflects what comes in meanwhile.
+func autorotate() -> void:
+	var second_wind := mission.combo("autorotate", "grace")
+	chain_dodge.start_slow(SECOND_WIND_SLOW if second_wind else AUTOROTATE_SLOW)
+	if second_wind:
+		chain_dodge.grace_left = SECOND_WIND_GRACE
+	mission.hud.spawn_popup("SECOND WIND" if second_wind else "AUTOROTATE", global_position, Color.WHITE, true, true)
+	Sfx.play_2d("time_stop")
+
+
+## Double The Gun (an upgrade): doubles the miniguns until there have been
+## `level` doublings. Each copies every mounted minigun, set off to the side
+## of the first, and adds its muzzle to the gun controller's list (the same
+## array), so the fire rate doubles too. Only ever adds guns.
+func double_gun(level: int) -> void:
+	var list: Array = weapon_muzzles.get("minigun", [])
+	if list.is_empty():
+		return
+	var first: Node3D = list[0].get_parent()
+	while gun_doublings < level:
+		gun_doublings += 1
+		for i in list.size():
+			var copy: Node3D = first.duplicate()
+			first.get_parent().add_child(copy)
+			# Alternating left and right, further out each pair, a little lower.
+			var n := list.size()
+			var side := 1.0 if n % 2 == 1 else -1.0
+			copy.position = first.position + Vector3(side * 0.5 * ceili(n / 2.0), -0.12 * floori(n / 2.0), 0.0)
+			for child in copy.get_children():
+				if child is Marker3D:
+					list.append(child)
+					break

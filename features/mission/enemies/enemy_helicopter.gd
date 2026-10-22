@@ -51,7 +51,7 @@ const HeavyRocket := preload("res://features/mission/enemies/projectiles/heavy_r
 @export var salvo_size: int = 3
 # Seconds between missiles in a salvo.
 @export var salvo_spacing: float = 0.3
-# Heavy rockets (flare-proof, make repeated passes) instead of SAMs.
+# Heavy rockets (they make repeated passes) instead of SAMs.
 @export var heavy_rockets: bool = false
 @export var missile_damage: float = 34.0
 @export var missile_explosion: PackedScene
@@ -318,7 +318,7 @@ func update_missiles(heli: Helicopter, delta: float) -> void:
 	if distance_to_heli(heli) > engage_range or not on_screen():
 		lock_timer = 0.0
 		return
-	if update_lock(heli, delta, lock_time, heavy_rockets):
+	if update_lock(heli, delta, lock_time):
 		fire_salvo(heli)
 
 

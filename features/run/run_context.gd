@@ -32,13 +32,11 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	screens = RunScreens.new()
 	add_child(screens)
-	RunUpgrades.save_defaults()
 	start_run()
 
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
-	RunUpgrades.restore_defaults()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -54,7 +52,6 @@ func start_run() -> void:
 		mission.queue_free()
 	get_tree().paused = false
 	Engine.time_scale = 1.0
-	RunUpgrades.restore_defaults()
 	best_chain = 0
 	over = false
 	screens.show_leftovers(0)
@@ -93,6 +90,8 @@ func start_run() -> void:
 
 func _on_stretch_started(index: int) -> void:
 	update_title()
+	# Autorotate (an upgrade) saves you once per stretch.
+	mission.helicopter.autorotate_ready = true
 	Music.play("final_travel" if index == stretch_count - 1 else "travel")
 	screens.show_banner("FINAL STRETCH" if index == stretch_count - 1 else "GO  ^")
 	screens.show_go()
@@ -112,17 +111,28 @@ func _on_arena_cleared(_index: int) -> void:
 	# before the pick fades in with the game paused.
 	screens.show_banner("ARENA CLEAR")
 	Sfx.play_2d("combo")
-	RunUpgrades.heal(mission.helicopter, STRETCH_HEAL)
+	mission.helicopter.repair(STRETCH_HEAL)
 	mission.hud.spawn_popup("+%d HULL" % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true)
 	await get_tree().create_timer(PICK_DELAY, false).timeout
 	if over or mission.helicopter.dead:
 		return
+	var cards := RunUpgrades.offer(mission)
+	if cards.is_empty():
+		# Everything held already: straight on.
+		director.next_stretch()
+		return
+	for i in cards.size():
+		cards[i] = cards[i].duplicate()
+		cards[i].card = RunUpgrades.card_text(i + 1, cards[i], mission)
 	get_tree().paused = true
 	Music.duck(true)
-	screens.show_picks("CLEARED - PICK ONE", RunUpgrades.offer(mission), func(id: String) -> void:
-		RunUpgrades.apply(id, mission)
+	screens.show_picks("CLEARED - PICK ONE", cards, func(id: String) -> void:
+		var completed := RunUpgrades.apply(id, mission)
+		mission.hud.show_upgrades(RunUpgrades.held_names(mission))
 		Music.duck(false)
 		get_tree().paused = false
+		for combo: Dictionary in completed:
+			screens.show_banner("COMBO: " + combo.name)
 		director.next_stretch())
 
 

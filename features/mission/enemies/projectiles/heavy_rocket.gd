@@ -1,6 +1,6 @@
 extends "res://features/mission/enemies/projectiles/aa_missile.gd"
 
-# Heavy rocket: one big, dark rocket that flares can't fool. It lines up
+# Heavy rocket: one big, dark rocket that can't be sent back. It lines up
 # on the helicopter from afar, then commits to a straight run for the last
 # commit_distance: anything still on that line gets hit, so a sidestep
 # beats it. Then it flies on, slows, swings round and lines up again,
@@ -35,7 +35,6 @@ var break_offs: int = 0
 
 
 func _init() -> void:
-	ignores_flares = true
 	# Too heavy to turn back: it has to be outflown, every pass.
 	deflectable = false
 	size = 1.8

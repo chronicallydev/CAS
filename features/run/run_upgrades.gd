@@ -1,70 +1,162 @@
 class_name RunUpgrades
 extends RefCounted
 
-# The upgrades offered between stretches of a run. Placeholders for now
-# (a proper set is still to be designed): small stat bumps to the
-# helicopter, the minigun and the chain dodge. Each is
-# {id, name, text}; apply() makes it happen.
+# The upgrades offered between stretches of a run (see DESIGN.md). Each one
+# changes how something works rather than a number: three categories (gun,
+# deflect, movement), each with a utility, a lethality and a survivability
+# role, two upgrades per slot. Every upgrade is a one-off, except Double
+# The Gun, which can be taken again and again (its count is the value in
+# MissionContext.upgrades).
 #
-# The chain dodge's tuning is static (ChainDodge), so a run snapshots it
-# at the start and restores it (save_defaults / restore_defaults).
+# A pick deals one card per category. Within a category the role is drawn
+# by weight: every role starts at 1 and gains 1 for each upgrade of that
+# role already held, so a build leans the way you've been picking.
+#
+# Some pairs combine (COMBOS): holding both adds an extra effect, and a
+# card shows when it would complete one.
+#
+# What's held lives on the mission (MissionContext.upgrades); the systems
+# that change ask MissionContext.upgraded() and combo() as they go.
 
+const CATEGORIES := ["gun", "deflect", "movement"]
+const ROLES := ["utility", "lethality", "survivability"]
+# What the cards call each role (they're narrow).
+const ROLE_LABELS := {"utility": "UTILITY", "lethality": "LETHAL", "survivability": "SURVIVAL"}
+
+# Card text is short lines: the card is about 18 characters wide.
 const LIST := [
-	{"id": "repair", "name": "REPAIR", "text": "Patch up 50 hull"},
-	{"id": "plating", "name": "PLATING", "text": "+34 max hull\n(and patch it)"},
-	{"id": "extra_dash", "name": "EXTRA DASH", "text": "+1 dash charge"},
-	{"id": "quick_dash", "name": "QUICK DASH", "text": "Dashes recharge\n25% faster"},
-	{"id": "focus", "name": "FOCUS", "text": "Perfect dodge window\n+0.08s"},
-	{"id": "bullet_time", "name": "BULLET TIME", "text": "Slow motion lasts\n+0.4s"},
-	{"id": "spin_up", "name": "SPIN UP", "text": "Minigun fires\n25% faster"},
+	{"id": "rubber_bullets", "name": "RUBBER BULLETS", "category": "gun", "role": "utility",
+		"text": "Rounds bounce\ninto a nearby\nenemy"},
+	{"id": "seeker_rounds", "name": "SEEKER ROUNDS", "category": "gun", "role": "utility",
+		"text": "Rounds curve\nonto enemies\nnear your aim"},
+	{"id": "shredder", "name": "SHREDDER", "category": "gun", "role": "lethality",
+		"text": "Keep firing on\none target: up\nto 3x damage"},
+	{"id": "incendiary", "name": "INCENDIARY", "category": "gun", "role": "lethality",
+		"text": "Vehicles and\nbuildings burn,\nfire spreads"},
+	# Stackable: each pick doubles the guns again (and halves accuracy again).
+	{"id": "double_gun", "name": "DOUBLE THE GUN", "category": "gun", "role": "lethality", "stackable": true,
+		"text": "Doubles your\nguns, but halves\nthe accuracy\nof all of them"},
+	{"id": "flak_screen", "name": "FLAK SCREEN", "category": "gun", "role": "survivability",
+		"text": "Your rounds\nshoot down the\nmissiles they pass"},
+	{"id": "salvage", "name": "SALVAGE", "category": "gun", "role": "survivability",
+		"text": "Wrecks drop\nscrap: fly over\nit to patch hull"},
+	{"id": "redirect", "name": "REDIRECT", "category": "deflect", "role": "utility",
+		"text": "Deflections go\nfor the enemy\nyou aim at"},
+	{"id": "time_bank", "name": "TIME BANK", "category": "deflect", "role": "utility",
+		"text": "Slow motion\ngrows with every\nmissile dodged"},
+	{"id": "split", "name": "SPLIT", "category": "deflect", "role": "lethality",
+		"text": "Deflected\nmissiles split\nin two"},
+	{"id": "overcharge", "name": "OVERCHARGE", "category": "deflect", "role": "lethality",
+		"text": "Each deflection\ngrows the\nmissile's blast"},
+	{"id": "grace", "name": "GRACE", "category": "deflect", "role": "survivability",
+		"text": "Just after a\nperfect dodge,\nhits deflect too"},
+	{"id": "absorb", "name": "ABSORB", "category": "deflect", "role": "survivability",
+		"text": "Every deflected\nmissile patches\nhull"},
+	{"id": "decoy", "name": "DECOY", "category": "movement", "role": "utility",
+		"text": "A dash leaves\na decoy that\nmissiles chase"},
+	{"id": "steer_dash", "name": "STEER DASH", "category": "movement", "role": "utility",
+		"text": "Steer while\nyou dash"},
+	{"id": "ram", "name": "RAM", "category": "movement", "role": "lethality",
+		"text": "Dash into enemy\nhelicopters to\nsmash them"},
+	{"id": "rotor_wash", "name": "ROTOR WASH", "category": "movement", "role": "lethality",
+		"text": "Dashing flattens\ninfantry, rocks\nvehicles"},
+	{"id": "rotor_guard", "name": "ROTOR GUARD", "category": "movement", "role": "survivability",
+		"text": "A dash blasts\neverything away\n(long cooldown)"},
+	{"id": "autorotate", "name": "AUTOROTATE", "category": "movement", "role": "survivability",
+		"text": "Once a stretch,\nlive through a\nkilling hit"},
 ]
 
-static var _defaults: Dictionary = {}
+# Pairs that combine, and what holding both adds.
+const COMBOS := [
+	{"a": "rubber_bullets", "b": "incendiary", "name": "HOT RICOCHETS", "text": "Ricochets set fires"},
+	{"a": "split", "b": "overcharge", "name": "CHAIN REACTION", "text": "Split halves keep the growth"},
+	{"a": "seeker_rounds", "b": "redirect", "name": "PAINTED", "text": "Deflections go for enemies your seekers hit"},
+	{"a": "shredder", "b": "ram", "name": "FINISHER", "text": "Rams cash in the shred"},
+	{"a": "decoy", "b": "grace", "name": "MIRROR", "text": "Missiles hitting a decoy deflect"},
+	{"a": "rotor_guard", "b": "absorb", "name": "REGEN GUARD", "text": "Missiles blasted away patch hull"},
+	{"a": "flak_screen", "b": "split", "name": "SHRAPNEL", "text": "Missiles you shoot down split into deflections"},
+	{"a": "salvage", "b": "rotor_wash", "name": "SCAVENGER", "text": "Flattened infantry drop scrap"},
+	{"a": "time_bank", "b": "steer_dash", "name": "LONG DRIFT", "text": "Dashes go twice as far in slow motion"},
+	{"a": "autorotate", "b": "grace", "name": "SECOND WIND", "text": "Surviving a killing hit gives slow motion and grace"},
+]
 
 
-## `count` different upgrades to choose from; no repair at full hull.
-static func offer(mission: MissionContext, count: int = 3) -> Array:
-	var heli := mission.helicopter
-	var pool := LIST.filter(func(upgrade: Dictionary) -> bool:
-		return upgrade.id != "repair" or heli.health < heli.max_health)
-	pool.shuffle()
-	return pool.slice(0, count)
+static func find(id: String) -> Dictionary:
+	for upgrade: Dictionary in LIST:
+		if upgrade.id == id:
+			return upgrade
+	return {}
 
 
-static func apply(id: String, mission: MissionContext) -> void:
-	var heli := mission.helicopter
-	var guns := mission.guns
-	match id:
-		"repair":
-			heal(heli, 50.0)
-		"plating":
-			heli.max_health += 34.0
-			heli.health_bar.max_value = heli.max_health
-			heal(heli, 34.0)
-		"extra_dash":
-			heli.dash_charges += 1
-			heli.dash_charges_left += 1
-		"quick_dash":
-			heli.dash_cooldown *= 0.75
-		"focus":
-			ChainDodge.tune("perfect_window", ChainDodge.perfect_window + 0.08)
-		"bullet_time":
-			ChainDodge.tune("slow_time", ChainDodge.slow_time + 0.4)
-		"spin_up":
-			guns.minigun_rpm *= 1.25
+## Up to one card per category, each not yet held, its role drawn by
+## weight (see above). Empty once everything is held.
+static func offer(mission: MissionContext) -> Array:
+	var weights := {}
+	for role in ROLES:
+		weights[role] = 1.0
+	for id in mission.upgrades:
+		var held := find(id)
+		if not held.is_empty():
+			weights[held.role] += 1.0
+
+	var cards: Array = []
+	for category in CATEGORIES:
+		var pool := LIST.filter(func(upgrade: Dictionary) -> bool:
+			return upgrade.category == category and (upgrade.get("stackable", false) or not mission.upgrades.has(upgrade.id)))
+		if pool.is_empty():
+			continue
+		var total := 0.0
+		for upgrade: Dictionary in pool:
+			total += weights[upgrade.role]
+		var roll := randf() * total
+		for upgrade: Dictionary in pool:
+			roll -= weights[upgrade.role]
+			if roll <= 0.0:
+				cards.append(upgrade)
+				break
+	return cards
 
 
-static func heal(heli: Helicopter, amount: float) -> void:
-	heli.health = minf(heli.health + amount, heli.max_health)
-	heli.health_bar.value = heli.health
+## The combos `id` would complete with what's already held.
+static func combos_with(id: String, mission: MissionContext) -> Array:
+	return COMBOS.filter(func(combo: Dictionary) -> bool:
+		return (combo.a == id and mission.upgrades.has(combo.b)) or (combo.b == id and mission.upgrades.has(combo.a)))
 
 
-static func save_defaults() -> void:
-	if _defaults.is_empty():
-		for property in ["perfect_window", "slow_time"]:
-			_defaults[property] = ChainDodge.tuning(property)
+## Takes `id`; returns the combos it completed.
+static func apply(id: String, mission: MissionContext) -> Array:
+	var completed := combos_with(id, mission)
+	if find(id).get("stackable", false):
+		mission.upgrades[id] = int(mission.upgrades.get(id, 0)) + 1
+	else:
+		mission.upgrades[id] = true
+	if id == "autorotate":
+		mission.helicopter.autorotate_ready = true
+	if id == "double_gun":
+		mission.helicopter.double_gun(mission.upgrades[id])
+	return completed
 
 
-static func restore_defaults() -> void:
-	for property in _defaults:
-		ChainDodge.tune(property, _defaults[property])
+## The held upgrades' names, in the order taken, for the HUD.
+static func held_names(mission: MissionContext) -> Array:
+	var names: Array = []
+	for id in mission.upgrades:
+		var upgrade := find(id)
+		if upgrade.is_empty():
+			continue
+		var name: String = upgrade.name
+		if upgrade.get("stackable", false):
+			name += " x%d" % int(mission.upgrades[id])
+		names.append(name)
+	return names
+
+
+## Card text: number, name, category and role, what it does, and any
+## combo it would complete.
+static func card_text(index: int, upgrade: Dictionary, mission: MissionContext) -> String:
+	var text := "%d  %s\n%s - %s\n\n%s" % [index, upgrade.name, upgrade.category.to_upper(), ROLE_LABELS[upgrade.role], upgrade.text]
+	if upgrade.get("stackable", false) and mission.upgrades.has(upgrade.id):
+		text += "\n\n(%d GUNS NOW)" % roundi(pow(2.0, int(mission.upgrades[upgrade.id])))
+	for combo: Dictionary in combos_with(upgrade.id, mission):
+		text += "\n\nCOMBO: " + combo.name
+	return text

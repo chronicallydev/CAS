@@ -29,13 +29,19 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   and the view won't scroll past a live one), then a *lock arena* (view
   pinned, helicopter waves; from the second stretch it's over a `City`,
   reinforced while its marked targets stand, and clears once they're
-  destroyed), then an upgrade pick (`RunUpgrades`, placeholders) with the
+  destroyed), then an upgrade pick (`RunUpgrades`) with the
   game paused. What each stretch holds is the table `RunDirector.PLAN`.
 - **Buildings** (`features/mission/structures/building.gd`) aren't
   enemies: they're in the `structures` group, which `GunController`
   damages by footprint, and break in stages down to rubble. `City` and
   `TravelObjective` build from them plus the existing tanks, cars and
   infantry (`dug_in` holds those in place).
+- **Upgrades** (`RunUpgrades`): the list, the weighted dealing and the
+  combos. What's held lives in `MissionContext.upgrades`; the systems it
+  changes (`GunController`, `aa_missile.gd`, `ChainDodge`, `Helicopter`)
+  ask `mission.upgraded(id)` / `combo(a, b)` where they act. Helper nodes
+  are in `features/mission/upgrades/` (Burn, Scrap, Decoy). The test range
+  panel can switch any of them on.
 - **The boss** (`features/mission/bosses/`): the last stretch's arena is a
   `Fortress` instead of a city. Its weapons are `FortressPart`s (buildings
   with guns, in `deflect_targets` so deflected missiles go for them); the
@@ -86,7 +92,8 @@ its own salvo. Weapon tuning lives in the GunController's exported values.
   toward the input at a rate set by `turn_speed` (`path_turn_scale`) while
   keeping speed, and steering past `reverse_angle` brakes straight through.
   The body leans into the steering force (`thrust`).
-- **One job per ability**: dash beats bullets, flares beat missiles.
+- **One ability, the dash**: it beats bullets, and a well-timed one beats
+  missiles (the chain dodge). There are no flares.
 - **Dash (Space / Shift)**: a ~14 m burst with brief invulnerability, with
   charges and a per-airframe cooldown (`HelicopterData.dash_cooldown`).
 - **Chain dodge** (`ChainDodge`, owned by the helicopter): a dash started
@@ -100,12 +107,9 @@ its own salvo. Weapon tuning lives in the GunController's exported values.
   practice salvo. All the feedback (callouts, shockwave ring, letterbox,
   next-missile brackets, sounds) is `DodgeFx` on the HUD, driven by
   ChainDodge's signals and animated in real time.
-- **Flares (F)**: lock-on enemies share `EnemyBase.update_lock()`: it counts
-  up `lock_timer` (which makes the HUD's edge arrow pulse), warns the
-  player, and gives up while `Helicopter.can_be_locked()` is false. Flares
-  make that false for a moment and retarget every missile already homing on
-  the helicopter to a decoy. They're unlimited but recharge
-  (`HelicopterData.flare_cooldown`).
+- **Lock-ons**: lock-on enemies share `EnemyBase.update_lock()`: it counts
+  up `lock_timer` (which makes the HUD's edge arrow pulse) and warns the
+  player.
 - A soft boundary (`Helicopter.bounds`) pushes the helicopter back toward
   the map centre.
 
@@ -118,7 +122,7 @@ Every enemy hunts the helicopter (`EnemyBase.objective()`).
 | Infantry (`infantry`) | rifle bursts in range | minigun |
 | Car (`car`) | circles the helicopter, roof gun bursts | keep moving, dash |
 | Tank (`tank`) | slow turret, heavy shells; armoured | rockets, keep moving |
-| SAM truck (`aa_launcher`) | locks on, single homing missile | turn hard, flares |
+| SAM truck (`aa_launcher`) | locks on, single homing missile | turn hard, chain dodge |
 | Scout (`enemy_scout`) | fast helicopter, circles close, 2-missile salvos, jinks often | chain dodge, deflect |
 | Gunship (`enemy_gunship`) | slow armoured helicopter, 4-missile salvos | chain dodge, deflect, rockets |
 
@@ -139,7 +143,7 @@ arrival (`fire_air_round`).
 
 `TestRangePanel` spawns the chosen unit and count at the cursor
 (middle-click or G), clears enemies, resets the range, toggles god mode and
-instant flares/no reloads, and shows live stats: damage taken per source
+instant dashes/no reloads, and shows live stats: damage taken per source
 (`Helicopter.damage_taken`), damage dealt and DPS (`GunController.damage_dealt`),
 and the hovered enemy's health, armour and lock state.
 

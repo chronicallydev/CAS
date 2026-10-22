@@ -1,8 +1,8 @@
 extends "res://features/mission/enemies/aa_launcher.gd"
 
-# Heavy rocket truck: a SAM truck with one fat tube. Its lock ignores
-# flares, and it fires a single heavy rocket (heavy_rocket.gd) that keeps
-# coming back until it has been dodged several times. It won't lock again
+# Heavy rocket truck: a SAM truck with one fat tube. It fires a single
+# heavy rocket (heavy_rocket.gd) that keeps coming back until it has been
+# dodged several times. It won't lock again
 # while its rocket is still flying.
 
 const HeavyRocket := preload("res://features/mission/enemies/projectiles/heavy_rocket.gd")

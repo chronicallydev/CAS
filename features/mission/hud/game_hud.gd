@@ -22,6 +22,8 @@ var gun: GunController
 
 var title_label: Label
 var score_label: Label
+# The run's upgrades, top right (see show_upgrades).
+var upgrades_label: Label
 
 var shown_score: float = 0.0
 
@@ -101,6 +103,16 @@ func build_readout() -> void:
 		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(title_label)
 	box.add_child(score_label)
+
+	upgrades_label = make_label("", 22, TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
+	upgrades_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
+	upgrades_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	upgrades_label.offset_left = -24
+	upgrades_label.offset_right = -24
+	upgrades_label.offset_top = 18
+	upgrades_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	upgrades_label.visible = false
+	add_child(upgrades_label)
 
 
 # --- Kill feedback -------------------------------------------------------
@@ -188,3 +200,10 @@ func build_combo_label() -> void:
 	combo_label.pivot_offset = Vector2(400, 25)
 	combo_label.modulate.a = 0.0
 	add_child(combo_label)
+
+
+## Lists the run's upgrades top right, one a line ("NAME x2" for a stack).
+func show_upgrades(names: Array) -> void:
+	upgrades_label.text = "\n".join(names)
+	upgrades_label.visible = not names.is_empty()
+	upgrades_label.reset_size()

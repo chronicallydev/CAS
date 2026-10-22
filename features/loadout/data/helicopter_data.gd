@@ -18,8 +18,6 @@ extends Resource
 @export var acceleration: float = 5.0
 @export var max_health: float = 100.0
 @export var turn_speed: float = 6.0
-## Seconds for the decoy flares to recharge after a drop.
-@export var flare_cooldown: float = 8.0
 ## Seconds for one dash charge (Shift) to come back.
 @export var dash_cooldown: float = 3.0
 #

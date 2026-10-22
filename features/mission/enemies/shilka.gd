@@ -7,8 +7,8 @@ extends EnemyBase
 # a steady circle, then fills it with flak for a moment, hurting every
 # tick you're inside. Hovering gets a box right on top of you. Turning out
 # of the strip during the warning saves you. Heavy armour shrugs off the
-# minigun. Answer: rockets or cannon, change course when the strip
-# appears, or a flare (which stops the radar locking on).
+# minigun. Answer: rockets or cannon, or change course when the strip
+# appears.
 # Built from primitives in code.
 
 const P := preload("res://shared/props/prop_builder.gd")
@@ -138,7 +138,7 @@ func _physics_process(delta: float) -> void:
 		lock_timer = 0.0
 		return
 
-	# Lock on (flares break it), then mark the strip.
+	# Lock on, then mark the strip.
 	if update_lock(heli, delta, lock_time):
 		mark_zone(heli)
 

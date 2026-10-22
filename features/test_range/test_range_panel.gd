@@ -5,7 +5,7 @@ extends CanvasLayer
 #   STATS      - (top, always in view) damage taken by source, damage dealt
 #                and DPS, and the enemy under the cursor
 #   SPAWN      - unit and count; middle-click or G drops them at the cursor
-#   HELICOPTER - reset the range, god mode, instant flares and no reloads
+#   HELICOPTER - reset the range, god mode, instant dashes and no reloads
 #   LOOK       - retro palette, dither amount and pixel resolution (set on
 #                the PixelArt autoload), the white hit flash and chunky
 #                explosions; all last across resets
@@ -15,6 +15,8 @@ extends CanvasLayer
 #   CHAIN DODGE - missile salvos at the helicopter (H) and live tuning of
 #                the perfect dodge, slow motion and deflection (ChainDodge);
 #                kept across resets
+#   UPGRADES   - switch any of the run's upgrades on (RunUpgrades); kept
+#                across resets
 #   PORTRAIT   - a test character portrait (CharacterPortrait) in the
 #                bottom-left corner, with its style, detail and shading
 #                live; COPY puts the changed values on the clipboard.
@@ -318,6 +320,7 @@ func refresh() -> void:
 	build_spawn(setup_box)
 	build_helicopter(setup_box)
 	build_chain_dodge(setup_box)
+	build_upgrades(setup_box)
 	build_look(setup_box)
 	build_movement(setup_box)
 	build_portrait_controls(setup_box)
@@ -344,9 +347,27 @@ func build_helicopter(box: VBoxContainer) -> void:
 	box.add_child(check("God mode (hits count, no damage)", range_context.god_mode, func(on: bool) -> void:
 		range_context.god_mode = on
 		range_context.apply_cheats()))
-	box.add_child(check("Instant flares, no reloads", range_context.infinite_ammo, func(on: bool) -> void:
+	box.add_child(check("Instant dashes, no reloads", range_context.infinite_ammo, func(on: bool) -> void:
 		range_context.infinite_ammo = on
 		range_context.apply_cheats()))
+
+
+# The run's upgrades (RunUpgrades), each on its own switch, to try out.
+func build_upgrades(box: VBoxContainer) -> void:
+	box.add_child(section("UPGRADES"))
+	for upgrade: Dictionary in RunUpgrades.LIST:
+		var id: String = upgrade.id
+		var label_text := "%s  (%s %s)" % [upgrade.name, upgrade.category, upgrade.role]
+		box.add_child(check(label_text, range_context.upgrades.has(id), func(on: bool) -> void:
+			if on:
+				range_context.upgrades[id] = true
+			else:
+				range_context.upgrades.erase(id)
+			# Guns can't be taken off a helicopter: start the range over.
+			if id == "double_gun":
+				range_context.rebuild()
+			else:
+				range_context.apply_cheats()))
 
 
 func build_chain_dodge(box: VBoxContainer) -> void:
@@ -564,8 +585,7 @@ func update_stats() -> void:
 	lines.append("[color=#%s]Damage dealt:[/color] %.1f   DPS %.1f" % [GOLD.to_html(false), c.damage_dealt_total, c.dps()])
 
 	var heli := c.mission.helicopter
-	var flares := "ready" if heli.flare_cooldown_left <= 0.0 else "%.1fs" % heli.flare_cooldown_left
-	lines.append("Hull %d / %d   Flares %s" % [heli.health, heli.max_health, flares])
+	lines.append("Hull %d / %d" % [heli.health, heli.max_health])
 	# What the movement numbers add up to.
 	var spool := heli.speed / maxf(heli.get_acceleration_rate(), 0.01)
 	var stop := heli.speed / maxf(heli.get_brake_rate(), 0.01)

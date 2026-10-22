@@ -51,8 +51,6 @@ var ground_y: float = -0.4
 var size: float = 1.0
 # Who fired it, for damage stats (e.g. "STINGER").
 var source_name: String = "MISSILE"
-# Flares don't pull it off (see Helicopter.deploy_flares).
-var ignores_flares: bool = false
 # A perfect dodge can send it back (the heavy rocket can't be).
 var deflectable: bool = true
 # Defused (see fizzle): it bursts without hurting anything.
@@ -75,8 +73,12 @@ var deflect_speed: float = 46.0
 var deflect_turn_rate: float = 2.6
 var deflect_time: float = 3.0
 var deflect_damage: float = 120.0
+# Absorb (an upgrade): hull patched per deflected missile.
+const ABSORB_REPAIR := 3.0
 var deflect_radius: float = 7.0
 var deflect_contact: float = 3.5
+# Overcharge (an upgrade): times it's been deflected, growing its blast.
+var charge: int = 0
 
 var velocity: Vector3
 # Where it points. Before ignition this turns on its own while the
@@ -203,7 +205,7 @@ func _physics_process(delta: float) -> void:
 
 func track_target(delta: float) -> void:
 	var position_now := target.global_position
-	# New target (launch, or a flare swap): start the estimate over.
+	# New target (launch): start the estimate over.
 	if target != tracked:
 		tracked = target
 		last_target_position = position_now
@@ -213,7 +215,7 @@ func track_target(delta: float) -> void:
 		previous_distance = INF
 	var measured := (position_now - last_target_position) / maxf(delta, 0.001)
 	last_target_position = position_now
-	# Smooth out frame jitter; a flare swap jumps once and settles.
+	# Smooth out frame jitter.
 	target_velocity = target_velocity.lerp(measured, 1.0 - exp(-12.0 * delta))
 
 
@@ -277,7 +279,7 @@ func steer(delta: float) -> void:
 func lose_target() -> void:
 	lost = true
 	var heli := helicopter()
-	# Only the helicopter's own dodges get feedback, not flares doing their job.
+	# Only near misses on the helicopter get feedback.
 	if heli == null or target != heli or closest > near_miss_radius:
 		return
 	var mission := MissionContext.of(self)
@@ -291,12 +293,69 @@ func lose_target() -> void:
 
 
 ## Perfect-dodged: stop chasing the helicopter and turn on the enemies.
-func deflect(homing: bool) -> void:
+## Upgrades (see RunUpgrades) change what happens: Overcharge grows the
+## blast, Absorb patches hull, Split sends half of it off on its own. A
+## half fresh off a split (`split`) skips those: its parent had them.
+func deflect(homing: bool, split: bool = false) -> void:
 	deflected = true
 	deflect_homing = homing
 	deflect_left = deflect_time
 	target = null
 	velocity = velocity.normalized() * maxf(velocity.length(), deflect_speed)
+	whiten()
+	var mission := MissionContext.of(self)
+	if mission == null or split:
+		return
+	if mission.upgraded("overcharge"):
+		charge += 1
+		deflect_radius *= 1.35
+		deflect_damage *= 1.3
+		model.scale *= 1.15
+	if mission.upgraded("absorb"):
+		mission.helicopter.repair(ABSORB_REPAIR)
+		mission.hud.spawn_popup("+%d HULL" % ABSORB_REPAIR, mission.helicopter.global_position, Color.WHITE, false, true)
+	if mission.upgraded("split"):
+		# Chain Reaction (with Overcharge): the halves keep the full blast.
+		if not mission.combo("split", "overcharge"):
+			deflect_damage *= 0.6
+			deflect_radius *= 0.8
+			model.scale *= 0.8
+		var ahead := velocity.normalized()
+		split_off(ahead.rotated(Vector3.UP, 0.45))
+		velocity = ahead.rotated(Vector3.UP, -0.45) * velocity.length()
+
+
+## A deflected copy of this missile flying off along `direction` (Split,
+## Shrapnel), with its blast, already lit.
+func split_off(direction: Vector3) -> Node3D:
+	var half: Node3D = get_script().new()
+	half.size = size * 0.8
+	half.explosion_scene = explosion_scene
+	half.ground_y = ground_y
+	half.source_name = source_name
+	half.deflect_damage = deflect_damage
+	half.deflect_radius = deflect_radius
+	half.charge = charge
+	MissionContext.spawn_parent(self).add_child(half)
+	half.global_position = global_position
+	half.velocity = direction.normalized() * maxf(velocity.length(), deflect_speed)
+	half.nose = half.velocity.normalized()
+	half.ignited = true
+	half.age = half.eject_time
+	half.flame.visible = true
+	half.trail.emitting = true
+	half.deflect(deflect_homing, true)
+	return half
+
+
+# Deflected: white, the player's colour.
+func whiten() -> void:
+	var white := StandardMaterial3D.new()
+	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	white.albedo_color = Color.WHITE
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", false, false):
+		if mesh != flame:
+			mesh.material_override = white
 
 
 ## Sent back at `at` (the player) by an enemy helicopter's own perfect
@@ -398,11 +457,22 @@ func pick_enemy() -> Node3D:
 	var best: Node3D = null
 	var best_score := INF
 	var forward := velocity.normalized()
+	# Redirect (an upgrade): the enemy nearest the cursor instead. Painted
+	# (with Seeker Rounds): enemies the seekers hit come first.
+	var mission := MissionContext.of(self)
+	var cursor: Variant = null
+	if mission != null and mission.upgraded("redirect") and mission.guns != null:
+		cursor = mission.guns.get_mouse_world_position()
+	var now := Time.get_ticks_msec()
 	for enemy in deflect_targets():
 		if not is_valid_enemy(enemy):
 			continue
 		var offset: Vector3 = aim_point(enemy) - global_position
 		var score := offset.length() * (2.0 - forward.dot(offset.normalized()))
+		if cursor is Vector3:
+			score = Vector2(enemy.global_position.x - cursor.x, enemy.global_position.z - cursor.z).length()
+		if enemy.has_meta("painted_ms") and int(enemy.get_meta("painted_ms")) > now:
+			score *= 0.1
 		if score < best_score:
 			best = enemy
 			best_score = score
@@ -488,6 +558,25 @@ func face(direction: Vector3) -> void:
 	look_at(global_position + direction, up)
 
 
+# Instead of going off: Grace (an upgrade) deflects a hit that lands just
+# after a perfect dodge, and Mirror (Decoy + Grace) one that hits a decoy.
+# True if it was saved that way.
+func save_by_deflecting() -> bool:
+	var mission := MissionContext.of(self)
+	if mission == null or not deflectable:
+		return false
+	var heli := mission.helicopter
+	var close := is_instance_valid(target) and global_position.distance_to(target.global_position) <= fuze_radius * 1.5
+	var graced: bool = close and mission.upgraded("grace") and target == heli and heli.chain_dodge.grace_left > 0.0
+	var mirrored: bool = close and target is Decoy and mission.combo("decoy", "grace")
+	if not graced and not mirrored:
+		return false
+	deflect(true)
+	mission.hud.spawn_popup("GRACE" if graced else "MIRROR", global_position, Color.WHITE)
+	Sfx.play_2d("time_resume")
+	return true
+
+
 ## Bursts where it is, harmlessly: the fight it was part of is over.
 func fizzle() -> void:
 	harmless = true
@@ -495,6 +584,8 @@ func fizzle() -> void:
 
 
 func detonate() -> void:
+	if not deflected and not harmless and save_by_deflecting():
+		return
 	var on_ground := global_position.y <= ground_y + 0.5
 	# A deflected missile is the player's: it spares the helicopter.
 	var hurt := false if deflected or harmless else blast_helicopter()
@@ -528,8 +619,7 @@ func detonate() -> void:
 	queue_free()
 
 
-# The blast hurts the helicopter by distance, whatever the rocket was
-# chasing (a flare dropped too close still lets it through). True if hit.
+# The blast hurts the helicopter by distance. True if hit.
 func blast_helicopter() -> bool:
 	var heli := helicopter()
 	if heli == null:

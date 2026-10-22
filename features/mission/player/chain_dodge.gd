@@ -67,6 +67,13 @@ var chain: int = 0
 var slow_left: float = 0.0
 # Game seconds left to keep the chain going.
 var chain_left: float = 0.0
+# Grace (an upgrade): real seconds left in which a hit is deflected anyway.
+var grace_left: float = 0.0
+
+# Grace's window after a perfect dodge (real seconds), and Time Bank's
+# extra slow motion per missile dodged (it also stops the shrinking).
+const GRACE_TIME := 1.0
+const TIME_BANK_PER_MISSILE := 0.35
 
 
 func setup(heli: Helicopter, mission_context: MissionContext) -> void:
@@ -82,6 +89,7 @@ func is_slowed() -> bool:
 func _process(delta: float) -> void:
 	if get_tree().paused:
 		return
+	grace_left = maxf(grace_left - delta / maxf(Engine.time_scale, 0.001), 0.0)
 	if slow_left > 0.0:
 		# Engine.time_scale scales delta; count the slow motion in real time.
 		slow_left -= delta / maxf(Engine.time_scale, 0.001)
@@ -110,7 +118,13 @@ func on_dash(velocity_before: Vector3) -> bool:
 	chain_left = chain_timeout
 	if refund_dash:
 		helicopter.dash_charges_left = mini(helicopter.dash_charges_left + 1, helicopter.dash_charges)
-	start_slow(maxf(slow_time * pow(slow_shrink, chain - 1), min_slow_time))
+	var slow := maxf(slow_time * pow(slow_shrink, chain - 1), min_slow_time)
+	if upgraded("time_bank"):
+		slow = slow_time + TIME_BANK_PER_MISSILE * dodged.size()
+		mission.hud.spawn_popup("TIME BANK +%.1fs" % (slow - slow_time), helicopter.global_position, Color.WHITE, false, true)
+	start_slow(slow)
+	if upgraded("grace"):
+		grace_left = GRACE_TIME
 	perfect_dodge.emit(chain, dodged)
 	return true
 
@@ -179,3 +193,7 @@ func break_chain() -> void:
 		end_slow()
 	if chain > 0:
 		end_chain()
+
+
+func upgraded(id: String) -> bool:
+	return mission != null and mission.upgraded(id)

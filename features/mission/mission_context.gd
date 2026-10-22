@@ -45,6 +45,10 @@ var _hit_stop_active: bool = false
 ## The time scale between hit stops: below 1 during a chain dodge's slow
 ## motion (see ChainDodge), which hit stops then leave alone.
 var base_time_scale: float = 1.0
+# Upgrades held this run, by id (see RunUpgrades): systems ask upgraded()
+# and combo() to change how they work. Empty outside a run, unless the
+# test range turns some on.
+var upgrades: Dictionary = {}
 
 
 func _ready() -> void:
@@ -53,7 +57,7 @@ func _ready() -> void:
 
 ## Fits the airframe and its weapons and hands every system what it needs.
 func setup() -> void:
-	for property in ["speed", "acceleration", "max_health", "turn_speed", "flare_cooldown", "dash_cooldown"]:
+	for property in ["speed", "acceleration", "max_health", "turn_speed", "dash_cooldown"]:
 		helicopter.set(property, airframe.get(property))
 	helicopter.initialize(self, airframe, mounted_weapons())
 	guns.equip(mounted_types(), helicopter.weapon_muzzles)
@@ -157,3 +161,12 @@ func game_over(_reason: String) -> void:
 		return
 	is_over = true
 	request_retry.emit.call_deferred()
+
+
+func upgraded(id: String) -> bool:
+	return upgrades.has(id)
+
+
+## Both halves of a combo held (see RunUpgrades.COMBOS).
+func combo(a: String, b: String) -> bool:
+	return upgrades.has(a) and upgrades.has(b)

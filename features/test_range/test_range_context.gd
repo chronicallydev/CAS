@@ -45,6 +45,8 @@ var mission: MissionContext
 ## Cheats, kept across rebuilds.
 var god_mode: bool = true
 var infinite_ammo: bool = false
+## Upgrades switched on from the panel (id -> true), kept across rebuilds.
+var upgrades: Dictionary = {}
 
 ## Movement values tuned from the panel (helicopter property -> value),
 ## kept across rebuilds, and what they were before any tuning.
@@ -115,8 +117,11 @@ func apply_cheats() -> void:
 	if mission == null:
 		return
 	mission.helicopter.invulnerable = god_mode
-	mission.helicopter.infinite_flares = infinite_ammo
+	mission.helicopter.infinite_dashes = infinite_ammo
 	mission.guns.infinite_ammo = infinite_ammo
+	mission.upgrades = upgrades.duplicate()
+	mission.helicopter.double_gun(int(upgrades.get("double_gun", 0)))
+	mission.helicopter.autorotate_ready = true
 
 
 # --- Movement tuning ---------------------------------------------------------

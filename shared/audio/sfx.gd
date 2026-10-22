@@ -63,8 +63,6 @@ const MIX := {
 	"body_thud": -12.0,
 	"gear_clank": -17.0,
 	"scream": -11.0,
-	# Flare pop when the helicopter drops decoys.
-	"flare": -9.0,
 	# The helicopter's dash.
 	"dash_whoosh": -8.0,
 	# Chain dodge: time stopping on a perfect dodge, and starting again.
@@ -128,7 +126,6 @@ func _ready() -> void:
 	streams["body_thud"] = make_stream(synth_thud())
 	streams["gear_clank"] = make_stream(synth_clang(0.3, [930.0, 2150.0, 3400.0], 16.0))
 	streams["scream"] = make_stream(synth_scream())
-	streams["flare"] = make_stream(synth_explosion(0.35, 0.95, 260.0))
 	streams["dash_whoosh"] = make_stream(synth_whoosh())
 	# The same whoosh, mixed louder (and pitched down when played) for a
 	# missile tearing past.

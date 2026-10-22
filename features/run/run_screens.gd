@@ -202,8 +202,9 @@ func show_picks(title: String, options: Array, on_pick: Callable) -> void:
 			close_overlay()
 			on_pick.call(option.id)
 		pick_actions.append(choose)
-		var card := card_button("%d  %s\n\n%s" % [i + 1, option.name, option.text], choose)
-		card.custom_minimum_size = Vector2(600, 330)
+		# Upgrades bring their own card text (RunUpgrades.card_text).
+		var card := card_button(option.get("card", "%d  %s\n\n%s" % [i + 1, option.name, option.text]), choose)
+		card.custom_minimum_size = Vector2(700, 600)
 		row.add_child(card)
 
 

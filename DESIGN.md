@@ -103,6 +103,28 @@ clothes, touch their hair, poke them, and they react.
 - **Scouts keep coming** at you over a city while its targets stand,
   a few at a time.
 
+## Upgrades
+
+- One pick (1 of 3) after each cleared arena; no rerolls. Every upgrade
+  **changes how something works**, never just a number, and is a one-off.
+- Three **categories** (gun, deflect, movement) by three **roles**
+  (utility, lethality, survivability), two upgrades per slot, plus Double
+  The Gun, the one upgrade that stacks (each pick doubles the guns and
+  halves their accuracy):
+
+  | | Utility | Lethality | Survivability |
+  |---|---|---|---|
+  | Gun | Rubber Bullets, Seeker Rounds | Shredder, Incendiary, Double The Gun | Flak Screen, Salvage |
+  | Deflect | Redirect, Time Bank | Split, Overcharge | Grace, Absorb |
+  | Movement | Decoy, Steer Dash | Ram, Rotor Wash | Rotor Guard, Autorotate |
+
+- **Dealing**: one card per category. Roles are weighted by what you
+  already hold (each role 1, plus 1 per upgrade of it), so a build leans
+  the way you pick.
+- **Combos**: hand-made pairs that add an extra effect, shown on a card
+  that would complete one (`RunUpgrades.COMBOS`), e.g. Rubber Bullets +
+  Incendiary: ricochets set fires.
+
 ## Enemies
 
 Variety comes from **missile types**, not from many units.

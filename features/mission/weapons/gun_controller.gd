@@ -28,6 +28,30 @@ const SLOT_NAMES := ["LMB", "RMB"]
 # for a moment.
 const HEAVY_KILL_HEALTH := 10.0
 
+# Upgrades (see RunUpgrades and the end of this file).
+# Seeker Rounds: how far from the aim an enemy pulls rounds onto it.
+const SEEK_RADIUS := 5.0
+# Rubber Bullets: ricochets look this far for a new target, this often,
+# for this share of a round's damage.
+const RICOCHET_RANGE := 12.0
+const RICOCHET_CHANCE := 0.5
+const RICOCHET_SHARE := 0.6
+# Flak Screen: missiles this close to a round's path are shot down.
+const FLAK_RADIUS := 3.0
+# Shredder: each round on the same target adds this, up to SHRED_MAX
+# (3x damage); a gap longer than SHRED_GAP_MS starts it over.
+const SHRED_STEP := 0.1
+const SHRED_MAX := 2.0
+const SHRED_GAP_MS := 400
+# Incendiary: chance a round sets its target alight.
+const IGNITE_CHANCE := 0.08
+# Painted (a combo): how long a seeker hit marks an enemy.
+const PAINT_MS := 4000
+# Shredder: the multiplier shown under the reticle while it's ramping.
+var shred_label: Label
+var last_shred: float = 1.0
+var last_shred_ms: int = -100000
+
 const JavelinExplosion := preload("res://features/mission/vfx/javelin_explosion.gd")
 const Tracer := preload("res://features/mission/enemies/projectiles/tank_shell.gd")
 const Rocket := preload("res://features/mission/weapons/rocket.gd")
@@ -232,6 +256,7 @@ func fire_gun(weapon: Weapon, gun_rpm: float, delta: float) -> void:
 func update_cursor(delta: float) -> void:
 	var firing := is_firing()
 	cursor.scale = default_cursor_size * (0.9 if firing else 1.0)
+	update_shred_label()
 
 	# Tint the reticle red while the LMB weapon reloads.
 	var primary_reloading := not equipped.is_empty() and get_reload_left(equipped[0]) > 0.0
@@ -392,7 +417,7 @@ func random_spread(spread: float) -> Vector3:
 # Minigun rounds land wherever the cursor currently points.
 func fire_minigun_round() -> void:
 	# Rounds scatter around the reticle.
-	var spread := minigun_spread
+	var spread := minigun_spread * gun_spread_scale()
 	var air := locked_air_target()
 	if air != null:
 		var from_air := take_muzzle(Weapon.MINIGUN)
@@ -406,9 +431,19 @@ func fire_minigun_round() -> void:
 		return
 
 	var from := take_muzzle(Weapon.MINIGUN)
+	var landing: Vector3 = hit + random_spread(spread)
+	# Seeker Rounds (an upgrade): curve onto an enemy near the aim.
+	if upgraded("seeker_rounds"):
+		var seek := seek_target(hit)
+		if seek != null:
+			landing = seek.global_position + random_spread(0.8)
+			landing.y = hit.y
+			# Painted (a combo): deflections go for what seekers hit.
+			if mission.combo("seeker_rounds", "redirect"):
+				seek.set_meta("painted_ms", Time.get_ticks_msec() + PAINT_MS)
 
 	play_shot_sound("gun_minigun", 1.4, 1.7, from)
-	schedule_explosion(from, hit + random_spread(spread), minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
+	schedule_explosion(from, landing, minigun_impact_delay, minigun_radius, minigun_damage, minigun_explosion_scale, true)
 
 
 # A round at an enemy helicopter: aimed where it will be when the round
@@ -438,9 +473,11 @@ func fire_air_round(from: Vector3, target: Node3D, spread: float) -> void:
 			spawn_ricochet(target.global_position, target.global_position - from, (outward + Vector3.UP * 0.5).normalized())
 		if damage_enemy(target, minigun_damage, true):
 			report_kills(1, target.get("max_health") >= HEAVY_KILL_HEALTH)
+		after_round(from, target.global_position)
 	else:
 		# A miss: a smaller puff where it passed.
 		spawn_impact(aim, minigun_explosion_scale * 0.6)
+		after_round(from, aim)
 
 
 # Barrels spin up while the trigger is held and wind down when let go.
@@ -519,6 +556,8 @@ func schedule_explosion(from: Vector3, position: Vector3, delay: float, radius: 
 	explode_at(position, radius, hit_damage, vfx_scale, light_weapon)
 	if light_weapon and randf() < ricochet_chance:
 		spawn_ricochet(position, position - from, Vector3.UP)
+	if light_weapon:
+		after_round(from, position)
 
 
 # A round glancing off at `at`: a short bright streak bouncing away
@@ -621,8 +660,14 @@ func damage_enemy(enemy: Node3D, hit_damage: float, light_weapon: bool, force: f
 		register_kill(enemy, 10)
 		return true
 
+	# Shredder (an upgrade): rounds held on one target ramp up.
+	if light_weapon and upgraded("shredder"):
+		hit_damage *= shred(enemy)
 	var health_before: float = enemy.get("health") if enemy.get("health") != null else 0.0
 	var killed_now: bool = enemy.take_damage(hit_damage, light_weapon)
+	# Incendiary (an upgrade): vehicles and buildings catch fire.
+	if light_weapon and not killed_now and upgraded("incendiary") and burnable(enemy) and randf() < IGNITE_CHANCE:
+		Burn.ignite(enemy, mission)
 	if enemy.get("health") != null:
 		damage_dealt.emit(health_before - maxf(enemy.health, 0.0))
 	if killed_now:
@@ -659,6 +704,12 @@ func register_hit() -> void:
 
 func register_kill(enemy: Node3D, points: int) -> void:
 	kills += 1
+	# Salvage (an upgrade): wrecks leave scrap.
+	if upgraded("salvage"):
+		if enemy.get("leaves_wreck") or enemy.has_method("make_crash_smoke"):
+			Scrap.drop(enemy.global_position, mission, 0.5)
+		elif enemy is Building:
+			Scrap.drop(enemy.global_position, mission, 0.25)
 	mission.add_score(points)
 	hit_flash = 0.22
 	hit_was_kill = true
@@ -668,3 +719,146 @@ func register_kill(enemy: Node3D, points: int) -> void:
 	# mission context connects to this signal.
 	var label: String = enemy.get("display_name") if enemy.get("display_name") != null else ""
 	kill_registered.emit(points, enemy.global_position, label)
+
+
+# --- Upgrades (see RunUpgrades) ---------------------------------------------
+
+func upgraded(id: String) -> bool:
+	return mission != null and mission.upgraded(id)
+
+
+# The enemy nearest `point` within SEEK_RADIUS for Seeker Rounds: a ground
+# unit, or a building that's a marked target. Null if none.
+func seek_target(point: Vector3) -> Node3D:
+	var best: Node3D = null
+	var best_distance := SEEK_RADIUS
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or enemy.is_in_group("air_enemies"):
+			continue
+		var distance := Vector2(enemy.global_position.x - point.x, enemy.global_position.z - point.z).length()
+		if distance < best_distance:
+			best = enemy
+			best_distance = distance
+	if best != null:
+		return best
+	for node in get_tree().get_nodes_in_group("structures"):
+		var building := node as Building
+		if building != null and building.target and not building.dormant and building.ground_distance(point) < SEEK_RADIUS:
+			return building
+	return null
+
+
+# What happens after any minigun round lands at `at`, fired from `from`.
+func after_round(from: Vector3, at: Vector3) -> void:
+	if upgraded("flak_screen"):
+		shoot_down_missiles(from, at)
+	if upgraded("rubber_bullets") and randf() < RICOCHET_CHANCE:
+		ricochet(at)
+
+
+# Flak Screen: enemy missiles near the round's path burst harmlessly.
+# Shrapnel (a combo with Split) bursts them into two deflections.
+func shoot_down_missiles(from: Vector3, to: Vector3) -> void:
+	var path := to - from
+	for missile in get_tree().get_nodes_in_group("aa_missiles"):
+		if missile.deflected or missile.harmless:
+			continue
+		var along := clampf((missile.global_position - from).dot(path) / maxf(path.length_squared(), 0.001), 0.0, 1.0)
+		if missile.global_position.distance_to(from + path * along) > FLAK_RADIUS:
+			continue
+		if mission.combo("flak_screen", "split"):
+			var away: Vector3 = missile.velocity.normalized()
+			for side in [-1.0, 1.0]:
+				missile.split_off(away.rotated(Vector3.UP, side * 0.5))
+		missile.fizzle()
+		mission.hud.spawn_popup("SHOT DOWN", missile.global_position, Color.WHITE)
+
+
+# Rubber Bullets: the round bounces into the nearest enemy around `at`
+# (not one it's sitting on). Hot Ricochets (a combo with Incendiary) sets
+# what it hits alight.
+func ricochet(at: Vector3) -> void:
+	var best: Node3D = null
+	var best_distance := RICOCHET_RANGE
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		var distance := enemy.global_position.distance_to(at)
+		if distance > minigun_radius and distance < best_distance:
+			best = enemy
+			best_distance = distance
+	if best == null:
+		return
+	var target := best
+	var streak := Tracer.new()
+	streak.radius = 0.18
+	streak.length = 2.0
+	streak.outline = 0.3
+	streak.color = Color.WHITE
+	streak.outline_color = Color.BLACK
+	MissionContext.spawn_parent(self).add_child(streak)
+	streak.setup(at, target.global_position, 0.12, 0.0, func(_where: Vector3) -> void:
+		if not is_instance_valid(target) or not target.is_in_group("enemies"):
+			return
+		damage_enemy(target, minigun_damage * RICOCHET_SHARE, true)
+		if mission.combo("rubber_bullets", "incendiary") and is_instance_valid(target) and burnable(target):
+			Burn.ignite(target, mission))
+	Sfx.play_3d("ricochet", at, 0.0, randf_range(0.9, 1.3), 0.0)
+
+
+func burnable(node: Node3D) -> bool:
+	return node is Building or node.get("leaves_wreck") == true
+
+
+# Shredder: the damage multiplier for one more round on `enemy`, ramping
+# while the rounds keep coming.
+func shred(enemy: Node3D) -> float:
+	var now := Time.get_ticks_msec()
+	var stack := 0.0
+	if enemy.has_meta("shred"):
+		var state: Array = enemy.get_meta("shred")
+		if now - int(state[1]) <= SHRED_GAP_MS:
+			stack = minf(float(state[0]) + SHRED_STEP, SHRED_MAX)
+	enemy.set_meta("shred", [stack, now])
+	last_shred = 1.0 + stack
+	last_shred_ms = now
+	return 1.0 + stack
+
+
+## Finisher (Shredder + Ram): the shred built up on `enemy`, spent.
+func cash_in_shred(enemy: Node3D) -> float:
+	if not enemy.has_meta("shred"):
+		return 0.0
+	var state: Array = enemy.get_meta("shred")
+	enemy.remove_meta("shred")
+	return float(state[0]) if Time.get_ticks_msec() - int(state[1]) <= SHRED_GAP_MS * 3 else 0.0
+
+
+# Double The Gun: every doubling halves accuracy (doubles the spread).
+func gun_spread_scale() -> float:
+	if mission == null:
+		return 1.0
+	return pow(2.0, int(mission.upgrades.get("double_gun", 0)))
+
+
+# Shredder's multiplier ("x2.4") under the reticle while rounds keep it
+# climbing, so you can see the focus paying off.
+func update_shred_label() -> void:
+	if shred_label == null:
+		if not upgraded("shredder"):
+			return
+		shred_label = Label.new()
+		shred_label.add_theme_font_size_override("font_size", UiStyle.px(16))
+		shred_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		shred_label.add_theme_constant_override("outline_size", 12)
+		shred_label.add_theme_stylebox_override("normal", UiStyle.plate(4.0))
+		shred_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cursor.get_parent().add_child(shred_label)
+	var climbing := Time.get_ticks_msec() - last_shred_ms < SHRED_GAP_MS and last_shred >= 1.3
+	shred_label.visible = climbing
+	if climbing:
+		shred_label.text = "x%.1f" % last_shred
+		shred_label.reset_size()
+		shred_label.position = get_viewport().get_mouse_position() + Vector2(-shred_label.size.x * 0.5, 70.0)

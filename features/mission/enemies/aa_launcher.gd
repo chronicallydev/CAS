@@ -29,8 +29,6 @@ const Missile := preload("res://features/mission/enemies/projectiles/aa_missile.
 @export var missile_eject_speed: float = 9.0
 @export var missile_eject_time: float = 1.0
 @export var missile_explosion: PackedScene
-# Flares don't break this launcher's lock (the heavy rocket truck).
-@export var lock_ignores_flares: bool = false
 
 @onready var launcher: Node3D = $Launcher
 @onready var rails: Node3D = $Launcher/Rails
@@ -88,9 +86,8 @@ func _physics_process(delta: float) -> void:
 		lock_timer = 0.0
 		return
 
-	# Lock on (flares break it unless lock_ignores_flares), then fire and
-	# reload.
-	if update_lock(heli, delta, lock_time, lock_ignores_flares):
+	# Lock on, then fire and reload.
+	if update_lock(heli, delta, lock_time):
 		reload_timer = reload_time
 		fire_at(heli)
 
