@@ -9,14 +9,28 @@ weapons and AA units) is parked in `_parked/`, outside the build. See
 ## Scenes
 
 ```
-TestRange (features/test_range/test_range.tscn, TestRangeContext)  <- main scene
+Run (features/run/run.tscn, RunContext)  <- main scene
+├── RunScreens               banners, upgrade picks, end screen
+├── Mission (features/mission/mission.tscn, MissionContext)
+│   ├── World                everything that pauses: camera, helicopter,
+│   │                        guns, environment, spawned enemies/effects
+│   └── GameHUD              score, kill pop-ups, multi-kills, edge arrows
+└── RunDirector              stretches, spawns, view and corridor
+
+TestRange (features/test_range/test_range.tscn, TestRangeContext)
 ├── Panel (TestRangePanel)   side panel: spawn, cheats, live stats
-└── Mission (features/mission/mission.tscn, MissionContext)
-    ├── World                everything that pauses: camera, helicopter,
-    │                        guns, environment, spawned enemies/effects
-    └── GameHUD              score, kill pop-ups, multi-kills, edge arrows
+└── Mission                  as above
 ```
 
+- **A run** (see DESIGN.md) is 6 stretches. `RunDirector` leads the
+  mission through each: *travel* (the view only scrolls forward,
+  `TopDownCamera.max_focus_z`, and the bottom of the screen is a wall,
+  `Helicopter.corridor`; SAM trucks appear ahead), then a *lock arena*
+  (view pinned, helicopter waves from a budget that grows each stretch),
+  then an upgrade pick (`RunUpgrades`, placeholders) with the game paused.
+  Terrain streams in ahead, a `DesertEnvironment` per stretch. The Cobra
+  flies with the minigun only. Shot down or done, the end screen offers
+  retry (R) or the test range (T); the test range's PLAY RUN comes back.
 - **The test range owns the mission.** It instantiates `mission.tscn`,
   spawns enemies into `mission.world` and rebuilds the mission on RESET
   RANGE or when the helicopter is shot down (`MissionContext.request_retry`).

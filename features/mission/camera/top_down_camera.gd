@@ -20,6 +20,12 @@ extends Node3D
 # ...and toward where the target is flying: seconds of its velocity.
 @export var velocity_lead: float = 0.12
 
+# Limits on the ground z the view centres on (screen up is -z). A run
+# (RunDirector) ratchets max_focus_z forward so the view never scrolls
+# back, and pins both to hold the view on a lock arena.
+var min_focus_z: float = -INF
+var max_focus_z: float = INF
+
 @export_group("Shake")
 # Largest sideways offset of the view at full trauma, in metres.
 @export var max_shake: float = 1.6
@@ -80,7 +86,9 @@ func _physics_process(delta: float) -> void:
 	if target == null:
 		return
 
-	var desired := ground_point() + get_lead() + offset
+	var focus := ground_point() + get_lead()
+	focus.z = clampf(focus.z, min_focus_z, max_focus_z)
+	var desired := focus + offset
 	global_position = global_position.lerp(desired, 1.0 - exp(-follow_speed * delta))
 	look_at(global_position - offset)
 

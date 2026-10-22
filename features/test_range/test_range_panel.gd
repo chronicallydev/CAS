@@ -333,6 +333,8 @@ func build_spawn(box: VBoxContainer) -> void:
 func build_helicopter(box: VBoxContainer) -> void:
 	box.add_child(section("HELICOPTER"))
 	box.add_child(button("RESET RANGE", range_context.rebuild, 16))
+	box.add_child(button("PLAY RUN", func() -> void:
+		get_tree().change_scene_to_file("res://features/run/run.tscn"), 16))
 
 	box.add_child(check("God mode (hits count, no damage)", range_context.god_mode, func(on: bool) -> void:
 		range_context.god_mode = on

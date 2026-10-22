@@ -111,6 +111,11 @@ var dead: bool = false
 var lock_warning_timer: float = 0.0
 # Past the edge of the area of operations.
 var out_of_bounds: bool = false
+# Set by a run (RunDirector): a rectangle (x, z) to stay in instead of the
+# round area of operations. See keep_in_corridor.
+var use_corridor: bool = false
+var corridor: Rect2 = Rect2()
+var corridor_margin: float = 6.0
 var flare_cooldown_left: float = 0.0
 var flare_protection_left: float = 0.0
 var dash_charges_left: int = 0
@@ -459,6 +464,9 @@ static func dash_ease(t: float) -> float:
 # Soft edge of the area of operations: push back past it, harder the
 # further out, and never more than bounds_overshoot beyond.
 func keep_in_bounds(delta: float) -> void:
+	if use_corridor:
+		keep_in_corridor(delta)
+		return
 	var flat := Vector2(position.x, position.z)
 	var over := flat.length() - bounds
 	out_of_bounds = over > 0.0
@@ -473,6 +481,28 @@ func keep_in_bounds(delta: float) -> void:
 		flat = flat.normalized() * (bounds + bounds_overshoot)
 		position.x = flat.x
 		position.z = flat.y
+
+
+# A run's corridor: inside `corridor` (x, z on the ground) it's pushed
+# back from the last corridor_margin metres of each edge and can't cross
+# them. The edges are the screen's, so there's no warning.
+func keep_in_corridor(delta: float) -> void:
+	var low := corridor.position
+	var high := corridor.end
+	var push := get_acceleration_rate() * 1.2
+	var over_low := Vector2(low.x + corridor_margin - position.x, low.y + corridor_margin - position.z)
+	var over_high := Vector2(position.x - (high.x - corridor_margin), position.z - (high.y - corridor_margin))
+	if over_low.x > 0.0:
+		velocity.x += push * minf(over_low.x / corridor_margin, 1.0) * delta
+	if over_high.x > 0.0:
+		velocity.x -= push * minf(over_high.x / corridor_margin, 1.0) * delta
+	if over_low.y > 0.0:
+		velocity.z += push * minf(over_low.y / corridor_margin, 1.0) * delta
+	if over_high.y > 0.0:
+		velocity.z -= push * minf(over_high.y / corridor_margin, 1.0) * delta
+	position.x = clampf(position.x, low.x, high.x)
+	position.z = clampf(position.z, low.y, high.y)
+	out_of_bounds = false
 
 
 func _process(delta: float) -> void:
