@@ -139,5 +139,5 @@ func pass_by() -> void:
 		return
 	Sfx.play_2d("missile_flyby", 0.0, 0.65)
 	mission.shake(0.15)
-	var text := "DODGED %d/%d" % [passes, max_passes]
+	var text := tr("DODGED %d/%d") % [passes, max_passes]
 	mission.hud.spawn_popup(text, heli.global_position, Color(0.55, 0.85, 1.0), passes >= max_passes)

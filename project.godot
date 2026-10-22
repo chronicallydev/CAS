@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="CasSimPrototype"
-run/main_scene="res://features/run/run.tscn"
+run/main_scene="res://features/menu/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 Sfx="*res://shared/audio/sfx.gd"
 Music="*res://shared/audio/music.gd"
 PixelArt="*res://shared/pixelart/pixel_art.gd"
+Settings="*res://shared/settings/settings.gd"
 
 [display]
 

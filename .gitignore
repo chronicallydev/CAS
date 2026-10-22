@@ -4,3 +4,6 @@
 
 # Music: kept locally, not in the repo (too big for the GitHub zip).
 /assets/music/
+
+# Exported builds (see export_presets.cfg).
+/build/

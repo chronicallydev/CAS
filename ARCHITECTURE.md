@@ -1,7 +1,7 @@
 # Architecture
 
 The build is cut down to the core: **flying and shooting**. Everything else
-(menu, hangar, campaign map, waves, rigs, pickups, saving, extra airframes,
+(the old menu, hangar, campaign map, waves, rigs, pickups, saving, extra airframes,
 weapons and AA units) is parked in `_parked/`, outside the build. See
 `_parked/README.md` for what's there and how to bring it back.
 `_parked/ARCHITECTURE.md` describes the full game as it was.
@@ -9,8 +9,12 @@ weapons and AA units) is parked in `_parked/`, outside the build. See
 ## Scenes
 
 ```
-Run (features/run/run.tscn, RunContext)  <- main scene
+MainMenu (features/menu/main_menu.tscn)  <- main scene
+                             play, test range, language, fullscreen, quit
+
+Run (features/run/run.tscn, RunContext)
 ├── RunScreens               banners, upgrade picks, end screen
+├── TakeoffIntro             the opening takeoff (skippable), then gone
 ├── Mission (features/mission/mission.tscn, MissionContext)
 │   ├── World                everything that pauses: camera, helicopter,
 │   │                        guns, environment, spawned enemies/effects
@@ -49,11 +53,15 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   `RunDirector.PLAN`'s `boss` flag places it.
   Terrain streams in ahead, a `DesertEnvironment` per stretch. The Cobra
   flies with the minigun only. Shot down or done, the end screen offers
-  retry (R) or the test range (T); the test range's PLAY RUN comes back.
+  retry (R) or the menu (M); Esc goes to the menu any time.
+- **The ace** (`enemy_ace.gd`, the mini boss; `PLAN`'s `ace` flag): an
+  enemy helicopter whose `STAGES` change how it fights as its hull drops
+  (passive, then full salvos, then heavy rockets alternating with
+  missiles). Beating it gives all three upgrades on offer.
 - **The test range owns the mission.** It instantiates `mission.tscn`,
   spawns enemies into `mission.world` and rebuilds the mission on RESET
   RANGE or when the helicopter is shot down (`MissionContext.request_retry`).
-  Esc quits.
+  Esc goes back to the menu.
 - **The mission wires its own children.** In `_ready()` it copies the
   airframe's stats onto the helicopter, builds the model, equips the guns
   and starts the HUD.
@@ -62,10 +70,31 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   `MissionContext.spawn_parent(self)`, the mission's `World` node, so it is
   all freed with the mission.
 
-`Sfx`, `Music` and `PixelArt` are the only autoloads. They are engine-level
-services and hold no game state. `PixelArt` also redirects every UI
+`Sfx`, `Music`, `PixelArt` and `Settings` are the only autoloads. They are
+engine-level services and hold no game state. `PixelArt` also redirects every UI
 CanvasLayer into its low-res, 1-bit UI viewport (the test range panel opts
-out with the `crisp_ui` meta); `UiStyle.px` sizes text to that grid.
+out with the `crisp_ui` meta); `UiStyle.px` sizes text to that grid, and
+`PixelArt.fit_canvas` scales the canvas so a low-res pixel is a whole
+number of canvas units at any window size (otherwise the pixel font loses
+columns).
+
+`Settings` holds the player's options (language, fullscreen; F11 or
+Alt+Enter) in `user://options.cfg`. **Text** is written in English and
+translated by the `TranslationServer`: `UkrainianStrings` maps each English
+string to Ukrainian. A Label whose whole text is a key translates itself;
+text put together in code uses `tr()` (or `Settings.t()` in static code)
+with the format string as the key. New player-facing text needs an entry
+there.
+
+## Web build
+
+`export_presets.cfg` has a Web preset (output `build/web/`, ignored by
+git). The web runs the Compatibility renderer, so `PixelArt` swaps in
+`pixel_outline_compat.gdshader` (silhouettes only: there's no normal
+buffer) and darkens the image to match Forward+ (`COMPAT_GAMMA`). Threads
+are off, so it runs on any host without special headers (itch.io
+included). Exporting needs the standard (non-.NET) Godot 4.7 editor with
+its export templates: the .NET editor can't export to the web.
 
 ## Loadout
 
@@ -156,9 +185,11 @@ features/
   mission/     mission context, plus:
 	camera/ player/ weapons/ enemies/ (projectiles/) effects/
 	environment/ hud/ vfx/
-  test_range/  test range context and its side panel (main scene)
-shared/        audio, pixelart, ui style, prop builder, helicopter model,
-			   3D health bar
+  menu/        the main menu (main scene)
+  run/         run context, director, screens, upgrades, takeoff intro
+  test_range/  test range context and its side panel
+shared/        audio, pixelart, settings and translations, ui style, prop
+			   builder, helicopter model, 3D health bar
 assets/        fonts, ui textures, audio files
 _parked/       out of the build (has a .gdignore), see its README
 ```

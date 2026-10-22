@@ -323,13 +323,13 @@ func update_weapon_label() -> void:
 	var parts: Array[String] = []
 	for slot in equipped.size():
 		var weapon := equipped[slot]
-		var text: String = WEAPON_NAMES[weapon]
+		var text := tr(WEAPON_NAMES[weapon])
 		if copies(weapon) > 1:
 			text += " x%d" % copies(weapon)
 		var reload := get_reload_left(weapon)
 		if reload > 0.0:
 			text += " (%.1f)" % reload
-		parts.append("%s %s" % [SLOT_NAMES[slot], text])
+		parts.append("%s %s" % [tr(SLOT_NAMES[slot]), text])
 	weapon_label.text = "     ".join(parts) if not parts.is_empty() else "NO WEAPONS"
 
 

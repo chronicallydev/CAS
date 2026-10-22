@@ -25,7 +25,13 @@ extends Node
 #
 # Approach adapted from "3D Pixel Art - Tutorial" by Eduardo Schildt (MIT).
 
-const OUTLINE_SHADER := preload("res://shared/pixelart/pixel_outline.gdshader")
+# Loaded by path, not preloaded: the full one only compiles on Forward+,
+# and the web build runs Compatibility (see outline_shader).
+const OUTLINE_SHADER := "res://shared/pixelart/pixel_outline.gdshader"
+const OUTLINE_SHADER_COMPAT := "res://shared/pixelart/pixel_outline_compat.gdshader"
+# Compatibility hands the 3D image to the palette pass brighter than
+# Forward+; this darkens it back (retro_palette.gdshader's source_gamma).
+const COMPAT_GAMMA := 2.6
 const PALETTE_SHADER := preload("res://shared/pixelart/retro_palette.gdshader")
 const UI_SHADER := preload("res://shared/pixelart/ui_1bit.gdshader")
 
@@ -88,7 +94,7 @@ func _ready() -> void:
 	# Full-screen outline quad. Drawn first among transparent objects, so
 	# smoke and explosions still render on top of it.
 	var material := ShaderMaterial.new()
-	material.shader = OUTLINE_SHADER
+	material.shader = outline_shader()
 	material.render_priority = -128
 	var quad := QuadMesh.new()
 	quad.size = Vector2(2, 2)
@@ -114,6 +120,8 @@ func _ready() -> void:
 	display.material = palette_material
 	palette = palette
 	dither = dither
+	if is_compatibility():
+		palette_material.set_shader_parameter("source_gamma", COMPAT_GAMMA)
 	layer.add_child(display)
 
 	build_ui()
@@ -143,6 +151,17 @@ func _process(delta: float) -> void:
 	# The scene camera keeps working for aiming and audio, but draws nothing.
 	camera.cull_mask = 0
 	sync_camera(camera)
+
+
+# The Compatibility renderer: what the web build runs.
+func is_compatibility() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
+
+# The outline pass for the renderer in use: Compatibility has no normal
+# buffer, so it gets the silhouette-only version.
+func outline_shader() -> Shader:
+	return load(OUTLINE_SHADER_COMPAT if is_compatibility() else OUTLINE_SHADER)
 
 
 ## Inverts the whole image for `seconds`: the 1-bit way to flash the
@@ -224,6 +243,8 @@ func build_ui() -> void:
 	ui_viewport.transparent_bg = true
 	ui_viewport.disable_3d = true
 	ui_viewport.size_2d_override_stretch = true
+	# Every item on whole low-res pixels (see fit_canvas).
+	ui_viewport.snap_2d_transforms_to_pixel = true
 	ui_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(ui_viewport)
 
@@ -243,17 +264,42 @@ func build_ui() -> void:
 
 
 ## Canvas units per low-res UI pixel, for sizing UI to the pixel grid (see
-## UiStyle.px).
+## UiStyle.px). Always a whole number (see fit_canvas).
 func ui_pixel_units() -> float:
 	var window := Vector2(get_window().size)
-	var canvas := get_viewport().get_visible_rect().size
-	var ui_pixel := maxi(1, roundi(window.y / target_height))
-	return ui_pixel * canvas.y / window.y
+	return ceilf(ui_pixel_size(window) / natural_scale(window) - 0.001)
+
+
+# Window pixels per low-res UI pixel.
+func ui_pixel_size(window: Vector2) -> int:
+	return maxi(1, roundi(window.y / target_height))
+
+
+# Window pixels per canvas unit as the project's stretch settings give it
+# (canvas_items, expand: the base size scaled to fit, the rest added on).
+func natural_scale(window: Vector2) -> float:
+	var base := Vector2(ProjectSettings.get_setting("display/window/size/viewport_width"), ProjectSettings.get_setting("display/window/size/viewport_height"))
+	return maxf(minf(window.x / base.x, window.y / base.y), 0.001)
+
+
+# A low-res UI pixel has to be a whole number of canvas units, or the pixel
+# font and 1px lines fall between low-res pixels and come out with columns
+# missing. The canvas is scaled (content_scale_factor) to round it up to
+# the next whole number, so the UI only ever comes out a little smaller
+# than laid out, never bigger than the screen.
+func fit_canvas() -> void:
+	var window := Vector2(get_window().size)
+	var factor := 1.0
+	if pixel_ui and window.y > 0.0:
+		factor = ui_pixel_size(window) / (natural_scale(window) * ui_pixel_units())
+	if absf(get_window().content_scale_factor - factor) > 0.0001:
+		get_window().content_scale_factor = factor
 
 
 # Sizes the UI viewport to the window in low-res pixels (as the 3D image),
 # with its 2D laid out in the usual canvas coordinates over the same area.
 func sync_ui() -> void:
+	fit_canvas()
 	ui_layer.visible = pixel_ui
 	if not pixel_ui:
 		return

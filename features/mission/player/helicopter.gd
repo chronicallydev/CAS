@@ -558,13 +558,13 @@ func update_hud(delta: float) -> void:
 		if dash_recharge_left <= 0.0:
 			dash_charges_left += 1
 			dash_recharge_left = dash_cooldown
-	var dash_text := "DASH %d/%d [SPACE]" % [dash_charges_left, dash_charges]
+	var dash_text := tr("DASH %d/%d [SPACE]") % [dash_charges_left, dash_charges]
 	if dash_charges_left < dash_charges:
-		dash_text = "DASH %d/%d %.1fs" % [dash_charges_left, dash_charges, dash_recharge_left]
+		dash_text = tr("DASH %d/%d %.1fs") % [dash_charges_left, dash_charges, dash_recharge_left]
 	guard_cooldown_left = maxf(guard_cooldown_left - delta, 0.0)
 	guard_left = maxf(guard_left - delta, 0.0)
 	if mission.upgraded("rotor_guard"):
-		dash_text += "\nGUARD " + ("READY" if guard_cooldown_left <= 0.0 else "%.0fs" % guard_cooldown_left)
+		dash_text += "\n%s %s" % [tr("GUARD"), tr("READY") if guard_cooldown_left <= 0.0 else tr("%.0fs") % guard_cooldown_left]
 	ability_label.text = dash_text
 
 	var incoming := false
@@ -673,6 +673,7 @@ func build_hud() -> void:
 	ability_label = Label.new()
 	ability_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ability_label.add_theme_font_size_override("font_size", UiStyle.px(16))
+	ability_label.add_theme_constant_override("line_spacing", UiStyle.line_gap(UiStyle.px(16)))
 	ability_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5))
 	ability_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	ability_label.add_theme_constant_override("outline_size", 12)

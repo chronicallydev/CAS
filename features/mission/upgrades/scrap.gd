@@ -56,6 +56,6 @@ func _physics_process(delta: float) -> void:
 	var under := heli.ground_under()
 	if Vector2(under.x - global_position.x, under.z - global_position.z).length() <= PICKUP:
 		heli.repair(REPAIR)
-		mission.hud.spawn_popup("+%d HULL" % REPAIR, global_position, Color.WHITE)
+		mission.hud.spawn_popup(tr("+%d HULL") % REPAIR, global_position, Color.WHITE)
 		Sfx.play_2d("ui_click", 0.0, 1.4)
 		queue_free()

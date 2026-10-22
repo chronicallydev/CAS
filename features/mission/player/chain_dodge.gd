@@ -123,7 +123,7 @@ func on_dash(velocity_before: Vector3) -> bool:
 	var slow := maxf(slow_time * pow(slow_shrink, chain - 1), min_slow_time)
 	if upgraded("time_bank"):
 		slow = slow_time + TIME_BANK_PER_MISSILE * dodged.size()
-		mission.hud.spawn_popup("TIME BANK +%.1fs" % (slow - slow_time), helicopter.global_position, Color.WHITE, false, true)
+		mission.hud.spawn_popup(tr("TIME BANK +%.1fs") % (slow - slow_time), helicopter.global_position, Color.WHITE, false, true)
 	start_slow(slow)
 	if upgraded("grace"):
 		grace_left = GRACE_TIME

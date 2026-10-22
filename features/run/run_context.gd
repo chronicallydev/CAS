@@ -1,15 +1,16 @@
 class_name RunContext
 extends Node
 
-## A run: the game's main scene (see DESIGN.md).
+## A run (see DESIGN.md), started from the main menu (MainMenu).
 ##
 ## It owns a mission (mission.tscn, flown with the minigun only) and a
-## RunDirector that leads it through the stretches. Between stretches it
+## RunDirector that leads it through the stretches, once the takeoff
+## (TakeoffIntro, skippable) has played. Between stretches it
 ## pauses for an upgrade pick (RunUpgrades); being shot down or clearing
 ## the last arena ends the run with its numbers, and R starts a new one.
-## T on the end screen opens the test range. Esc quits.
+## M on the end screen, or Esc at any time, goes back to the menu.
 
-const TEST_RANGE := "res://features/test_range/test_range.tscn"
+const MENU := "res://features/menu/main_menu.tscn"
 # Hull patched up after each cleared arena.
 const STRETCH_HEAL := 20
 # Game seconds between an arena clearing and the upgrade pick.
@@ -53,7 +54,8 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		get_tree().quit()
+		get_tree().paused = false
+		get_tree().change_scene_to_file(MENU)
 
 
 func start_run() -> void:
@@ -90,18 +92,24 @@ func start_run() -> void:
 	director.boss_built.connect(_on_boss_built)
 	director.ace_arrived.connect(func(unit: Node3D) -> void:
 		ace = unit
-		screens.show_boss_bar("ACE"))
+		screens.show_boss_bar("ACE")
+		unit.stage_changed.connect(func(stage: int) -> void:
+			screens.show_banner("THE ACE GETS SERIOUS" if stage == 2 else "HEAVY ROCKETS")))
 	director.targets_changed.connect(_on_targets_changed)
 	director.held_by.connect(func(what: String) -> void:
 		screens.hide_go()
-		screens.show_banner("CLEAR THE SAMS" if what == "SAMS" else "DESTROY THE " + what))
+		screens.show_banner("CLEAR THE SAMS" if what == "SAMS" else tr("DESTROY THE %s") % tr(what)))
 	director.path_cleared.connect(_on_path_cleared)
 	director.leftovers_changed.connect(screens.show_leftovers)
 	director.convoy_escaped.connect(func() -> void:
 		screens.show_banner("CONVOY ESCAPED"))
 	director.arena_cleared.connect(_on_arena_cleared)
 	director.run_complete.connect(_on_run_complete)
-	director.setup(mission)
+	# The run proper starts once the helicopter has taken off.
+	var intro := TakeoffIntro.new()
+	add_child(intro)
+	intro.finished.connect(func() -> void: director.setup(mission))
+	intro.play(mission)
 
 
 func _on_stretch_started(index: int) -> void:
@@ -128,7 +136,7 @@ func _on_arena_cleared(_index: int) -> void:
 	screens.show_banner("ACE DOWN" if director.has_ace() else "ARENA CLEAR")
 	Sfx.play_2d("combo")
 	mission.helicopter.repair(STRETCH_HEAL)
-	mission.hud.spawn_popup("+%d HULL" % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true)
+	mission.hud.spawn_popup(tr("+%d HULL") % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true)
 	await get_tree().create_timer(PICK_DELAY, false).timeout
 	if over or mission.helicopter.dead:
 		return
@@ -154,7 +162,7 @@ func _on_arena_cleared(_index: int) -> void:
 		Music.duck(false)
 		get_tree().paused = false
 		if not completed.is_empty():
-			screens.show_banner("COMBO: " + " + ".join(completed.map(func(combo: Dictionary) -> String: return combo.name)))
+			screens.show_banner(tr("COMBO: %s") % " + ".join(completed.map(func(combo: Dictionary) -> String: return tr(combo.name))))
 		director.next_stretch())
 
 
@@ -176,13 +184,13 @@ func end_run(title: String) -> void:
 	get_tree().paused = true
 	Music.play("run_complete" if director.state == RunDirector.State.DONE else "shot_down")
 	var lines := [
-		"Stretch %d / %d" % [director.stretch + 1, stretch_count],
-		"Kills %d     Score %d" % [mission.guns.kills, mission.score],
-		"Best chain %d" % best_chain,
+		tr("Stretch %d / %d") % [director.stretch + 1, stretch_count],
+		tr("Kills %d     Score %d") % [mission.guns.kills, mission.score],
+		tr("Best chain %d") % best_chain,
 	]
 	screens.show_end(title, lines, start_run, func() -> void:
 		get_tree().paused = false
-		get_tree().change_scene_to_file(TEST_RANGE))
+		get_tree().change_scene_to_file(MENU))
 
 
 func _on_targets_changed(left: int, total: int) -> void:
@@ -195,9 +203,9 @@ func _on_targets_changed(left: int, total: int) -> void:
 
 
 func update_title() -> void:
-	var text := "STRETCH %d / %d" % [director.stretch + 1, stretch_count]
+	var text := tr("STRETCH %d / %d") % [director.stretch + 1, stretch_count]
 	if targets_total > 0:
-		text += "    TARGETS %d / %d" % [targets_total - targets_left, targets_total]
+		text += "    " + tr("TARGETS %d / %d") % [targets_total - targets_left, targets_total]
 	mission.hud.title_label.text = text
 
 

@@ -24,6 +24,15 @@ static func px(size: float) -> int:
 	return roundi(FONT_GRID * PixelArt.ui_pixel_units() * maxi(1, roundi(size / 48.0)))
 
 
+## Extra line spacing for a label at `font_size` (from px), so its later
+## lines sit on the low-res pixel grid like its first: off it, every other
+## line loses a row of pixels.
+static func line_gap(font_size: int) -> int:
+	var units := PixelArt.ui_pixel_units()
+	var height := FONT.get_height(font_size)
+	return roundi(ceilf(height / units - 0.001) * units - height)
+
+
 ## A solid black backing for HUD text, so it reads over the dithered ground
 ## in 1-bit.
 static func plate(margin: float = 10.0) -> StyleBoxFlat:

@@ -144,7 +144,7 @@ static func held_names(mission: MissionContext) -> Array:
 		var upgrade := find(id)
 		if upgrade.is_empty():
 			continue
-		var name: String = upgrade.name
+		var name := Settings.t(upgrade.name)
 		if upgrade.get("stackable", false):
 			name += " x%d" % int(mission.upgrades[id])
 		names.append(name)
@@ -152,11 +152,13 @@ static func held_names(mission: MissionContext) -> Array:
 
 
 ## Card text: number, name, category and role, what it does, and any
-## combo it would complete.
+## combo it would complete, in the current language.
 static func card_text(index: int, upgrade: Dictionary, mission: MissionContext) -> String:
-	var text := "%d  %s\n%s - %s\n\n%s" % [index, upgrade.name, upgrade.category.to_upper(), ROLE_LABELS[upgrade.role], upgrade.text]
+	var category := Settings.t(upgrade.category.to_upper())
+	var role := Settings.t(ROLE_LABELS[upgrade.role])
+	var text := "%d  %s\n%s - %s\n\n%s" % [index, Settings.t(upgrade.name), category, role, Settings.t(upgrade.text)]
 	if upgrade.get("stackable", false) and mission.upgrades.has(upgrade.id):
-		text += "\n\n(%d GUNS NOW)" % roundi(pow(2.0, int(mission.upgrades[upgrade.id])))
+		text += "\n\n" + Settings.t("(%d GUNS NOW)") % roundi(pow(2.0, int(mission.upgrades[upgrade.id])))
 	for combo: Dictionary in combos_with(upgrade.id, mission):
-		text += "\n\nCOMBO: " + combo.name
+		text += "\n\n" + Settings.t("COMBO: %s") % Settings.t(combo.name)
 	return text

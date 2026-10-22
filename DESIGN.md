@@ -142,10 +142,13 @@ Variety comes from **missile types**, not from many units.
 - **Bosses**: an ace helicopter (dogfight) and a fortress or carrier
   destroyed piece by piece (target fight).
 - **The ace** (built, the third stretch's arena, over open ground): a
-  fast, armoured helicopter with a scout escort, firing five-missile
-  salvos. The gun barely scratches it, so it comes down to its own
-  missiles deflected back, while it dashes clear or sends some back
-  again. Beating it gives all three upgrades on offer instead of one.
+  fast, armoured helicopter with a scout escort. The gun barely scratches
+  it, so it comes down to its own missiles deflected back. It fights in
+  three stages as its hull drops: at first it hangs back and fires pairs
+  of missiles; below 70% it closes in with four-missile salvos and starts
+  sending deflections back; below 35% it alternates heavy-rocket salvos
+  (dodge only) with missile salvos (to deflect and finish it). Beating it
+  gives all three upgrades on offer instead of one.
 - **The fortress** (built, the final arena; about 90 s): a keep inside a
   wall ring with five emplacements (two SAM batteries, two flak guns, a
   heavy rocket rail). Deflected missiles home on the emplacements, so

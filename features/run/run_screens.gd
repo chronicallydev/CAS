@@ -11,7 +11,7 @@ extends CanvasLayer
 #   boss bar   - the boss's name and health across the top
 #   picks      - pick one of three upgrades (click, or 1 / 2 / 3)
 #   end screen - shot down or run complete, with the run's numbers and
-#                retry (R) / test range (T)
+#                retry (R) / menu (M)
 
 const PAPER := Color.WHITE
 const INK := Color.BLACK
@@ -124,7 +124,7 @@ func show_leftovers(count: int) -> void:
 	if count <= 0:
 		left_label.modulate.a = 0.0
 		return
-	left_label.text = "%d LEFT" % count
+	left_label.text = tr("%d LEFT") % count
 	place_top(left_label, 0.1)
 	left_label.modulate.a = 1.0
 	left_label.pivot_offset = left_label.size * 0.5
@@ -210,8 +210,8 @@ func show_picks(title: String, options: Array, on_pick: Callable) -> void:
 
 # --- End screen ----------------------------------------------------------------
 
-## The run is over: `lines` of numbers, then retry and test range.
-func show_end(title: String, lines: Array, on_retry: Callable, on_test_range: Callable) -> void:
+## The run is over: `lines` of numbers, then retry and back to the menu.
+func show_end(title: String, lines: Array, on_retry: Callable, on_menu: Callable) -> void:
 	var box := open_overlay(title)
 	for line: String in lines:
 		var label := text_label(line, 30, INK)
@@ -227,13 +227,13 @@ func show_end(title: String, lines: Array, on_retry: Callable, on_test_range: Ca
 			close_overlay()
 			action.call()
 	var retry_action: Callable = close_then.call(on_retry)
-	var test_range_action: Callable = close_then.call(on_test_range)
+	var menu_action: Callable = close_then.call(on_menu)
 	var retry := card_button("RETRY  [R]", retry_action)
-	var test_range := card_button("TEST RANGE  [T]", test_range_action)
-	for button in [retry, test_range]:
+	var menu := card_button("MENU  [M]", menu_action)
+	for button in [retry, menu]:
 		button.custom_minimum_size = Vector2(560, 130)
 		row.add_child(button)
-	end_actions = {KEY_R: retry_action, KEY_T: test_range_action}
+	end_actions = {KEY_R: retry_action, KEY_M: menu_action}
 
 
 # --- Pieces --------------------------------------------------------------------
@@ -307,7 +307,7 @@ func card_button(text: String, action: Callable) -> Button:
 	return button
 
 
-func box_style(fill: Color, border: int, margin: float) -> StyleBoxFlat:
+static func box_style(fill: Color, border: int, margin: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = INK if fill == PAPER else PAPER
@@ -316,10 +316,11 @@ func box_style(fill: Color, border: int, margin: float) -> StyleBoxFlat:
 	return style
 
 
-func text_label(text: String, size: int, color: Color = PAPER) -> Label:
+static func text_label(text: String, size: int, color: Color = PAPER) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", UiStyle.px(size))
+	label.add_theme_constant_override("line_spacing", UiStyle.line_gap(UiStyle.px(size)))
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", INK)
 	label.add_theme_constant_override("outline_size", 14)

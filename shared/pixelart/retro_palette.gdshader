@@ -29,6 +29,10 @@ uniform float levels = 8.0;
 uniform float dither = 0.5;
 // The camera's position in low-res pixels (set by pixel_art.gd).
 uniform ivec2 dither_offset = ivec2(0);
+// Gamma applied to the image first. The Compatibility renderer (the web
+// build) hands the 3D image over brighter than Forward+, so pixel_art.gd
+// darkens it there to match.
+uniform float source_gamma = 1.0;
 // Inverts the whole image (the 1-bit damage flash; see PixelArt.invert_flash).
 uniform bool invert = false;
 
@@ -100,6 +104,7 @@ vec3 shade(vec3 srgb, float threshold) {
 
 void fragment() {
 	vec4 source = texture(TEXTURE, UV);
+	source.rgb = pow(max(source.rgb, vec3(0.0)), vec3(source_gamma));
 	if (mode == 0) {
 		COLOR = source;
 	} else {

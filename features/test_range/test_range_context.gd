@@ -8,7 +8,7 @@ extends Node
 ## would anywhere else, but enemies are spawned by hand. The side panel
 ## (TestRangePanel) picks what to spawn and toggles cheats. Middle-click or
 ## G drops the chosen unit at the cursor. Losing the helicopter resets the
-## range. Esc quits.
+## range. Esc goes back to the main menu.
 
 @export var mission_scene: PackedScene
 @export var panel: TestRangePanel
@@ -76,7 +76,8 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		get_tree().quit()
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://features/menu/main_menu.tscn")
 		return
 	var spawn_click: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE
 	var spawn_key: bool = event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_G

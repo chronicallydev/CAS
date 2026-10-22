@@ -82,9 +82,10 @@ func _on_perfect_dodge(chain: int, missiles: Array) -> void:
 	spawn_ring(heli.global_position, chain)
 	slide_bars(1.0, 0.12)
 
-	var text := "PERFECT" if chain == 1 else "PERFECT x%d" % chain
+	var prefix := ""
 	if missiles.size() > 1:
-		text = "DOUBLE " + text if missiles.size() == 2 else "MULTI " + text
+		prefix = "DOUBLE " if missiles.size() == 2 else "MULTI "
+	var text := tr(prefix + "PERFECT") if chain == 1 else tr(prefix + "PERFECT x%d") % chain
 	punch(callout, text, 1.0 + minf(chain - 1, 5) * 0.12)
 
 
@@ -96,7 +97,7 @@ func _on_slow_ended() -> void:
 func _on_chain_ended(chain: int) -> void:
 	if chain < 2:
 		return
-	banner.text = "CHAIN x%d" % chain
+	banner.text = tr("CHAIN x%d") % chain
 	banner.reset_size()
 	banner.position = (size - banner.size) * Vector2(0.5, 0.28)
 	banner.pivot_offset = banner.size * 0.5
@@ -122,7 +123,7 @@ func enemy_reflect(at: Vector3, rallies: int) -> void:
 	var label := make_text(36)
 	label.add_theme_color_override("font_color", INK)
 	label.add_theme_color_override("font_outline_color", PAPER)
-	label.text = "REVERSED" if rallies == 1 else "RALLY x%d" % (rallies + 1)
+	label.text = tr("REVERSED") if rallies == 1 else tr("RALLY x%d") % (rallies + 1)
 	label.reset_size()
 	label.pivot_offset = label.size * 0.5
 	var anchor := at + Vector3.UP * 3.0
@@ -146,7 +147,7 @@ func deflect_kill(at: Vector3, kills: int) -> void:
 	if PixelArt.is_monochrome():
 		PixelArt.invert_flash(0.05)
 	spawn_ring(at, 1)
-	var text := "DEFLECT KILL" if kills == 1 else "DEFLECT KILL x%d" % kills
+	var text := tr("DEFLECT KILL") if kills == 1 else tr("DEFLECT KILL x%d") % kills
 	var label := make_text(34)
 	var anchor := at + Vector3.UP * 3.0
 	var follow := func(rise: float) -> void:

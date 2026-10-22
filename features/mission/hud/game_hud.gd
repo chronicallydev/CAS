@@ -72,9 +72,9 @@ func _process(delta: float) -> void:
 
 	# Count the score up smoothly.
 	shown_score = move_toward(shown_score, mission.score, maxf(200.0, absf(mission.score - shown_score) * 6.0) * delta)
-	score_label.text = "SCORE  %s" % UiStyle.format_money(int(shown_score))
+	score_label.text = "%s  %s" % [tr("SCORE"), UiStyle.format_money(int(shown_score))]
 	if gun != null:
-		score_label.text += "     KILLS  %d" % gun.kills
+		score_label.text += "     %s  %d" % [tr("KILLS"), gun.kills]
 
 
 func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -82,6 +82,7 @@ func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGN
 	label.text = text
 	label.horizontal_alignment = align
 	label.add_theme_font_size_override("font_size", UiStyle.px(size))
+	label.add_theme_constant_override("line_spacing", UiStyle.line_gap(UiStyle.px(size)))
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 12)
@@ -121,7 +122,7 @@ func build_readout() -> void:
 func register_kill(points: int, world_position: Vector3, label: String) -> void:
 	var text := "+%d" % points
 	if label != "":
-		text += " " + label
+		text += " " + tr(label)
 
 	var color := TEXT
 	if points >= 300:
@@ -169,13 +170,13 @@ func finish_combo() -> void:
 	var bonus := 10 * count * (count - 1)
 	mission.add_score(bonus)
 
-	var title := "MULTI KILL x%d" % count
+	var title := tr("MULTI KILL x%d") % count
 	match count:
-		2: title = "DOUBLE KILL"
-		3: title = "TRIPLE KILL"
-		4: title = "QUAD KILL"
+		2: title = tr("DOUBLE KILL")
+		3: title = tr("TRIPLE KILL")
+		4: title = tr("QUAD KILL")
 	if count >= 8:
-		title = "MASSACRE x%d" % count
+		title = tr("MASSACRE x%d") % count
 
 	combo_label.text = "%s   +%s" % [title, UiStyle.format_money(bonus)]
 	Sfx.play_2d("combo")

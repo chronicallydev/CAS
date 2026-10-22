@@ -38,6 +38,7 @@ const PLAYLISTS := {
 	"shot_down": ["18_waiting"],
 	"run_complete": ["05_brotherhood"],
 	"test_range": ["04_sparring_session", "11_squad_building"],
+	"menu": ["01_title_screen"],
 }
 
 var players: Array[AudioStreamPlayer] = []
@@ -63,6 +64,13 @@ func _ready() -> void:
 		add_child(player)
 		player.finished.connect(_on_finished.bind(player))
 		players.append(player)
+
+
+# Quitting mid-track: let go of the stream, or it's reported leaked at exit.
+func _exit_tree() -> void:
+	for player in players:
+		player.stop()
+		player.stream = null
 
 
 func play(list: String) -> void:

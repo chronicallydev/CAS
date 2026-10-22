@@ -313,7 +313,7 @@ func deflect(homing: bool, split: bool = false) -> void:
 		model.scale *= 1.15
 	if mission.upgraded("absorb"):
 		mission.helicopter.repair(ABSORB_REPAIR)
-		mission.hud.spawn_popup("+%d HULL" % ABSORB_REPAIR, mission.helicopter.global_position, Color.WHITE, false, true)
+		mission.hud.spawn_popup(tr("+%d HULL") % ABSORB_REPAIR, mission.helicopter.global_position, Color.WHITE, false, true)
 	if mission.upgraded("split"):
 		# Chain Reaction (with Overcharge): the halves keep the full blast.
 		if not mission.combo("split", "overcharge"):
