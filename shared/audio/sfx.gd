@@ -51,9 +51,8 @@ const MIX := {
 	"hit_tick": -18.0,
 	"kill_tick": -11.0,
 	"combo": -6.0,
-	# Minigun spin-up whine and overheat hiss.
+	# Minigun spin-up whine.
 	"spin_up": -15.0,
-	"overheat": -5.0,
 	# Rocket pods and the FAB bomb.
 	"rocket_fire": -9.0,
 	"bomb_release": -6.0,
@@ -121,7 +120,6 @@ func _ready() -> void:
 	streams["kill_tick"] = make_stream(synth_blips([1700.0, 2550.0], 0.05))
 	streams["combo"] = make_stream(synth_blips([880.0, 1175.0, 1760.0], 0.08))
 	streams["spin_up"] = make_stream(synth_spin_up())
-	streams["overheat"] = make_stream(synth_overheat())
 	streams["rocket_fire"] = streams["missile_launch"]
 	streams["bomb_release"] = make_stream(synth_clang(0.4, [140.0, 390.0, 820.0], 9.0))
 	streams["bomb_whistle"] = make_stream(synth_whistle())
@@ -484,23 +482,6 @@ func synth_spin_up() -> PackedFloat32Array:
 		phase += lerpf(180.0, 720.0, progress * progress) / RATE
 		var env := minf(t / 0.02, 1.0) * (1.0 if progress < 0.85 else (1.0 - progress) / 0.15)
 		out[i] = (sin(TAU * phase) * 0.6 + sin(TAU * phase * 3.0) * 0.25 + noise() * 0.05) * env
-	return out
-
-
-# Overheat: a metallic clunk followed by a steam hiss.
-func synth_overheat() -> PackedFloat32Array:
-	var duration := 0.8
-	var n := int(duration * RATE)
-	var out := PackedFloat32Array()
-	out.resize(n)
-	var prev := 0.0
-	for i in n:
-		var t := float(i) / RATE
-		var clunk := (sin(TAU * 220.0 * t) + 0.5 * sin(TAU * 610.0 * t)) * exp(-t * 30.0)
-		var white := noise()
-		var hiss := (white - prev) * minf(t / 0.05, 1.0) * exp(-t * 3.5)
-		prev = white
-		out[i] = clunk * 0.9 + hiss * 0.6
 	return out
 
 

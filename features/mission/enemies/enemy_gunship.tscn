@@ -6,7 +6,7 @@
 
 [node name="EnemyGunship" type="Node3D"]
 script = ExtResource("1_heli")
-max_health = 50.0
+max_health = 40.0
 light_armor = 0.5
 score_value = 200
 display_name = "GUNSHIP"
@@ -26,7 +26,7 @@ turn_rate = 2.5
 max_tilt_degrees = 20.0
 engage_range = 80.0
 lock_time = 1.8
-reload_time = 6.5
+reload_time = 5.5
 salvo_size = 4
 salvo_spacing = 0.28
 missile_damage = 34.0

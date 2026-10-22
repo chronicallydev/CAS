@@ -362,7 +362,9 @@ func fly_deflected(delta: float) -> void:
 		detonate()
 
 
-func is_valid_enemy(enemy: Node) -> bool:
+# Untyped: `enemy` may already have been freed, and a typed argument
+# would reject it before the check below.
+func is_valid_enemy(enemy: Variant) -> bool:
 	return enemy != null and is_instance_valid(enemy) and not enemy.is_queued_for_deletion() and enemy.get("health") > 0.0
 
 

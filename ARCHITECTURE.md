@@ -26,11 +26,11 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   mission through each: *travel* (the view only scrolls forward,
   `TopDownCamera.max_focus_z`, and the bottom of the screen is a wall,
   `Helicopter.corridor`; SAM trucks and `TravelObjective`s appear ahead,
-  and the view won't scroll past a live one), then a *lock arena* over a
-  `City` (view pinned, helicopter waves from a budget that grows each
-  stretch; it clears once the waves are down and the city's marked
-  targets are destroyed), then an upgrade pick (`RunUpgrades`,
-  placeholders) with the game paused.
+  and the view won't scroll past a live one), then a *lock arena* (view
+  pinned, helicopter waves; from the second stretch it's over a `City`,
+  reinforced while its marked targets stand, and clears once they're
+  destroyed), then an upgrade pick (`RunUpgrades`, placeholders) with the
+  game paused. What each stretch holds is the table `RunDirector.PLAN`.
 - **Buildings** (`features/mission/structures/building.gd`) aren't
   enemies: they're in the `structures` group, which `GunController`
   damages by footprint, and break in stages down to rubble. `City` and

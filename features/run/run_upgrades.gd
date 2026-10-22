@@ -17,7 +17,6 @@ const LIST := [
 	{"id": "focus", "name": "FOCUS", "text": "Perfect dodge window\n+0.08s"},
 	{"id": "bullet_time", "name": "BULLET TIME", "text": "Slow motion lasts\n+0.4s"},
 	{"id": "spin_up", "name": "SPIN UP", "text": "Minigun fires\n25% faster"},
-	{"id": "coolant", "name": "COOLANT", "text": "Minigun heats up\n40% slower"},
 ]
 
 static var _defaults: Dictionary = {}
@@ -53,8 +52,6 @@ static func apply(id: String, mission: MissionContext) -> void:
 			ChainDodge.tune("slow_time", ChainDodge.slow_time + 0.4)
 		"spin_up":
 			guns.minigun_rpm *= 1.25
-		"coolant":
-			guns.minigun_heat_time *= 1.4
 
 
 static func heal(heli: Helicopter, amount: float) -> void:

@@ -445,37 +445,37 @@ static func make(kind_name: String, footprint: Vector2, as_target: bool = false)
 	match kind_name:
 		"house":
 			building.size = Vector3(footprint.x, randf_range(3.5, 5.0), footprint.y)
-			building.max_health = 30.0
+			building.max_health = 14.0
 			building.occupants = randi_range(0, 1)
 		"block":
 			building.size = Vector3(footprint.x, randf_range(6.0, 8.5), footprint.y)
-			building.max_health = 70.0
+			building.max_health = 28.0
 			building.occupants = randi_range(1, 3)
 			building.score_value = 50
 		"warehouse":
 			building.size = Vector3(footprint.x, randf_range(4.5, 6.0), footprint.y)
-			building.max_health = 50.0
+			building.max_health = 22.0
 			building.score_value = 35
 		"hq":
 			building.size = Vector3(footprint.x, 9.0, footprint.y)
-			building.max_health = 140.0
+			building.max_health = 60.0
 			building.occupants = 3
 			building.display_name = "HQ"
 		"radar":
 			building.size = Vector3(footprint.x, 5.0, footprint.y)
-			building.max_health = 90.0
+			building.max_health = 40.0
 			building.occupants = 1
 			building.display_name = "RADAR"
 		"ammo_dump":
 			building.size = Vector3(footprint.x, 2.6, footprint.y)
-			building.max_health = 80.0
+			building.max_health = 36.0
 			building.light_armor = 0.4
 			building.explosive = true
 			building.blast_radius = 20.0
 			building.display_name = "AMMO DUMP"
 		"fuel_tank":
 			building.size = Vector3(footprint.x, randf_range(5.0, 7.0), footprint.x)
-			building.max_health = 45.0
+			building.max_health = 24.0
 			building.light_armor = 0.3
 			building.explosive = true
 			# Enough to set off the next tank over: depots go up in chains.

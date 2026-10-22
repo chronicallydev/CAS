@@ -46,10 +46,8 @@ const Rocket := preload("res://features/mission/weapons/rocket.gd")
 @export_group("Minigun")
 @export_range(1.0, 6000.0, 1.0) var minigun_rpm: float = 1800.0
 @export_range(0.0, 10.0, 0.05) var minigun_impact_delay: float = 0.35
-# Spread radius around the reticle when cold; grows by minigun_bloom as
-# the barrels heat up.
+# Spread radius around the reticle.
 @export_range(0.0, 50.0, 0.1) var minigun_spread: float = 2.0
-@export_range(0.0, 50.0, 0.1) var minigun_bloom: float = 3.0
 @export_range(0.1, 100.0, 0.1) var minigun_radius: float = 1.5
 @export_range(0.1, 100.0, 0.1) var minigun_damage: float = 1.0
 @export_range(0.05, 2.0, 0.05) var minigun_explosion_scale: float = 0.35
@@ -59,12 +57,6 @@ const Rocket := preload("res://features/mission/weapons/rocket.gd")
 @export_range(0.0, 1.0, 0.05) var ricochet_chance: float = 0.3
 # Barrels spin up for this long before the first round.
 @export_range(0.0, 3.0, 0.05) var minigun_spin_up: float = 0.4
-# Seconds of continuous fire until it overheats.
-@export_range(0.5, 30.0, 0.1) var minigun_heat_time: float = 3.0
-# Heat lost per second while not firing (1.0 = fully cool in a second).
-@export_range(0.05, 5.0, 0.05) var minigun_cool_rate: float = 0.5
-# How long an overheat locks the gun out.
-@export_range(0.1, 10.0, 0.1) var minigun_jam_time: float = 2.0
 
 
 @export_group("Rockets")
@@ -103,12 +95,8 @@ var kills : int = 0
 # Reticle flash when rounds land on an enemy.
 var hit_flash: float = 0.0
 var hit_was_kill: bool = false
-# Minigun state: heat 0..1, overheat lockout and barrel spin.
-var minigun_heat: float = 0.0
-var minigun_overheated: bool = false
+# Minigun barrel spin.
 var minigun_spin: float = 0.0
-var heat_bar: ColorRect
-var heat_fill: ColorRect
 # Rockets: shots left in the current salvo, time to the next, reload.
 var rockets_queued: int = 0
 var rocket_shot_timer: float = 0.0
@@ -117,7 +105,7 @@ var weapon_label: Label
 var mission: MissionContext
 # The enemy helicopter the reticle is locked on (see locked_air_target).
 var locked_target: Node3D
-# Test range cheat: no reloads, no minigun heat.
+# Test range cheat: no reloads.
 var infinite_ammo: bool = false
 
 # Pixels of the reticle image per canvas pixel (see Reticle).
@@ -160,7 +148,6 @@ func _ready() -> void:
 	kill_count.get_parent().add_child.call_deferred(weapon_label)
 	# Kills are shown in the HUD readout now.
 	kill_count.visible = false
-	build_heat_bar()
 	update_weapon_label()
 
 
@@ -209,8 +196,6 @@ func _process(delta: float) -> void:
 	kill_count.text = str(kills)
 	if infinite_ammo:
 		rocket_reload_timer = 0.0
-		minigun_heat = 0.0
-		minigun_overheated = false
 	# A button released over UI never reaches _unhandled_input; let go here.
 	for slot in equipped.size():
 		if trigger.get(equipped[slot], false) and not Input.is_mouse_button_pressed(SLOT_BUTTONS[slot]):
@@ -225,8 +210,8 @@ func _process(delta: float) -> void:
 
 	# A held minigun keeps firing at its (copy-multiplied) rate.
 	if trigger.get(Weapon.MINIGUN, false):
-		# Nothing until the barrels are up to speed, and nothing while jammed.
-		if minigun_overheated or minigun_spin < minigun_spin_up:
+		# Nothing until the barrels are up to speed.
+		if minigun_spin < minigun_spin_up:
 			fire_timers[Weapon.MINIGUN] = 0.0
 		else:
 			fire_gun(Weapon.MINIGUN, minigun_rpm, delta)
@@ -244,16 +229,10 @@ func update_cursor(delta: float) -> void:
 	var firing := is_firing()
 	cursor.scale = default_cursor_size * (0.9 if firing else 1.0)
 
-	# The minigun reticle opens up with the bloom.
-	if is_equipped(Weapon.MINIGUN):
-		cursor.scale *= 1.0 + minigun_heat * 0.45
-
-	# Tint the reticle red while the LMB weapon reloads or the minigun jams.
+	# Tint the reticle red while the LMB weapon reloads.
 	var primary_reloading := not equipped.is_empty() and get_reload_left(equipped[0]) > 0.0
 	if primary_reloading:
 		cursor.modulate = Color(1.0, 0.4, 0.4)
-	elif trigger.get(Weapon.MINIGUN, false) and minigun_overheated:
-		cursor.modulate = Color(1.0, 0.45, 0.25)
 	else:
 		cursor.modulate = Color.WHITE
 
@@ -319,8 +298,6 @@ func update_weapon_label() -> void:
 		var reload := get_reload_left(weapon)
 		if reload > 0.0:
 			text += " (%.1f)" % reload
-		elif weapon == Weapon.MINIGUN and minigun_overheated:
-			text += " OVERHEAT"
 		parts.append("%s %s" % [SLOT_NAMES[slot], text])
 	weapon_label.text = "     ".join(parts) if not parts.is_empty() else "NO WEAPONS"
 
@@ -410,8 +387,8 @@ func random_spread(spread: float) -> Vector3:
 
 # Minigun rounds land wherever the cursor currently points.
 func fire_minigun_round() -> void:
-	# Rounds scatter around the reticle, wider the hotter the barrels get.
-	var spread := minigun_spread + minigun_bloom * minigun_heat
+	# Rounds scatter around the reticle.
+	var spread := minigun_spread
 	var air := locked_air_target()
 	if air != null:
 		var from_air := take_muzzle(Weapon.MINIGUN)
@@ -462,10 +439,9 @@ func fire_air_round(from: Vector3, target: Node3D, spread: float) -> void:
 		spawn_impact(aim, minigun_explosion_scale * 0.6)
 
 
-# Spin-up, heat build-up while firing, cooling, and the overheat lockout.
-# All mounted miniguns share one heat gauge.
+# Barrels spin up while the trigger is held and wind down when let go.
 func update_minigun(delta: float) -> void:
-	var trigger_down: bool = trigger.get(Weapon.MINIGUN, false) and not minigun_overheated
+	var trigger_down: bool = trigger.get(Weapon.MINIGUN, false)
 
 	if trigger_down:
 		if minigun_spin <= 0.0:
@@ -473,54 +449,6 @@ func update_minigun(delta: float) -> void:
 		minigun_spin = minf(minigun_spin + delta, minigun_spin_up)
 	else:
 		minigun_spin = maxf(minigun_spin - delta * 2.0, 0.0)
-
-	if trigger_down and minigun_spin >= minigun_spin_up:
-		minigun_heat += delta / maxf(minigun_heat_time, 0.1)
-		if minigun_heat >= 1.0:
-			minigun_heat = 1.0
-			minigun_overheated = true
-			minigun_spin = 0.0
-			Sfx.play_2d("overheat")
-	elif minigun_overheated:
-		# Locked out until it has fully cooled.
-		minigun_heat -= delta / maxf(minigun_jam_time, 0.1)
-		if minigun_heat <= 0.0:
-			minigun_heat = 0.0
-			minigun_overheated = false
-	else:
-		minigun_heat = maxf(minigun_heat - delta * minigun_cool_rate, 0.0)
-
-	update_heat_bar()
-
-
-# Slim heat gauge under the reticle while a minigun is fitted.
-const HEAT_BAR_SIZE := Vector2(80, 5)
-
-func build_heat_bar() -> void:
-	heat_bar = ColorRect.new()
-	heat_bar.color = Color(0.05, 0.05, 0.05, 0.6)
-	heat_bar.size = HEAT_BAR_SIZE
-	heat_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	heat_fill = ColorRect.new()
-	heat_fill.size = Vector2(0, HEAT_BAR_SIZE.y)
-	heat_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	heat_bar.add_child(heat_fill)
-	kill_count.get_parent().add_child.call_deferred(heat_bar)
-
-
-func update_heat_bar() -> void:
-	if heat_bar == null:
-		return
-
-	heat_bar.visible = is_equipped(Weapon.MINIGUN) and minigun_heat > 0.01
-	heat_bar.position = get_viewport().get_mouse_position() + Vector2(-HEAT_BAR_SIZE.x * 0.5, 62)
-	heat_fill.size.x = HEAT_BAR_SIZE.x * minigun_heat
-
-	if minigun_overheated:
-		var blink := fmod(Time.get_ticks_msec() / 1000.0, 0.3) < 0.15
-		heat_fill.color = Color(1.0, 0.2, 0.15) if blink else Color(1.0, 0.6, 0.5)
-	else:
-		heat_fill.color = Color(0.95, 0.85, 0.3).lerp(Color(1.0, 0.3, 0.15), minigun_heat)
 
 
 # --- Rocket pods ---------------------------------------------------------

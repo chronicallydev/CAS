@@ -8,11 +8,13 @@ extends Node
 #            appear ahead as you reach them, and the view won't scroll a
 #            live one off the bottom: they have to be destroyed, not
 #            flown past.
-#   arena  - reaching the end locks the view over a city (city.gd):
-#            enemy helicopters defend it in waves, generated from a budget
-#            that grows each stretch (two waves in the last one, the
-#            stand-in for a boss). It clears once every wave is shot down
-#            and the city's marked targets are destroyed.
+#   arena  - reaching the end locks the view, over a city (city.gd) from
+#            the second stretch on. Enemy helicopters defend it in waves,
+#            and while targets still stand scouts keep flying in a few at a
+#            time, so it never turns into shooting an empty town. It clears
+#            once the targets are down and nothing is left in the air
+#            (waves not yet sent are skipped: fast is rewarded). An
+#            open-ground arena plays all its waves.
 #   clear  - arena_cleared fires; the run context shows an upgrade pick,
 #            then calls next_stretch(). After the last, run_complete.
 # Terrain streams in ahead: a DesertEnvironment per stretch, each its own
@@ -39,6 +41,23 @@ const GunshipScene := preload("res://features/mission/enemies/enemy_gunship.tscn
 # the route).
 const BIOMES := ["desert", "wadi", "oilfield", "saltflat", "refinery", "desert"]
 
+# The run's ramp: each stretch brings in one new thing. Per stretch:
+#   objectives - travel objectives, in the order they come
+#   sams, heavy - SAM trucks along the way (one more sits by each
+#                 objective)
+#   city       - [columns, rows, targets], or [] for open ground
+#   waves      - helicopter wave budgets: a scout costs 1, a gunship 2
+#   scouts     - how many helicopters may be up at once before more scouts
+#                trickle in, while targets still stand
+const PLAN := [
+	{"objectives": ["tank_line"], "sams": 1, "heavy": 0, "city": [], "waves": [1.0], "scouts": 0},
+	{"objectives": ["compound"], "sams": 1, "heavy": 0, "city": [2, 2, 1], "waves": [1.0], "scouts": 1},
+	{"objectives": ["convoy"], "sams": 2, "heavy": 1, "city": [3, 2, 2], "waves": [2.0], "scouts": 1},
+	{"objectives": ["depot", "tank_line"], "sams": 2, "heavy": 1, "city": [3, 3, 2], "waves": [2.0], "scouts": 2},
+	{"objectives": ["convoy", "compound"], "sams": 2, "heavy": 1, "city": [4, 3, 3], "waves": [2.0, 2.0], "scouts": 2},
+	{"objectives": ["depot", "convoy"], "sams": 3, "heavy": 1, "city": [4, 3, 4], "waves": [3.0, 3.0], "scouts": 3},
+]
+
 enum State { TRAVEL, ARENA, CLEARED, DONE }
 
 @export var stretch_count: int = 6
@@ -57,6 +76,10 @@ enum State { TRAVEL, ARENA, CLEARED, DONE }
 # A live SAM truck holds the view from scrolling on once it's this far
 # behind the view centre, so it stays on screen above the bottom edge.
 @export var sam_hold: float = 26.0
+# Seconds between one wave going down and the next coming in.
+@export var wave_gap: float = 2.5
+# Seconds between trickling scouts (see PLAN).
+@export var scout_interval: float = 4.0
 
 var mission: MissionContext
 var stretch: int = 0
@@ -79,6 +102,10 @@ var escaped: Array[String] = []
 # units still alive.
 var waves: Array = []
 var wave_units: Array = []
+# Counts down wave_gap before the next wave.
+var wave_timer: float = 0.0
+# Counts down scout_interval before the next trickling scout.
+var scout_timer: float = 0.0
 var environments: Dictionary = {}
 # Each stretch's city (built with the stretch), and the ground they take
 # up, kept clear of terrain props.
@@ -151,23 +178,25 @@ func corridor(far_z: float, near_z: float) -> Rect2:
 
 # --- Travel --------------------------------------------------------------------
 
-# Travel objectives spread along the stretch (one, two from the third
-# stretch on), each with a SAM truck beside it; then SAM trucks scattered
-# along the way: more each stretch, heavy ones from the third on.
+func plan() -> Dictionary:
+	return PLAN[mini(stretch, PLAN.size() - 1)]
+
+
+# The stretch's travel objectives (see PLAN) spread along it, each with a
+# SAM truck beside it, and its SAM trucks scattered along the way.
 func plan_travel(start: float) -> void:
 	pending.clear()
 	pending_objectives.clear()
-	var kinds := TravelObjective.KINDS.duplicate()
-	kinds.shuffle()
-	var count := 1 if stretch < 2 else 2
+	var kinds: Array = plan().objectives
+	var count := kinds.size()
 	for i in count:
 		var z := start - travel_length * (i + 1.0) / (count + 1.0) - randf_range(-15.0, 15.0)
 		var x := randf_range(-14.0, 14.0)
 		pending_objectives.append([kinds[i], Vector3(x, 0.0, z)])
 		var side := 1.0 if x < 0.0 else -1.0
 		pending.append([SamScene, Vector3(x + side * randf_range(22.0, 30.0), 0.0, z - randf_range(8.0, 16.0))])
-	var light := mini(1 + stretch, 4)
-	var heavy := 0 if stretch < 2 else mini(1 + stretch / 3, 2)
+	var light: int = plan().sams
+	var heavy: int = plan().heavy
 	for i in light + heavy:
 		var scene: PackedScene = HeavySamScene if i < heavy else SamScene
 		var z := randf_range(start - 70.0, start - travel_length + 10.0)
@@ -229,25 +258,27 @@ func gate() -> float:
 
 # --- Arena -----------------------------------------------------------------------
 
-# Budget per wave: a scout costs 1, a gunship 2 (likelier later on). The
-# last stretch has two waves.
+# The stretch's waves (see PLAN).
 func plan_waves() -> Array:
-	var budgets := [1.0 + stretch * 0.8]
-	if is_last_stretch():
-		budgets = [4.0, 5.0]
 	var planned: Array = []
-	for budget: float in budgets:
-		var wave: Array = []
-		var left := budget
-		while left >= 1.0:
-			if left >= 2.0 and randf() < 0.35 + stretch * 0.08:
-				wave.append(GunshipScene)
-				left -= 2.0
-			else:
-				wave.append(ScoutScene)
-				left -= 1.0
-		planned.append(wave)
+	for budget: float in plan().waves:
+		planned.append(make_wave(budget))
 	return planned
+
+
+# Helicopters for a budget: a scout costs 1, a gunship 2 (likelier later
+# on).
+func make_wave(budget: float) -> Array:
+	var wave: Array = []
+	var left := budget
+	while left >= 1.0:
+		if left >= 2.0 and randf() < 0.35 + stretch * 0.08:
+			wave.append(GunshipScene)
+			left -= 2.0
+		else:
+			wave.append(ScoutScene)
+			left -= 1.0
+	return wave
 
 
 func start_arena() -> void:
@@ -270,6 +301,7 @@ func start_arena() -> void:
 			vehicle.global_position = city.road_spot()
 		escaped.clear()
 	next_wave()
+	scout_timer = scout_interval
 	arena_started.emit(stretch)
 
 
@@ -283,16 +315,37 @@ func next_wave() -> void:
 		wave_units.append(spawn(wave[i], at))
 
 
+# While a city's targets stand, a scout flies in every scout_interval
+# whenever fewer than the stretch's limit are up (see PLAN).
+func trickle_scouts() -> void:
+	scout_timer -= get_physics_process_delta_time()
+	if scout_timer > 0.0:
+		return
+	if get_tree().get_nodes_in_group("air_enemies").size() >= plan().scouts:
+		return
+	scout_timer = scout_interval
+	var side := -1.0 if randf() < 0.5 else 1.0
+	spawn(ScoutScene, Vector3(side * randf_range(20.0, 60.0), 0.0, arena_z - arena_half_depth - randf_range(25.0, 45.0)))
+
+
 func update_arena() -> void:
 	wave_units = wave_units.filter(func(unit: Variant) -> bool:
 		return is_instance_valid(unit) and unit.is_in_group("enemies"))
-	if not wave_units.is_empty():
-		return
-	if not waves.is_empty():
-		next_wave()
-		return
 	var city: City = cities.get(stretch)
-	if city != null and city.targets_left() > 0:
+	var defending := city != null and city.targets_left() > 0
+	if defending:
+		trickle_scouts()
+	if not wave_units.is_empty():
+		wave_timer = wave_gap
+		return
+	# The next planned wave, a beat after the last: over open ground every
+	# one comes, over a city only while it still has targets.
+	if not waves.is_empty() and (defending or city == null):
+		wave_timer -= get_physics_process_delta_time()
+		if wave_timer <= 0.0:
+			next_wave()
+		return
+	if defending or not get_tree().get_nodes_in_group("air_enemies").is_empty():
 		return
 	state = State.CLEARED
 	if is_last_stretch():
@@ -330,11 +383,18 @@ func despawn_behind_view(focus_z: float) -> void:
 			enemy.queue_free()
 
 
-# The stretch's city, filling its arena. More targets further in.
+# The stretch's city (see PLAN), sized by its blocks: from a village up
+# to a town filling the arena. Open ground has none.
 func build_city(index: int) -> void:
+	var layout: Array = plan().city
+	if layout.is_empty():
+		targets_changed.emit(0, 0)
+		return
 	var city := City.new()
-	city.extent = Vector2(corridor_half_width * 2.0 - 8.0, arena_half_depth * 2.0 - 8.0)
-	city.target_count = 4 if is_last_stretch() else mini(2 + index / 2, 4)
+	city.columns = layout[0]
+	city.rows = layout[1]
+	city.target_count = layout[2]
+	city.extent = Vector2(city.columns * 18.5 + (city.columns - 1) * city.road_width, city.rows * 16.0 + (city.rows - 1) * city.road_width)
 	mission.world.add_child(city)
 	city.position = Vector3(0.0, 0.0, arena_z)
 	cities[index] = city

@@ -10,6 +10,8 @@ extends Node
 ## T on the end screen opens the test range. Esc quits.
 
 const TEST_RANGE := "res://features/test_range/test_range.tscn"
+# Hull patched up after each cleared arena.
+const STRETCH_HEAL := 20
 
 @export var mission_scene: PackedScene = preload("res://features/mission/mission.tscn")
 @export var stretch_count: int = 6
@@ -71,7 +73,7 @@ func start_run() -> void:
 	director.stretch_started.connect(_on_stretch_started)
 	director.arena_started.connect(func(_index: int) -> void:
 		Music.play("final_arena" if director.is_last_stretch() else "arena")
-		screens.show_banner("DESTROY THE TARGETS"))
+		screens.show_banner("DESTROY THE TARGETS" if targets_total > 0 else "INTERCEPT"))
 	director.targets_changed.connect(_on_targets_changed)
 	director.held_by.connect(func(what: String) -> void:
 		screens.show_banner("CLEAR THE SAMS" if what == "SAMS" else "DESTROY THE " + what))
@@ -93,6 +95,9 @@ func _on_arena_cleared(_index: int) -> void:
 	await get_tree().create_timer(1.2, false).timeout
 	if over or mission.helicopter.dead:
 		return
+	# A small patch-up for every stretch cleared.
+	RunUpgrades.heal(mission.helicopter, STRETCH_HEAL)
+	mission.hud.spawn_popup("+%d HULL" % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true, true)
 	get_tree().paused = true
 	Music.duck(true)
 	screens.show_picks("CLEARED - PICK ONE", RunUpgrades.offer(mission), func(id: String) -> void:
@@ -139,4 +144,7 @@ func _on_targets_changed(left: int, total: int) -> void:
 
 
 func update_title() -> void:
-	mission.hud.title_label.text = "STRETCH %d / %d    TARGETS %d / %d" % [director.stretch + 1, stretch_count, targets_total - targets_left, targets_total]
+	var text := "STRETCH %d / %d" % [director.stretch + 1, stretch_count]
+	if targets_total > 0:
+		text += "    TARGETS %d / %d" % [targets_total - targets_left, targets_total]
+	mission.hud.title_label.text = text

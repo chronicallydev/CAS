@@ -1,6 +1,6 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dsvosa3jfhvfh"]
 
-[ext_resource type="Script" path="res://features/mission/enemies/tank.gd" id="1_tank"]
+[ext_resource type="Script" uid="uid://dpyiv55cufdrf" path="res://features/mission/enemies/tank.gd" id="1_tank"]
 [ext_resource type="PackedScene" uid="uid://b0qka4ak6seq1" path="res://features/mission/vfx/explosion_scene.tscn" id="2_boom"]
 [ext_resource type="PackedScene" uid="uid://csbkfwjtht7fc" path="res://shared/health_bar/health_bar_3d.tscn" id="3_bar"]
 
@@ -16,7 +16,7 @@ albedo_color = Color(0.35, 0.33, 0.3, 1)
 
 [sub_resource type="BoxMesh" id="Mesh_track"]
 material = SubResource("Mat_track")
-size = Vector3(0.8, 1.0, 5.6)
+size = Vector3(0.8, 1, 5.6)
 
 [sub_resource type="StandardMaterial3D" id="Mat_turret"]
 albedo_color = Color(0.36, 0.41, 0.25, 1)
@@ -31,40 +31,39 @@ top_radius = 0.15
 bottom_radius = 0.18
 height = 3.2
 
-[node name="Tank" type="Node3D"]
+[node name="Tank" type="Node3D" unique_id=54757676]
 script = ExtResource("1_tank")
-max_health = 12.0
+shell_explosion = ExtResource("2_boom")
+max_health = 4.12
+light_armor = 0.5
 score_value = 50
 display_name = "TANK"
 leaves_wreck = true
-detach_parts = PackedStringArray("Turret")
-light_armor = 0.88
-shell_explosion = ExtResource("2_boom")
 
-[node name="Hull" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0)
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1712104482]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 mesh = SubResource("Mesh_hull")
 
-[node name="TrackL" type="MeshInstance3D" parent="."]
+[node name="TrackL" type="MeshInstance3D" parent="." unique_id=467914348]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0.5, 0)
 mesh = SubResource("Mesh_track")
 
-[node name="TrackR" type="MeshInstance3D" parent="."]
+[node name="TrackR" type="MeshInstance3D" parent="." unique_id=756182537]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9, 0.5, 0)
 mesh = SubResource("Mesh_track")
 
-[node name="Turret" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0.2)
+[node name="Turret" type="Node3D" parent="." unique_id=2054060238]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0.2)
 
-[node name="TurretBody" type="MeshInstance3D" parent="Turret"]
+[node name="TurretBody" type="MeshInstance3D" parent="Turret" unique_id=554528658]
 mesh = SubResource("Mesh_turret")
 
-[node name="Barrel" type="MeshInstance3D" parent="Turret"]
+[node name="Barrel" type="MeshInstance3D" parent="Turret" unique_id=1857311229]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0.1, -2.6)
 mesh = SubResource("Mesh_barrel")
 
-[node name="Muzzle" type="Marker3D" parent="Turret"]
+[node name="Muzzle" type="Marker3D" parent="Turret" unique_id=1111937116]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -4.3)
 
-[node name="HealthBar3D" parent="." instance=ExtResource("3_bar")]
+[node name="HealthBar3D" parent="." unique_id=17277480 instance=ExtResource("3_bar")]
 transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 4.2, 0)

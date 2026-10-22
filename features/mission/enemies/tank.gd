@@ -10,7 +10,7 @@ const TankShell := preload("res://features/mission/enemies/projectiles/tank_shel
 # The tank stops somewhere in this distance range from the base.
 @export var firing_range_min: float = 24.0
 @export var firing_range_max: float = 34.0
-@export var fire_interval: float = 3.5
+@export var fire_interval: float = 2.6
 @export var shell_damage: float = 5.0
 @export var shell_flight_time: float = 1.2
 @export var turret_turn_speed: float = 2.0

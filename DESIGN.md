@@ -84,6 +84,20 @@ clothes, touch their hair, poke them, and they react.
   infantry pouring out as it goes.
 - **The minigun kills everything**, slowly against armour and
   buildings: big targets mean holding position under fire.
+- **Arcade pace**: a full run is about 8 minutes, and dying is common.
+- **The run ramps up**: each stretch brings in one new thing (the plan
+  is `RunDirector.PLAN`). The first arena is an open-ground intercept,
+  then a village with one target, then towns growing to a full city.
+- **Cities stay defended**: while targets stand, helicopter
+  reinforcements keep coming. Taking the targets down fast skips the
+  waves not yet sent.
+- **Hull**: a small patch-up after every cleared arena, plus the repair
+  and plating upgrades.
+- **Wrecking pays**: building kills feed the combo.
+- **The minigun never overheats**: it spins up, then fires as long as
+  it's held.
+- **Scouts keep coming** at you over a city while its targets stand,
+  a few at a time.
 
 ## Enemies
 
