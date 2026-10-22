@@ -46,6 +46,11 @@ const HeavySamScene := preload("res://features/mission/enemies/heavy_launcher.ts
 const ScoutScene := preload("res://features/mission/enemies/enemy_scout.tscn")
 const GunshipScene := preload("res://features/mission/enemies/enemy_gunship.tscn")
 const AceScene := preload("res://features/mission/enemies/enemy_ace.tscn")
+# Every enemy type a run spawns, and how long they're drawn for (see
+# warm_up).
+const WARM_UP := [SamScene, HeavySamScene, ScoutScene, GunshipScene, AceScene,
+	TravelObjective.TankScene, TravelObjective.CarScene, TravelObjective.InfantryScene]
+const WARM_UP_TIME := 0.5
 
 # Biomes along the run (the ridge is left out: its mountains would sit on
 # the route).
@@ -151,8 +156,34 @@ var clear_areas: Array[Rect2] = []
 var objective_nodes: Array = []
 
 
+## Gets the slow first-time work done while the takeoff plays, so play
+## doesn't start on a stalled frame (it shows as a jolt): builds the terrain
+## ahead and warms up the enemies' shaders. Idle until setup.
+func prepare(mission_context: MissionContext) -> void:
+	mission = mission_context
+	set_physics_process(false)
+	stream_terrain()
+	warm_up()
+
+
+# An enemy type's first frame on screen stalls while its shaders compile.
+# One of each, frozen and out of every group, is drawn hidden under the
+# ground for WARM_UP_TIME, then freed.
+func warm_up() -> void:
+	var under := mission.camera_rig.get_focus() + Vector3(0.0, -20.0, 0.0)
+	for scene: PackedScene in WARM_UP:
+		var unit := scene.instantiate() as Node3D
+		unit.process_mode = Node.PROCESS_MODE_DISABLED
+		mission.world.add_child(unit)
+		for group in unit.get_groups():
+			unit.remove_from_group(group)
+		unit.global_position = under
+		get_tree().create_timer(WARM_UP_TIME).timeout.connect(unit.queue_free)
+
+
 func setup(mission_context: MissionContext) -> void:
 	mission = mission_context
+	set_physics_process(true)
 	mission.helicopter.use_corridor = true
 	start_stretch(0)
 

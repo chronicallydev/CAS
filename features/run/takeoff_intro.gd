@@ -4,13 +4,15 @@ extends Node
 # The run's opening shot (about 5 s): the helicopter sits on a helipad
 # behind the start, spools up, lifts off to its flying altitude and noses
 # over up the screen, the way the whole run goes. It reaches the run's
-# start at full speed, then `finished` fires and the player has it.
-# Any key or mouse button skips straight to that point.
+# start at full speed and the player has it; `run_starting` fires a little
+# before (see start_run).
+# Any key or mouse button skips: the rest plays at SKIP_SPEED, so even a
+# skip hands over smoothly.
 #
 # The helicopter's own flight (_physics_process) is off while it plays;
-# pose() places it from the time alone, so skipping is just pose(DURATION).
+# pose() places it from the time alone.
 
-signal finished
+signal run_starting
 
 const P := preload("res://shared/props/prop_builder.gd")
 const Debris := preload("res://features/mission/effects/debris.gd")
@@ -21,8 +23,14 @@ const DURATION := 5.0
 const LIFT_START := 1.2
 const LIFT_END := 3.2
 const FORWARD_START := 2.2
-# Most the nose dips as it picks up speed.
-const NOSE_DOWN_DEGREES := 18.0
+# Seconds the hand-over takes (bars off, view easing back), and the last
+# seconds in which the nose turns to the cursor.
+const HANDOFF_TIME := 0.8
+const AIM_TIME := 1.2
+# How much faster the rest plays once skipped (5 s takes 0.6 s at most).
+const SKIP_SPEED := 8.0
+# How long before the end the HUD returns and the run starts.
+const START_LEAD := 0.6
 const PAD_RADIUS := 6.5
 # Height of the letterbox bars, as a fraction of the screen.
 const BAR_HEIGHT := 0.12
@@ -37,6 +45,8 @@ var pad: Vector3
 # How high the helicopter's origin sits above the pad when landed.
 var landed_height: float = 0.0
 var dust_timer: float = 0.0
+var skipping: bool = false
+var started: bool = false
 var saved_lead: float = 0.0
 # HUD layers hidden while it plays, to show again after.
 var hidden_layers: Array[CanvasLayer] = []
@@ -67,11 +77,15 @@ func play(mission_context: MissionContext) -> void:
 func _process(delta: float) -> void:
 	if done:
 		return
-	time += delta
+	var step := delta * (SKIP_SPEED if skipping else 1.0)
+	time += step
+	if time >= DURATION - START_LEAD:
+		start_run()
 	if time >= DURATION:
+		pose(DURATION, step)
 		finish()
 		return
-	pose(time)
+	pose(time, step)
 	# Rotor wash kicking up the sand while it's low.
 	var height := heli.global_position.y - pad.y
 	dust_timer -= delta
@@ -89,11 +103,16 @@ func _input(event: InputEvent) -> void:
 	if pressed and not event.is_echo():
 		# Taken here, so the press doesn't also fire or dash.
 		get_viewport().set_input_as_handled()
-		finish()
+		skipping = true
 
 
-# The helicopter at `t` seconds in.
-func pose(t: float) -> void:
+# The helicopter at `t` seconds in. Over the last AIM_TIME the nose comes
+# round to the cursor, where flight points it. The body leans the way
+# flight leans it (Helicopter._physics_process: into its speed and further
+# into the pull while it speeds up, in its own axes, so a nose turned
+# aside banks instead), eased like flight eases it `delta` seconds on.
+# So control takes over without a jolt; no `delta` sets it all outright.
+func pose(t: float, delta: float = -1.0) -> void:
 	var lift := smoothstep(LIFT_START, LIFT_END, t)
 	var height := lerpf(landed_height, heli.altitude, lift)
 	# Even acceleration from FORWARD_START, reaching full speed at the end.
@@ -102,28 +121,56 @@ func pose(t: float) -> void:
 	var forward := (start.z - pad.z) * u * u
 	heli.global_position = Vector3(pad.x, pad.y + height, pad.z + forward)
 	heli.velocity = Vector3(0.0, 0.0, -heli.speed * u)
-	# Nose down while it picks up speed, settling as the climb ends; a
-	# small rock as it comes off the pad.
-	var dip := sin(u * PI) * 0.6 + u * 0.4
+
+	var aim: Variant = heli.get_mouse_ground_point()
+	if aim != null:
+		var to_aim: Vector3 = aim - heli.global_position
+		if Vector2(to_aim.x, to_aim.z).length() > 1.0:
+			var turn := smoothstep(DURATION - AIM_TIME, DURATION, t)
+			heli.rotation.y = lerp_angle(0.0, atan2(-to_aim.x, -to_aim.z), turn)
+
+	# The pull forward comes in over the first half second of the run.
+	var pull := (1.0 - u) * smoothstep(FORWARD_START, FORWARD_START + 0.5, t)
+	var lean := Vector3(0.0, 0.0, -(u + pull * heli.thrust_lean))
+	var local := (heli.global_transform.basis.inverse() * lean).limit_length(heli.max_lean) * deg_to_rad(heli.max_tilt_degrees)
+	# A small rock as it comes off the pad.
 	var rock := sin(t * 9.0) * 0.03 * (smoothstep(LIFT_START - 0.4, LIFT_START, t) - lift)
-	heli.body.rotation.x = -deg_to_rad(NOSE_DOWN_DEGREES) * dip * lerpf(1.0, 0.45, u)
-	heli.body.rotation.z = rock
+	var follow := 1.0 if delta < 0.0 else 1.0 - exp(-8.0 * delta)
+	heli.body.rotation.x = lerpf(heli.body.rotation.x, local.z, follow)
+	heli.body.rotation.z = lerpf(heli.body.rotation.z, -local.x + rock, follow)
 
 
+# START_LEAD before the end: the HUD comes back and the run starts, while
+# the flight is still scripted. Both stall a frame the first time; here
+# the pose just catches up, where in the player's hands it would jolt.
+func start_run() -> void:
+	if started:
+		return
+	started = true
+	for layer in hidden_layers:
+		if is_instance_valid(layer):
+			layer.visible = true
+	run_starting.emit()
+
+
+# Hands over: the bars slide off and the view eases back into leaning
+# toward the cursor. Called directly, it lands on the last pose outright.
 func finish() -> void:
 	if done:
 		return
 	done = true
-	pose(DURATION)
+	if time < DURATION:
+		pose(DURATION)
+	start_run()
 	heli.set_physics_process(true)
-	mission.camera_rig.cursor_lead = saved_lead
-	for layer in hidden_layers:
-		if is_instance_valid(layer):
-			layer.visible = true
-	if bars != null:
-		bars.queue_free()
-	finished.emit()
-	queue_free()
+
+	var rig := mission.camera_rig
+	var tween := create_tween().set_parallel()
+	tween.tween_property(rig, "cursor_lead", saved_lead, HANDOFF_TIME).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	for bar: Control in bars.get_children():
+		var off := Vector2(0.0, -bar.size.y if bar.anchor_top == 0.0 else bar.size.y)
+		tween.tween_property(bar, "position", bar.position + off, HANDOFF_TIME * 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(queue_free)
 
 
 # --- Pieces --------------------------------------------------------------------

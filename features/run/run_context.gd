@@ -11,8 +11,6 @@ extends Node
 ## M on the end screen, or Esc at any time, goes back to the menu.
 
 const MENU := "res://features/menu/main_menu.tscn"
-# Hull patched up after each cleared arena.
-const STRETCH_HEAL := 20
 # Game seconds between an arena clearing and the upgrade pick.
 const PICK_DELAY := 2.6
 
@@ -105,10 +103,13 @@ func start_run() -> void:
 		screens.show_banner("CONVOY ESCAPED"))
 	director.arena_cleared.connect(_on_arena_cleared)
 	director.run_complete.connect(_on_run_complete)
-	# The run proper starts once the helicopter has taken off.
+	# The run proper starts once the helicopter has taken off; the terrain
+	# ahead and the first music are loaded now, while it can't be seen.
+	director.prepare(mission)
+	Music.prepare("travel")
 	var intro := TakeoffIntro.new()
 	add_child(intro)
-	intro.finished.connect(func() -> void: director.setup(mission))
+	intro.run_starting.connect(func() -> void: director.setup(mission))
 	intro.play(mission)
 
 
@@ -117,6 +118,8 @@ func _on_stretch_started(index: int) -> void:
 	# Autorotate (an upgrade) saves you once per stretch.
 	mission.helicopter.autorotate_ready = true
 	Music.play("final_travel" if index == stretch_count - 1 else "travel")
+	# Loaded now, with the stretch, rather than as the arena starts.
+	Music.prepare("final_arena" if index == stretch_count - 1 else "arena")
 	screens.show_banner("FINAL STRETCH" if index == stretch_count - 1 else "GO  ^")
 	screens.show_go()
 
@@ -135,8 +138,9 @@ func _on_arena_cleared(_index: int) -> void:
 	# before the pick fades in with the game paused.
 	screens.show_banner("ACE DOWN" if director.has_ace() else "ARENA CLEAR")
 	Sfx.play_2d("combo")
-	mission.helicopter.repair(STRETCH_HEAL)
-	mission.hud.spawn_popup(tr("+%d HULL") % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true)
+	# Every cleared arena (the ace's too) patches the hull right up.
+	mission.helicopter.repair(mission.helicopter.max_health)
+	mission.hud.spawn_popup(tr("HULL RESTORED"), mission.helicopter.global_position, Color.WHITE, true)
 	await get_tree().create_timer(PICK_DELAY, false).timeout
 	if over or mission.helicopter.dead:
 		return

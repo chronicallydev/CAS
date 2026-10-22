@@ -6,8 +6,10 @@ extends Node
 #
 # Autoloaded as "Music", like Sfx: it holds no game state and keeps
 # playing through pauses, slow motion and scene changes.
-#   Music.play("arena")  - switch playlist (does nothing if already on it)
-#   Music.duck(true)     - lower the music while a menu is up
+#   Music.play("arena")    - switch playlist (does nothing if already on it)
+#   Music.prepare("arena") - load its next track now, so play() later
+#                            doesn't stall a frame loading it (~0.1 s)
+#   Music.duck(true)       - lower the music while a menu is up
 
 const DIR := "res://assets/music/"
 const BUS := "Music"
@@ -46,6 +48,8 @@ var players: Array[AudioStreamPlayer] = []
 var front: int = 0
 var playlist: String = ""
 var next_track: Dictionary = {}
+# Tracks loaded ahead by prepare(): path -> stream.
+var prepared: Dictionary = {}
 var bus_tween: Tween
 var fade_tween: Tween
 
@@ -71,6 +75,7 @@ func _exit_tree() -> void:
 	for player in players:
 		player.stop()
 		player.stream = null
+	prepared.clear()
 
 
 func play(list: String) -> void:
@@ -94,13 +99,28 @@ func duck(on: bool) -> void:
 		AudioServer.get_bus_volume_db(bus), LEVEL_DB + (DUCK_DB if on else 0.0), 0.4)
 
 
+func prepare(list: String) -> void:
+	if not PLAYLISTS.has(list):
+		return
+	var path := track_path(list)
+	if not prepared.has(path) and ResourceLoader.exists(path):
+		prepared[path] = load(path)
+
+
 func take_track(list: String) -> AudioStream:
-	var tracks: Array = PLAYLISTS[list]
-	var index: int = next_track.get(list, 0)
-	next_track[list] = (index + 1) % tracks.size()
-	var path: String = DIR + tracks[index] + ".mp3"
+	var path := track_path(list)
+	next_track[list] = (next_track.get(list, 0) + 1) % PLAYLISTS[list].size()
+	if prepared.has(path):
+		var stream: AudioStream = prepared[path]
+		prepared.erase(path)
+		return stream
 	# Null (silence) when the track isn't there.
 	return load(path) if ResourceLoader.exists(path) else null
+
+
+# The playlist's next track.
+func track_path(list: String) -> String:
+	return DIR + PLAYLISTS[list][next_track.get(list, 0)] + ".mp3"
 
 
 # Fades the playing track out and the new one in on the other player.

@@ -55,9 +55,10 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   flies with the minigun only. Shot down or done, the end screen offers
   retry (R) or the menu (M); Esc goes to the menu any time.
 - **The ace** (`enemy_ace.gd`, the mini boss; `PLAN`'s `ace` flag): an
-  enemy helicopter whose `STAGES` change how it fights as its hull drops
-  (passive, then full salvos, then heavy rockets alternating with
-  missiles). Beating it gives all three upgrades on offer.
+  enemy helicopter whose `STAGES` change how it fights (passive and
+  immune for `SIZING_UP` seconds, then full salvos, then below a hull
+  fraction heavy rockets alternating with missiles). Beating it gives all
+  three upgrades on offer. Every cleared arena restores the hull fully.
 - **The test range owns the mission.** It instantiates `mission.tscn`,
   spawns enemies into `mission.world` and rebuilds the mission on RESET
   RANGE or when the helicopter is shot down (`MissionContext.request_retry`).

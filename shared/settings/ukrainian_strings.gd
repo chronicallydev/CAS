@@ -49,6 +49,8 @@ const STRINGS := {
 	"MIRROR": "ДЗЕРКАЛО",
 	"TIME BANK +%.1fs": "БАНК ЧАСУ +%.1fс",
 	"+%d HULL": "+%d КОРПУС",
+	"HULL RESTORED": "КОРПУС ВІДНОВЛЕНО",
+	"IMMUNE": "НЕВРАЗЛИВИЙ",
 	"SHOT DOWN": "ЗБИТО",
 	"PERFECT": "ІДЕАЛЬНО",
 	"PERFECT x%d": "ІДЕАЛЬНО x%d",
