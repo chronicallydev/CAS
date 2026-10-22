@@ -94,6 +94,10 @@ var deflected: bool = false
 var deflect_homing: bool = true
 var deflect_left: float = 0.0
 var deflect_target: Node3D
+# Times an enemy helicopter has sent it back at the player (see reflect).
+var rallies: int = 0
+# Each rally sends it back this much faster.
+var rally_speedup: float = 1.12
 
 var model: Node3D
 var flame: MeshInstance3D
@@ -284,6 +288,38 @@ func deflect(homing: bool) -> void:
 	deflect_left = deflect_time
 	target = null
 	velocity = velocity.normalized() * maxf(velocity.length(), deflect_speed)
+
+
+## Sent back at `at` (the player) by an enemy helicopter's own perfect
+## dodge: guided again, its motor re-lit as if just fired, a little faster
+## each rally, and black again (the enemy's). The player can deflect it
+## once more, so a missile can go back and forth.
+func reflect(at: Node3D) -> void:
+	deflected = false
+	deflect_target = null
+	rallies += 1
+	target = at
+	lost = false
+	tracked = null
+	ignited = true
+	burned_out = false
+	# Back in the boost phase with a full motor.
+	age = eject_time
+	boost_speed *= rally_speedup
+	sustain_speed *= rally_speedup
+	var toward := (at.global_position - global_position).normalized()
+	velocity = toward * maxf(velocity.length(), sustain_speed)
+	nose = toward
+	face(nose)
+	flame.visible = true
+	motor_light.visible = true
+	trail.emitting = true
+	motor_sound.volume_db = Sfx.mix_db("missile_motor")
+	if not motor_sound.playing:
+		motor_sound.play()
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", false, false):
+		if mesh != flame:
+			mesh.material_override = null
 
 
 func fly_deflected(delta: float) -> void:

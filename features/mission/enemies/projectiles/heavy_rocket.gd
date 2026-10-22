@@ -113,6 +113,16 @@ func lose_target() -> void:
 	pass
 
 
+# Sent back: a fresh set of passes, at a faster cruise.
+func reflect(at: Node3D) -> void:
+	super(at)
+	cruise_speed *= rally_speedup
+	passes = 0
+	committed = false
+	extend_left = 0.0
+	break_offs = 0
+
+
 # Gone past on a straight run: a dodge. Fly on, then come round again;
 # after the last one it airbursts.
 func pass_by() -> void:

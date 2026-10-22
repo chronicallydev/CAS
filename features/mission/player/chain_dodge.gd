@@ -122,11 +122,13 @@ func incoming_missiles() -> Array:
 			continue
 		var offset: Vector3 = heli_position - missile.global_position
 		var distance := offset.length()
-		if distance > max_distance:
-			continue
 		# How fast the gap is closing.
 		var closing: float = (missile.velocity - helicopter.velocity).dot(offset / maxf(distance, 0.01))
 		if closing <= 0.0:
+			continue
+		# A fast missile (a rallied one) covers more than max_distance
+		# inside the window; the limit stretches to what it can cover.
+		if distance > maxf(max_distance, closing * perfect_window + missile.hit_radius):
 			continue
 		var impact := maxf(distance - missile.hit_radius, 0.0) / closing
 		if impact <= perfect_window:

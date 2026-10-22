@@ -13,6 +13,9 @@ extends Control
 #   time resumes  - a suck-back whoosh, the bars slide out
 #   chain ends    - a "CHAIN xN" banner mid-screen
 #   deflect kill  - a hit stop, an inverted frame and a callout where it hit
+#   enemy reflect - an enemy helicopter sent a missile back: the same in
+#                   reverse (ink callout, black ring first, lower time stop)
+#                   and a beat of slow motion to see it coming
 
 const PAPER := Color.WHITE
 const INK := Color.BLACK
@@ -108,6 +111,34 @@ func _on_chain_ended(chain: int) -> void:
 	banner_tween.tween_property(banner, "modulate:a", 0.0, 0.3)
 
 
+## An enemy helicopter at `at` sent a deflected missile back: the inverse
+## of a perfect dodge (ink text, black ring first, a lower time stop) and a
+## moment of slow motion to see it coming. `rallies` counts the returns.
+func enemy_reflect(at: Vector3, rallies: int) -> void:
+	Sfx.play_2d("time_stop", 0.0, 0.7 + minf(rallies - 1, 4) * 0.06)
+	mission.hit_stop(0.2, 0.15)
+	mission.shake(0.3, at)
+	spawn_ring(at, rallies, true)
+	var label := make_text(36)
+	label.add_theme_color_override("font_color", INK)
+	label.add_theme_color_override("font_outline_color", PAPER)
+	label.text = "REVERSED" if rallies == 1 else "RALLY x%d" % (rallies + 1)
+	label.reset_size()
+	label.pivot_offset = label.size * 0.5
+	var anchor := at + Vector3.UP * 3.0
+	var follow := func(rise: float) -> void:
+		var camera := get_viewport().get_camera_3d()
+		if camera == null or not is_instance_valid(label):
+			return
+		label.position = camera.unproject_position(anchor) - label.size * 0.5 - Vector2(0, rise)
+	follow.call(0.0)
+	label.scale = Vector2.ONE * 2.0
+	var tween := label.create_tween().set_ignore_time_scale(true).set_parallel()
+	tween.tween_property(label, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.tween_method(follow, 0.0, 50.0, 1.0).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.chain().tween_callback(label.queue_free)
+
+
 ## A deflected missile killed `kills` enemies at `at`.
 func deflect_kill(at: Vector3, kills: int) -> void:
 	mission.hit_stop(0.12)
@@ -201,8 +232,9 @@ func place_callout() -> void:
 
 
 # A flat ring spreading from `at` in the world, so it gets the game's
-# pixels and outlines: a white ring and a black one just behind it.
-func spawn_ring(at: Vector3, chain: int) -> void:
+# pixels and outlines: a white ring and a black one just behind it, or
+# black first for the enemy's (`ink_first`).
+func spawn_ring(at: Vector3, chain: int, ink_first: bool = false) -> void:
 	var radius := RING_RADIUS * (1.0 + minf(chain - 1, 4) * 0.15)
 	for i in 2:
 		var ring := MeshInstance3D.new()
@@ -213,7 +245,7 @@ func spawn_ring(at: Vector3, chain: int) -> void:
 		ring.mesh = mesh
 		var material := StandardMaterial3D.new()
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.albedo_color = PAPER if i == 0 else INK
+		material.albedo_color = PAPER if (i == 0) != ink_first else INK
 		ring.material_override = material
 		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mission.world.add_child(ring)

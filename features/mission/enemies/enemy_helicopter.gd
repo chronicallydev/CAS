@@ -4,10 +4,11 @@ extends EnemyBase
 # player's altitude and dogfights: circles at a preferred range with its
 # nose on the helicopter, swaps direction now and then, locks on (warning
 # the player) and fires a salvo of homing missiles, spaced so a good chain
-# dodge can take them all. It mirrors the player's dash: a deflected
-# missile coming for it makes it jink aside (dash_chance), while it has
-# charges. Shot down, it spins out trailing smoke, hits the ground and
-# blows up.
+# dodge can take them all. It mirrors the player's chain dodge: a deflected
+# missile coming for it may be sent straight back (reflect_chance), so a
+# missile can rally between them, or else it dashes clear (dash_chance)
+# while it has charges. Shot down, it spins out trailing smoke, hits the
+# ground and blows up.
 #
 # The look and the numbers are all exports, so each type is just a scene
 # (enemy_scout.tscn, enemy_gunship.tscn).
@@ -64,6 +65,10 @@ const HeavyRocket := preload("res://features/mission/enemies/projectiles/heavy_r
 @export_range(0.0, 1.0) var dash_chance: float = 0.6
 # Threats closer than this, in seconds to impact, make it react.
 @export var threat_window: float = 0.5
+# Chance it sends a deflected missile straight back at the player, times
+# reflect_falloff for every rally that missile has already had.
+@export_range(0.0, 1.0) var reflect_chance: float = 0.5
+@export_range(0.0, 1.0) var reflect_falloff: float = 0.6
 # Under sustained fire it jinks: once it has taken this much damage
 # (fading at half this per second), it swaps its circling direction and
 # dashes, if it has a charge, so the player has to find it again.
@@ -222,11 +227,14 @@ func update_dash_charges(delta: float) -> void:
 
 # Deflected missiles and the player's rockets: when one is about to land,
 # roll once whether to jink out of the way.
+# A deflected missile about to hit it gets one roll: send it back at the
+# player (reflect_chance, less likely each rally), else dash clear if it
+# has a charge (dash_chance), which shakes the missile off.
 func react_to_threats() -> void:
-	if dash_charges_left <= 0:
-		return
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
-		if not missile.deflected or judged_threats.has(missile):
+		# One roll per missile per rally.
+		var key := "%d:%d" % [missile.get_instance_id(), missile.rallies]
+		if not missile.deflected or judged_threats.has(key):
 			continue
 		if missile.deflect_target != self:
 			continue
@@ -234,20 +242,32 @@ func react_to_threats() -> void:
 		var closing: float = missile.velocity.dot(offset.normalized())
 		if closing <= 0.0 or offset.length() / closing > threat_window:
 			continue
-		judged_threats[missile] = true
-		if randf() < dash_chance:
-			# Sideways to the threat's path.
-			var side: Vector3 = missile.velocity.cross(Vector3.UP).normalized()
-			if randf() < 0.5:
-				side = -side
+		judged_threats[key] = true
+		# Sideways to the threat's path.
+		var side: Vector3 = missile.velocity.cross(Vector3.UP).normalized()
+		if randf() < 0.5:
+			side = -side
+		var heli := helicopter()
+		if heli != null and randf() < reflect_chance * pow(reflect_falloff, missile.rallies):
+			# Its own perfect dodge: a free dash, and the missile goes back.
+			dash(side, false)
+			missile.reflect(heli)
+			if mission != null:
+				mission.hud.dodge_fx.enemy_reflect(global_position, missile.rallies)
+			return
+		if dash_charges_left > 0 and randf() < dash_chance:
 			dash(side)
+			# Out of its seeker: it flies on past.
+			missile.deflect_homing = false
 			return
 
 
-func dash(direction: Vector3) -> void:
-	if dash_charges_left == dash_charges:
-		dash_recharge_left = dash_cooldown
-	dash_charges_left -= 1
+# `costs` false for the free dash of a reflect.
+func dash(direction: Vector3, costs: bool = true) -> void:
+	if costs:
+		if dash_charges_left == dash_charges:
+			dash_recharge_left = dash_cooldown
+		dash_charges_left -= 1
 	direction.y = 0.0
 	dash_direction = direction.normalized()
 	dash_time_left = dash_time

@@ -95,8 +95,10 @@ Every enemy hunts the helicopter (`EnemyBase.objective()`).
 
 Enemy helicopters (`enemy_helicopter.gd`, one script, a scene per type)
 fly at the player's altitude in the `air_enemies` group. They circle at a
-preferred range, lock on and fire salvos spaced for chain dodges, dash
-aside from deflected missiles, jink (swap direction and dash) after
+preferred range, lock on and fire salvos spaced for chain dodges, send
+deflected missiles back at the player (`reflect_chance`, falling off per
+rally; `aa_missile.reflect()` re-arms it, faster each rally, so a missile
+can go back and forth) or else dash clear of them, jink (swap direction and dash) after
 `jink_damage` of sustained fire, and spin down and crash when killed.
 `GunController.air_target()` picks a helicopter when the cursor is over it
 on screen (the ground under it is far off with the camera's angle): the
