@@ -58,13 +58,11 @@ var mission: MissionContext
 var body: Node3D
 var loose: Array[Node3D] = []
 var collider: StaticBody3D
-var marker: Node3D
 var smoke: CPUParticles3D
 var fire: CPUParticles3D
 var wall: Material
 var last_chip_ms: int = -100000
 var last_hit_from: Vector3 = Vector3.ZERO
-var time: float = 0.0
 var spinner: Node3D
 
 
@@ -73,13 +71,12 @@ func _ready() -> void:
 	add_to_group("structures")
 	health = max_health
 	position.y = ground_y
-	time = randf() * TAU
 	body = Node3D.new()
 	add_child(body)
 	build_body()
 	if target:
 		OneBit.ink(body)
-		build_marker()
+		TargetMarker.follow(self, size.y + 6.0)
 	add_collider()
 
 
@@ -172,22 +169,6 @@ func loose_cylinder(radius: float, height: float, at: Vector3, mat: Material) ->
 	loose.append(P.cylinder(body, radius, height, at, mat))
 
 
-# A downward arrow over a marked target: white with a black rim, so it
-# reads on any ground in 1-bit.
-func build_marker() -> void:
-	marker = Node3D.new()
-	marker.position = Vector3(0, size.y + 6.0, 0)
-	add_child(marker)
-	var arrow := CylinderMesh.new()
-	arrow.top_radius = 1.6
-	arrow.bottom_radius = 0.0
-	arrow.height = 2.6
-	arrow.radial_segments = 4
-	arrow.rings = 1
-	P.add_mesh(marker, arrow, Vector3.ZERO, OneBit.solid(Color.WHITE))
-	OneBit.rim(marker, Color.BLACK, 0.45)
-
-
 func add_collider() -> void:
 	collider = StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -200,10 +181,6 @@ func add_collider() -> void:
 
 
 func _process(delta: float) -> void:
-	time += delta
-	if marker != null:
-		marker.position.y = size.y + 6.0 + sin(time * 3.0) * 0.6
-		marker.rotation.y += delta * 1.5
 	if spinner != null and is_instance_valid(spinner) and spinner.get_parent() == body:
 		spinner.rotation.y += delta * 1.2
 
@@ -323,9 +300,6 @@ func collapse() -> void:
 	health = 0.0
 	remove_from_group("structures")
 	collider.queue_free()
-	if marker != null:
-		marker.queue_free()
-		marker = null
 	throw_loose(loose.size())
 	var scene := MissionContext.spawn_parent(self)
 	var centre := global_position + Vector3(0, size.y * 0.4, 0)

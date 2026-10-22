@@ -55,6 +55,8 @@ func start_run() -> void:
 	RunUpgrades.restore_defaults()
 	best_chain = 0
 	over = false
+	screens.show_leftovers(0)
+	screens.hide_go()
 
 	mission = mission_scene.instantiate()
 	# One weapon per helicopter: the Cobra flies with its chin minigun.
@@ -72,11 +74,15 @@ func start_run() -> void:
 	add_child(director)
 	director.stretch_started.connect(_on_stretch_started)
 	director.arena_started.connect(func(_index: int) -> void:
+		screens.hide_go()
 		Music.play("final_arena" if director.is_last_stretch() else "arena")
 		screens.show_banner("DESTROY THE TARGETS" if targets_total > 0 else "INTERCEPT"))
 	director.targets_changed.connect(_on_targets_changed)
 	director.held_by.connect(func(what: String) -> void:
+		screens.hide_go()
 		screens.show_banner("CLEAR THE SAMS" if what == "SAMS" else "DESTROY THE " + what))
+	director.path_cleared.connect(_on_path_cleared)
+	director.leftovers_changed.connect(screens.show_leftovers)
 	director.convoy_escaped.connect(func() -> void:
 		screens.show_banner("CONVOY ESCAPED"))
 	director.arena_cleared.connect(_on_arena_cleared)
@@ -88,6 +94,16 @@ func _on_stretch_started(index: int) -> void:
 	update_title()
 	Music.play("final_travel" if index == stretch_count - 1 else "travel")
 	screens.show_banner("FINAL STRETCH" if index == stretch_count - 1 else "GO  ^")
+	screens.show_go()
+
+
+# A hold let go: a chime, and the way on (to the arena, if nothing else is
+# left on the way).
+func _on_path_cleared() -> void:
+	var to_arena := director.sams.is_empty() and director.pending.is_empty() and director.objectives.is_empty() and director.pending_objectives.is_empty()
+	screens.show_banner("ARENA AHEAD  ^" if to_arena else "GO  ^")
+	screens.show_go()
+	Sfx.play_2d("combo")
 
 
 func _on_arena_cleared(_index: int) -> void:

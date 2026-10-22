@@ -27,6 +27,11 @@ signal arena_started(index: int)
 signal held_by(what: String)
 # A convoy vehicle got away (it turns up again in the city).
 signal convoy_escaped
+# A held view let go: the way ahead is open again.
+signal path_cleared
+# How many things are left holding you up, once few enough to mark them
+# (see leftover_mark); 0 when they aren't being counted.
+signal leftovers_changed(count: int)
 signal arena_cleared(index: int)
 # A marked target in the city went down (or the city was built).
 signal targets_changed(left: int, total: int)
@@ -80,6 +85,9 @@ enum State { TRAVEL, ARENA, CLEARED, DONE }
 @export var wave_gap: float = 2.5
 # Seconds between trickling scouts (see PLAN).
 @export var scout_interval: float = 4.0
+# Once this few enemies are left holding you up (a held view, or the
+# helicopters after a city's targets fall), each gets a marker.
+@export var leftover_mark: int = 3
 
 var mission: MissionContext
 var stretch: int = 0
@@ -90,6 +98,8 @@ var pending: Array = []
 # SAM trucks spawned this stretch, while alive.
 var sams: Array = []
 var held: bool = false
+# The view is stopped at a hold (see path_cleared).
+var blocked: bool = false
 # Travel objectives still to appear: [kind, position]; and the ones in
 # play, until cleared.
 var pending_objectives: Array = []
@@ -106,6 +116,8 @@ var wave_units: Array = []
 var wave_timer: float = 0.0
 # Counts down scout_interval before the next trickling scout.
 var scout_timer: float = 0.0
+# Leftovers last counted (see leftovers_changed).
+var leftover_count: int = 0
 var environments: Dictionary = {}
 # Each stretch's city (built with the stretch), and the ground they take
 # up, kept clear of terrain props.
@@ -133,6 +145,7 @@ func start_stretch(index: int) -> void:
 	stretch = index
 	state = State.TRAVEL
 	held = false
+	blocked = false
 	var start := stretch_start_z(index)
 	arena_z = start - travel_length - arena_half_depth
 	plan_travel(start)
@@ -163,13 +176,57 @@ func _physics_process(_delta: float) -> void:
 			if not held and heli.global_position.z < far_z + heli.corridor_margin and holder != "":
 				held = true
 				held_by.emit(holder)
+			# The view caught up with a hold; once that lets go, say so.
+			if holder != "" and focus_z <= rig.min_focus_z + 2.0:
+				blocked = true
+			elif blocked and holder == "":
+				# Free to fly on; the next hold gets its own callout.
+				blocked = false
+				held = false
+				path_cleared.emit()
 			spawn_pending(focus_z)
 			if sams.is_empty() and objectives.is_empty() and pending_objectives.is_empty() and heli.global_position.z < arena_z + arena_half_depth - 8.0:
 				start_arena()
 		State.ARENA:
 			update_arena()
 
+	mark_leftovers()
 	despawn_behind_view(focus_z)
+
+
+# What's holding you up right now: at a held view, the live SAM trucks and
+# objective parts; in an arena once a city's targets are down (or over
+# open ground), the helicopters still up. A city's standing targets have
+# their own markers, so nothing else counts while they do.
+func leftovers() -> Array:
+	var left: Array = []
+	match state:
+		State.TRAVEL:
+			if not blocked:
+				return left
+			left.append_array(sams)
+			for objective: TravelObjective in objectives:
+				left.append_array(objective.parts.filter(objective.alive))
+		State.ARENA:
+			var city: City = cities.get(stretch)
+			if city != null and city.targets_left() > 0:
+				return left
+			left.append_array(get_tree().get_nodes_in_group("air_enemies"))
+	return left
+
+
+# Marks the leftovers once there are leftover_mark or fewer, and reports
+# how many.
+func mark_leftovers() -> void:
+	var left := leftovers()
+	var count := left.size() if left.size() <= leftover_mark else 0
+	if count > 0:
+		for node: Node3D in left:
+			var above: float = node.size.y + 6.0 if node is Building else 6.0
+			TargetMarker.follow(node, above)
+	if count != leftover_count:
+		leftover_count = count
+		leftovers_changed.emit(count)
 
 
 func corridor(far_z: float, near_z: float) -> Rect2:
