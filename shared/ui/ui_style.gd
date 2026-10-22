@@ -13,9 +13,29 @@ const PANEL_BORDER := Color(0.62, 0.56, 0.44, 0.38)
 const GOLD := Color(0.88, 0.68, 0.34)
 
 
-# Monogram is drawn on an 8px grid; anything else gives uneven pixels. It
-# also reads smaller than most fonts, so sizes are scaled up a little.
+# Monogram's own size: at 16 one font pixel is one unit.
+const FONT_GRID := 16.0
+
+
+# Game UI is drawn at the pixel art's resolution (see PixelArt), so text is
+# sized to whole low-res pixels per font pixel: anything else comes out
+# mangled. Requested sizes up to ~60 get one, bigger ones (banners) two.
 static func px(size: float) -> int:
+	return roundi(FONT_GRID * PixelArt.ui_pixel_units() * maxi(1, roundi(size / 48.0)))
+
+
+## A solid black backing for HUD text, so it reads over the dithered ground
+## in 1-bit.
+static func plate(margin: float = 10.0) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color.BLACK
+	style.set_content_margin_all(margin)
+	return style
+
+
+# For full-resolution UI (the test range's dev panel): Monogram on its 8px
+# grid, scaled up a little as it reads small.
+static func crisp_px(size: float) -> int:
 	return maxi(16, roundi(size * 1.3 / 8.0) * 8)
 
 

@@ -55,12 +55,12 @@ const BIOMES := ["desert", "wadi", "oilfield", "saltflat", "refinery", "desert"]
 #   scouts     - how many helicopters may be up at once before more scouts
 #                trickle in, while targets still stand
 const PLAN := [
-	{"objectives": ["tank_line"], "sams": 1, "heavy": 0, "city": [], "waves": [1.0], "scouts": 0},
-	{"objectives": ["compound"], "sams": 1, "heavy": 0, "city": [2, 2, 1], "waves": [1.0], "scouts": 1},
-	{"objectives": ["convoy"], "sams": 2, "heavy": 1, "city": [3, 2, 2], "waves": [2.0], "scouts": 1},
-	{"objectives": ["depot", "tank_line"], "sams": 2, "heavy": 1, "city": [3, 3, 2], "waves": [2.0], "scouts": 2},
-	{"objectives": ["convoy", "compound"], "sams": 2, "heavy": 1, "city": [4, 3, 3], "waves": [2.0, 2.0], "scouts": 2},
-	{"objectives": ["depot", "convoy"], "sams": 3, "heavy": 1, "city": [4, 3, 4], "waves": [3.0, 3.0], "scouts": 3},
+	{"objectives": ["patrol"], "sams": 0, "heavy": 0, "city": [], "waves": [1.0], "scouts": 0},
+	{"objectives": ["armored_patrol"], "sams": 1, "heavy": 0, "city": [], "waves": [1.0, 1.0], "scouts": 0},
+	{"objectives": ["convoy"], "sams": 2, "heavy": 0, "city": [2, 2, 1], "waves": [1.0], "scouts": 1},
+	{"objectives": ["compound"], "sams": 2, "heavy": 1, "city": [3, 2, 2], "waves": [2.0], "scouts": 1},
+	{"objectives": ["depot", "tank_line"], "sams": 2, "heavy": 1, "city": [3, 3, 3], "waves": [2.0, 2.0], "scouts": 2},
+	{"objectives": ["convoy", "compound"], "sams": 3, "heavy": 2, "city": [4, 3, 4], "waves": [3.0, 3.0], "scouts": 3},
 ]
 
 enum State { TRAVEL, ARENA, CLEARED, DONE }
@@ -405,11 +405,25 @@ func update_arena() -> void:
 	if defending or not get_tree().get_nodes_in_group("air_enemies").is_empty():
 		return
 	state = State.CLEARED
+	defuse_missiles()
 	if is_last_stretch():
 		state = State.DONE
 		run_complete.emit()
 	else:
 		arena_cleared.emit(stretch)
+
+
+# The arena is won: enemy missiles still in the air burst harmlessly, one
+# after another, instead of chasing you into the next stretch.
+func defuse_missiles() -> void:
+	var delay := 0.0
+	for missile in get_tree().get_nodes_in_group("aa_missiles"):
+		if missile.deflected or missile.harmless:
+			continue
+		missile.harmless = true
+		delay += 0.12
+		# Bound to the missile, so the call is dropped if it's gone by then.
+		get_tree().create_timer(delay, false).timeout.connect(missile.fizzle)
 
 
 ## After the upgrade pick: unlock the view and start the next stretch.

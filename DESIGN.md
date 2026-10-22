@@ -85,9 +85,13 @@ clothes, touch their hair, poke them, and they react.
 - **The minigun kills everything**, slowly against armour and
   buildings: big targets mean holding position under fire.
 - **Arcade pace**: a full run is about 8 minutes, and dying is common.
+- **The UI is 1-bit too**: drawn at the pixel art's resolution, pure black
+  and white, HUD text on solid black plates.
 - **The run ramps up**: each stretch brings in one new thing (the plan
-  is `RunDirector.PLAN`). The first arena is an open-ground intercept,
-  then a village with one target, then towns growing to a full city.
+  is `RunDirector.PLAN`). The first two stretches are open ground: a few
+  riflemen and a car (then a tank) wandering at you, and an open-ground
+  intercept. Then a village with one target, then towns growing to a
+  full city, with dug-in objectives from the fourth stretch.
 - **Cities stay defended**: while targets stand, helicopter
   reinforcements keep coming. Taking the targets down fast skips the
   waves not yet sent.
@@ -106,6 +110,9 @@ Variety comes from **missile types**, not from many units.
 - **Enemy helicopters**: the main enemy; dogfights in lock arenas.
   Two or three types.
 - **Light SAM** and **heavy SAM**: ground missile launchers.
+- The **heavy rocket** (heavy SAM, gunships) can't be sent back by a
+  perfect dodge: it has to be outflown, pass after pass.
+- Enemy missiles still in the air when an arena is won burst harmlessly.
 - Missile types: fast straight, slow stubborn homing, splitting cluster,
   swarm.
 - Other ground units (infantry, cars, tanks, mortars, Shilka) are out

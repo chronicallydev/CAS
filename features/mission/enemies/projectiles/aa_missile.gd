@@ -53,6 +53,10 @@ var size: float = 1.0
 var source_name: String = "MISSILE"
 # Flares don't pull it off (see Helicopter.deploy_flares).
 var ignores_flares: bool = false
+# A perfect dodge can send it back (the heavy rocket can't be).
+var deflectable: bool = true
+# Defused (see fizzle): it bursts without hurting anything.
+var harmless: bool = false
 # A darker body and smoke tell rockets apart at a glance.
 var body_color: Color = Color(0.92, 0.92, 0.9)
 var trail_color: Color = Color(0.92, 0.92, 0.9, 0.5)
@@ -463,10 +467,16 @@ func face(direction: Vector3) -> void:
 	look_at(global_position + direction, up)
 
 
+## Bursts where it is, harmlessly: the fight it was part of is over.
+func fizzle() -> void:
+	harmless = true
+	detonate()
+
+
 func detonate() -> void:
 	var on_ground := global_position.y <= ground_y + 0.5
 	# A deflected missile is the player's: it spares the helicopter.
-	var hurt := false if deflected else blast_helicopter()
+	var hurt := false if deflected or harmless else blast_helicopter()
 	if deflected:
 		var kills := blast_enemies()
 		var mission := MissionContext.of(self)

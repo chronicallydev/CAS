@@ -12,6 +12,8 @@ extends Node
 const TEST_RANGE := "res://features/test_range/test_range.tscn"
 # Hull patched up after each cleared arena.
 const STRETCH_HEAL := 20
+# Game seconds between an arena clearing and the upgrade pick.
+const PICK_DELAY := 2.6
 
 @export var mission_scene: PackedScene = preload("res://features/mission/mission.tscn")
 @export var stretch_count: int = 6
@@ -107,13 +109,15 @@ func _on_path_cleared() -> void:
 
 
 func _on_arena_cleared(_index: int) -> void:
-	# A beat to see the last kill, then the pick with the game paused.
-	await get_tree().create_timer(1.2, false).timeout
+	# A beat to take in the win (the last wreck coming down, the patch-up)
+	# before the pick fades in with the game paused.
+	screens.show_banner("ARENA CLEAR")
+	Sfx.play_2d("combo")
+	RunUpgrades.heal(mission.helicopter, STRETCH_HEAL)
+	mission.hud.spawn_popup("+%d HULL" % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true)
+	await get_tree().create_timer(PICK_DELAY, false).timeout
 	if over or mission.helicopter.dead:
 		return
-	# A small patch-up for every stretch cleared.
-	RunUpgrades.heal(mission.helicopter, STRETCH_HEAL)
-	mission.hud.spawn_popup("+%d HULL" % STRETCH_HEAL, mission.helicopter.global_position, Color.WHITE, true, true)
 	get_tree().paused = true
 	Music.duck(true)
 	screens.show_picks("CLEARED - PICK ONE", RunUpgrades.offer(mission), func(id: String) -> void:

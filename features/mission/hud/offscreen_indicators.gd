@@ -25,6 +25,9 @@ const COLORS := {
 const SIZES := {"": 8.0, "CAR": 11.0, "TANK": 13.0, "SAM": 13.0, "BUNKER": 15.0, "FLAK": 15.0, "BOSS": 20.0,
 		"STINGER": 10.0, "SHILKA": 14.0, "RIPPLE": 13.0, "RADAR": 16.0, "LAUNCHER": 15.0}
 
+# Arrows drawn this much bigger than SIZES (see draw_arrow).
+const ARROW_SCALE := 2.5
+
 const RIG_COLOR := Color(0.45, 0.75, 1.0)
 const DANGER := Color(1.0, 0.2, 0.15)
 
@@ -112,6 +115,9 @@ func _draw() -> void:
 # Draws an arrow on the screen edge pointing toward `target`; returns where
 # its base sits (for a label).
 func draw_arrow(target: Vector2, color: Color, size: float) -> Vector2:
+	# Sizes are for full resolution; the HUD is drawn in low-res pixels now
+	# (see PixelArt), so make them a few pixels across at least.
+	size *= ARROW_SCALE
 	var rect := get_viewport_rect()
 	var center := rect.size * 0.5
 	var direction := (target - center)
@@ -138,7 +144,7 @@ func draw_arrow(target: Vector2, color: Color, size: float) -> Vector2:
 
 	draw_colored_polygon(points, color)
 	points.append(tip)
-	draw_polyline(points, Color(0, 0, 0, 0.6), 2.0, true)
+	draw_polyline(points, Color.BLACK, 8.0)
 	return base - direction * 14.0
 
 
@@ -156,5 +162,5 @@ func draw_label(text: String, at: Vector2, color: Color) -> void:
 	var size := UiStyle.px(16)
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var pos := at + Vector2(-width * 0.5, size * 0.35)
-	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(0, 0, 0, 0.7))
+	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 12, Color.BLACK)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)

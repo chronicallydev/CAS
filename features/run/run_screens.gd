@@ -14,6 +14,9 @@ extends CanvasLayer
 
 const PAPER := Color.WHITE
 const INK := Color.BLACK
+# How long a fresh overlay ignores input, and how long it takes to fade in.
+const ARM_MS := 600
+const FADE_IN := 0.35
 # The go chevrons: each one's width and height, and the gap between their
 # centres, in pixels.
 const GO_SIZE := Vector2(84.0, 44.0)
@@ -29,6 +32,9 @@ var overlay: Control
 # The pick buttons' actions while the picks are up, for the number keys.
 var pick_actions: Array = []
 var end_actions: Dictionary = {}
+# When the open overlay starts taking input (msec): it fades in first, so
+# held fire or a mashed key can't pick for you.
+var armed_at: int = 0
 
 
 func _ready() -> void:
@@ -54,6 +60,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	var key: int = event.physical_keycode
+	if not armed():
+		return
 	if not pick_actions.is_empty() and key >= KEY_1 and key < KEY_1 + pick_actions.size():
 		pick_actions[key - KEY_1].call()
 		get_viewport().set_input_as_handled()
@@ -143,8 +151,8 @@ func show_picks(title: String, options: Array, on_pick: Callable) -> void:
 			close_overlay()
 			on_pick.call(option.id)
 		pick_actions.append(choose)
-		var card := card_button("%d\n\n%s\n\n%s" % [i + 1, option.name, option.text], choose)
-		card.custom_minimum_size = Vector2(300, 260)
+		var card := card_button("%d  %s\n\n%s" % [i + 1, option.name, option.text], choose)
+		card.custom_minimum_size = Vector2(600, 330)
 		row.add_child(card)
 
 
@@ -171,7 +179,7 @@ func show_end(title: String, lines: Array, on_retry: Callable, on_test_range: Ca
 	var retry := card_button("RETRY  [R]", retry_action)
 	var test_range := card_button("TEST RANGE  [T]", test_range_action)
 	for button in [retry, test_range]:
-		button.custom_minimum_size = Vector2(320, 80)
+		button.custom_minimum_size = Vector2(560, 130)
 		row.add_child(button)
 	end_actions = {KEY_R: retry_action, KEY_T: test_range_action}
 
@@ -184,6 +192,9 @@ func open_overlay(title: String) -> VBoxContainer:
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(overlay)
+	armed_at = Time.get_ticks_msec() + ARM_MS
+	overlay.modulate.a = 0.0
+	create_tween().set_ignore_time_scale(true).tween_property(overlay, "modulate:a", 1.0, FADE_IN)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -193,7 +204,7 @@ func open_overlay(title: String) -> VBoxContainer:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", box_style(PAPER, 6, 36))
+	panel.add_theme_stylebox_override("panel", box_style(PAPER, 8, 36))
 	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 22)
@@ -206,6 +217,11 @@ func open_overlay(title: String) -> VBoxContainer:
 	return box
 
 
+# True once the open overlay has had time to fade in (see ARM_MS).
+func armed() -> bool:
+	return Time.get_ticks_msec() >= armed_at
+
+
 func close_overlay() -> void:
 	pick_actions.clear()
 	end_actions.clear()
@@ -214,18 +230,26 @@ func close_overlay() -> void:
 		overlay = null
 
 
+# The text is a Label over the button rather than the button's own text,
+# which clips its last line at the low-res UI's font size; it inverts with
+# the button on hover. Callers size the button to fit.
 func card_button(text: String, action: Callable) -> Button:
 	var button := Button.new()
-	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", UiStyle.px(34))
-	button.add_theme_stylebox_override("normal", box_style(PAPER, 5, 18))
-	button.add_theme_stylebox_override("hover", box_style(INK, 5, 18))
-	button.add_theme_stylebox_override("pressed", box_style(INK, 5, 18))
-	button.add_theme_color_override("font_color", INK)
-	button.add_theme_color_override("font_hover_color", PAPER)
-	button.add_theme_color_override("font_pressed_color", PAPER)
+	button.add_theme_stylebox_override("normal", box_style(PAPER, 8, 18))
+	button.add_theme_stylebox_override("hover", box_style(INK, 8, 18))
+	button.add_theme_stylebox_override("pressed", box_style(INK, 8, 18))
+	var label := text_label(text, 34, INK)
+	label.add_theme_constant_override("outline_size", 0)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	button.add_child(label)
+	button.mouse_entered.connect(func() -> void: label.add_theme_color_override("font_color", PAPER))
+	button.mouse_exited.connect(func() -> void: label.add_theme_color_override("font_color", INK))
 	button.pressed.connect(func() -> void:
+		if not armed():
+			return
 		Sfx.play_2d("ui_click")
 		action.call())
 	return button

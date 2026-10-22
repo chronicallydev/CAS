@@ -24,7 +24,8 @@ const TARGET_RMS := 0.22
 const MIX := {
 	# Warnings and damage to the player: must cut through.
 	"inbound_tone": -4.0,
-	"lock_tone": -8.0,
+	# Being locked on: a soft pip, under everything (it can go on a while).
+	"lock_tone": -17.0,
 	"heli_hit": 0.0,
 	"missile_launch": -1.0,
 	"sam_launch": 0.0,
@@ -112,7 +113,7 @@ func _ready() -> void:
 	streams["mortar_thump"] = make_stream(synth_explosion(0.45, 0.1, 70.0))
 	streams["base_hit"] = make_stream(synth_structure_hit())
 	streams["heli_hit"] = make_stream(synth_clang(0.45, [400.0, 1150.0, 2300.0], 10.0))
-	streams["lock_tone"] = make_stream(synth_beep_loop(0.6, 0.18, 950.0), true)
+	streams["lock_tone"] = make_stream(synth_pip_loop(1.0, 0.09, 660.0), true)
 	streams["inbound_tone"] = make_stream(synth_beep_loop(0.16, 0.08, 1500.0), true)
 	streams["rotor_loop"] = make_stream(synth_rotor_loop(), true)
 	streams["ui_click"] = make_stream(synth_click())
@@ -420,6 +421,19 @@ func synth_beep_loop(period: float, beep: float, freq: float) -> PackedFloat32Ar
 		var fade := minf(minf(t / 0.005, (beep - t) / 0.005), 1.0)
 		var tone := sin(TAU * freq * t) * 0.6 + signf(sin(TAU * freq * t)) * 0.25
 		out[i] = tone * fade
+	return out
+
+
+# Soft warning: one short, pure pip per loop that rings off quickly, so a
+# long lock doesn't grate.
+func synth_pip_loop(period: float, pip: float, freq: float) -> PackedFloat32Array:
+	var n := int(period * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in mini(int(pip * RATE), n):
+		var t := float(i) / RATE
+		var env := minf(t / 0.006, 1.0) * exp(-t * 4.0 / pip)
+		out[i] = sin(TAU * freq * t) * env
 	return out
 
 

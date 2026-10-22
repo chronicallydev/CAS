@@ -7,10 +7,12 @@ extends CanvasLayer
 # The mission context calls initialize(). The helicopter draws its own hull
 # bar, ability readout and lock warnings.
 
-const ACCENT := Color(1.0, 0.72, 0.25)
-const TEXT := Color(0.92, 0.93, 0.9)
-const MUTED := Color(0.7, 0.72, 0.68)
-const DANGER := Color(1.0, 0.35, 0.3)
+# The HUD is 1-bit (see PixelArt): everything is white text with a black
+# outline, told apart by size rather than colour.
+const ACCENT := Color.WHITE
+const TEXT := Color.WHITE
+const MUTED := Color.WHITE
+const DANGER := Color.WHITE
 
 const Indicators := preload("res://features/mission/hud/offscreen_indicators.gd")
 
@@ -79,8 +81,8 @@ func make_label(text: String, size: int, color: Color, align := HORIZONTAL_ALIGN
 	label.horizontal_alignment = align
 	label.add_theme_font_size_override("font_size", UiStyle.px(size))
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
-	label.add_theme_constant_override("outline_size", 6)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 12)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
@@ -94,6 +96,9 @@ func build_readout() -> void:
 
 	title_label = make_label("TEST RANGE", 34, ACCENT)
 	score_label = make_label("SCORE  0", 22, TEXT)
+	for label in [title_label, score_label]:
+		label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
+		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(title_label)
 	box.add_child(score_label)
 

@@ -558,15 +558,15 @@ func update_hud(delta: float) -> void:
 		warning_label.visible = false
 	elif incoming:
 		warning_label.text = "MISSILE INBOUND"
-		warning_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2))
+		warning_label.add_theme_color_override("font_color", Color.WHITE)
 		warning_label.visible = fmod(time, 0.25) < 0.15
 	elif lock_warning_timer > 0.0:
 		warning_label.text = "MISSILE LOCK"
-		warning_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.2))
+		warning_label.add_theme_color_override("font_color", Color.WHITE)
 		warning_label.visible = fmod(time, 0.6) < 0.4
 	elif out_of_bounds:
 		warning_label.text = "LEAVING AREA OF OPERATIONS"
-		warning_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+		warning_label.add_theme_color_override("font_color", Color.WHITE)
 		warning_label.visible = fmod(time, 0.8) < 0.55
 	else:
 		warning_label.visible = false
@@ -611,10 +611,12 @@ func build_hud() -> void:
 	# Hull bar at the bottom centre.
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	box.offset_left = -260
-	box.offset_right = 260
-	box.offset_top = -96
+	box.offset_left = -360
+	box.offset_right = 360
+	box.offset_top = -230
 	box.offset_bottom = -24
+	box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	box.alignment = BoxContainer.ALIGNMENT_END
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(box)
 
@@ -622,18 +624,28 @@ func build_hud() -> void:
 	caption.text = "HULL"
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.add_theme_font_size_override("font_size", UiStyle.px(16))
+	caption.add_theme_color_override("font_outline_color", Color.BLACK)
+	caption.add_theme_constant_override("outline_size", 12)
+	caption.add_theme_stylebox_override("normal", UiStyle.plate(4.0))
+	caption.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(caption)
 
 	health_bar = ProgressBar.new()
 	health_bar.max_value = max_health
 	health_bar.value = health
 	health_bar.show_percentage = false
-	health_bar.custom_minimum_size = Vector2(320, 14)
+	# Solid white on black inside a white frame: it has to read in 1-bit at
+	# the low-res HUD's pixel size.
+	health_bar.custom_minimum_size = Vector2(440, 40)
 	health_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+	bg.bg_color = Color.BLACK
+	bg.border_color = Color.WHITE
+	bg.set_border_width_all(8)
 	var fill := StyleBoxFlat.new()
-	fill.bg_color = Color(0.3, 0.85, 0.45)
+	fill.bg_color = Color.WHITE
+	fill.border_color = Color.BLACK
+	fill.set_border_width_all(8)
 	health_bar.add_theme_stylebox_override("background", bg)
 	health_bar.add_theme_stylebox_override("fill", fill)
 	box.add_child(health_bar)
@@ -643,19 +655,23 @@ func build_hud() -> void:
 	flare_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	flare_label.add_theme_font_size_override("font_size", UiStyle.px(16))
 	flare_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5))
-	flare_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
-	flare_label.add_theme_constant_override("outline_size", 4)
+	flare_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	flare_label.add_theme_constant_override("outline_size", 12)
+	flare_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
+	flare_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(flare_label)
 
 	# Lock / missile warning above the hull bar.
 	warning_label = Label.new()
 	warning_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	warning_label.offset_left = -200
-	warning_label.offset_right = 200
-	warning_label.offset_top = -142
-	warning_label.offset_bottom = -102
+	warning_label.offset_left = -500
+	warning_label.offset_right = 500
+	warning_label.offset_top = -330
+	warning_label.offset_bottom = -250
 	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	warning_label.add_theme_font_size_override("font_size", UiStyle.px(30))
+	warning_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	warning_label.add_theme_constant_override("outline_size", 12)
 	warning_label.visible = false
 	layer.add_child(warning_label)
 

@@ -122,7 +122,7 @@ func incoming_missiles(heli_velocity: Variant = null) -> Array:
 	var found: Array = []
 	var heli_position := helicopter.global_position
 	for missile in get_tree().get_nodes_in_group("aa_missiles"):
-		if missile.lost or missile.deflected or not missile.ignited or missile.target != helicopter:
+		if missile.lost or missile.deflected or not missile.deflectable or not missile.ignited or missile.target != helicopter:
 			continue
 		var offset: Vector3 = heli_position - missile.global_position
 		var distance := offset.length()

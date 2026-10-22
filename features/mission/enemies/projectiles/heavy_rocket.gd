@@ -36,6 +36,8 @@ var break_offs: int = 0
 
 func _init() -> void:
 	ignores_flares = true
+	# Too heavy to turn back: it has to be outflown, every pass.
+	deflectable = false
 	size = 1.8
 	damage = 50.0
 	fuze_radius = 5.0

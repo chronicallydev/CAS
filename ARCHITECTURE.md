@@ -51,8 +51,10 @@ TestRange (features/test_range/test_range.tscn, TestRangeContext)
   `MissionContext.spawn_parent(self)`, the mission's `World` node, so it is
   all freed with the mission.
 
-`Sfx` and `PixelArt` are the only autoloads. They are engine-level services
-and hold no game state.
+`Sfx`, `Music` and `PixelArt` are the only autoloads. They are engine-level
+services and hold no game state. `PixelArt` also redirects every UI
+CanvasLayer into its low-res, 1-bit UI viewport (the test range panel opts
+out with the `crisp_ui` meta); `UiStyle.px` sizes text to that grid.
 
 ## Loadout
 

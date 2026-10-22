@@ -5,7 +5,7 @@ extends Node
 # Whenever a scene has an active 3D camera, a second camera in a low-res
 # SubViewport (sharing the same world) copies it, renders with toon shading
 # and a pixel outline pass, and the result is scaled up with nearest
-# filtering behind the 2D UI, which stays crisp. With an orthographic
+# filtering behind the 2D UI. With an orthographic
 # camera the pixel camera is snapped to the pixel grid and the leftover
 # sub-pixel offset is applied to the upscaled image, so the scene doesn't
 # shimmer as the view moves. A retro colour pass on the upscaled image can
@@ -15,15 +15,26 @@ extends Node
 # It holds no game state: the root context switches it on or off from
 # GameSettings.pixel_art.
 #
+# The 2D UI goes the same way: every CanvasLayer that appears draws into a
+# low-res viewport (its custom_viewport) at the same pixel size as the 3D,
+# laid out in the window's usual coordinates (size_2d_override), and is
+# shown scaled up with nearest filtering through a 1-bit pass
+# (ui_1bit.gdshader). Input still goes through the window as before: only
+# the drawing moves. Layers with the "crisp_ui" meta (the test range's dev panel) stay
+# full resolution.
+#
 # Approach adapted from "3D Pixel Art - Tutorial" by Eduardo Schildt (MIT).
 
 const OUTLINE_SHADER := preload("res://shared/pixelart/pixel_outline.gdshader")
 const PALETTE_SHADER := preload("res://shared/pixelart/retro_palette.gdshader")
+const UI_SHADER := preload("res://shared/pixelart/ui_1bit.gdshader")
 
 # Set by the root context from GameSettings.pixel_art.
 @export var enabled: bool = true
 # Height of the low-res image; the pixel size is window height / this.
 @export var target_height: float = 240.0
+# Draw the UI at the low resolution, in black and white (see above).
+@export var pixel_ui: bool = true
 # Convert every StandardMaterial3D to toon shading as it appears.
 @export var toon_shading: bool = true
 # Index into RetroPalettes.LIST (0 = black & white, the game's look).
@@ -52,6 +63,10 @@ var invert_left: float = 0.0
 # The scene camera we're copying, and its own cull mask to restore.
 var source_camera: Camera3D
 var source_cull_mask: int = 0
+# The low-res UI: its viewport, and the layer and rect that show it.
+var ui_viewport: SubViewport
+var ui_layer: CanvasLayer
+var ui_display: TextureRect
 
 
 func _ready() -> void:
@@ -101,10 +116,12 @@ func _ready() -> void:
 	dither = dither
 	layer.add_child(display)
 
+	build_ui()
 	get_tree().node_added.connect(_on_node_added)
 
 
 func _process(delta: float) -> void:
+	sync_ui()
 	if invert_left > 0.0:
 		invert_left -= delta
 		palette_material.set_shader_parameter("invert", invert_left > 0.0)
@@ -200,12 +217,82 @@ func sync_camera(camera: Camera3D) -> void:
 	display.position = (window - display.size) * 0.5 + shift
 
 
+# --- Low-res UI -----------------------------------------------------------
+
+func build_ui() -> void:
+	ui_viewport = SubViewport.new()
+	ui_viewport.transparent_bg = true
+	ui_viewport.disable_3d = true
+	ui_viewport.size_2d_override_stretch = true
+	ui_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(ui_viewport)
+
+	ui_layer = CanvasLayer.new()
+	ui_layer.layer = 120
+	add_child(ui_layer)
+	ui_display = TextureRect.new()
+	ui_display.texture = ui_viewport.get_texture()
+	ui_display.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	ui_display.stretch_mode = TextureRect.STRETCH_SCALE
+	ui_display.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ui_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var material := ShaderMaterial.new()
+	material.shader = UI_SHADER
+	ui_display.material = material
+	ui_layer.add_child(ui_display)
+
+
+## Canvas units per low-res UI pixel, for sizing UI to the pixel grid (see
+## UiStyle.px).
+func ui_pixel_units() -> float:
+	var window := Vector2(get_window().size)
+	var canvas := get_viewport().get_visible_rect().size
+	var ui_pixel := maxi(1, roundi(window.y / target_height))
+	return ui_pixel * canvas.y / window.y
+
+
+# Sizes the UI viewport to the window in low-res pixels (as the 3D image),
+# with its 2D laid out in the usual canvas coordinates over the same area.
+func sync_ui() -> void:
+	ui_layer.visible = pixel_ui
+	if not pixel_ui:
+		return
+	var window := Vector2(get_window().size)
+	var canvas := get_viewport().get_visible_rect().size
+	var canvas_scale: float = window.y / canvas.y
+	ui_layer.transform = Transform2D.IDENTITY.scaled(Vector2.ONE / canvas_scale)
+	var ui_pixel := maxi(1, roundi(window.y / target_height))
+	var low := Vector2i((window / ui_pixel).ceil())
+	if low != ui_viewport.size:
+		ui_viewport.size = low
+	ui_viewport.size_2d_override = Vector2i((Vector2(low) * ui_pixel / canvas_scale).round())
+	ui_display.size = Vector2(low) * ui_pixel
+
+
 # --- Toon materials -----------------------------------------------------
 
 func _on_node_added(node: Node) -> void:
+	if pixel_ui and node is CanvasLayer and node != layer and node != ui_layer and not node.has_meta("crisp_ui") and not node.has_meta("pixel_ui"):
+		adopt_layer.call_deferred(node)
 	if toon_shading and enabled and node is GeometryInstance3D:
 		# Deferred, so code that builds a mesh can finish setting it up.
 		convert_node.call_deferred(node)
+
+
+# Moves a UI layer onto the low-res viewport. The engine only gets that
+# right for a layer outside the tree (set inside, it later disconnects the
+# wrong viewport), so it's taken out and put back where it was.
+# Untyped: it may have been freed before this deferred call.
+func adopt_layer(node: Variant) -> void:
+	if not is_instance_valid(node) or not node.is_inside_tree():
+		return
+	node.set_meta("pixel_ui", true)
+	var parent: Node = node.get_parent()
+	var index: int = node.get_index()
+	parent.remove_child(node)
+	node.custom_viewport = ui_viewport
+	parent.add_child(node)
+	parent.move_child(node, index)
 
 
 # Untyped: the node may have been freed before this deferred call runs, and

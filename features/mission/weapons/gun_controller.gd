@@ -137,14 +137,18 @@ func _ready() -> void:
 	weapon_label = Label.new()
 	weapon_label.add_theme_font_size_override("font_size", UiStyle.px(24))
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	weapon_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
-	weapon_label.add_theme_constant_override("outline_size", 6)
+	weapon_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	weapon_label.add_theme_constant_override("outline_size", 12)
+	weapon_label.add_theme_stylebox_override("normal", UiStyle.plate(6.0))
+	weapon_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	# Bottom-right corner, clear of the hull bar.
 	weapon_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	weapon_label.offset_left = -460
-	weapon_label.offset_top = -64
+	# Sized to its text (its plate hugs it), growing up and left from there.
+	weapon_label.offset_left = -24
+	weapon_label.offset_top = -24
 	weapon_label.offset_right = -24
-	weapon_label.offset_bottom = -20
+	weapon_label.offset_bottom = -24
+	weapon_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	kill_count.get_parent().add_child.call_deferred(weapon_label)
 	# Kills are shown in the HUD readout now.
 	kill_count.visible = false

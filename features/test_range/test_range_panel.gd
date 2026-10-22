@@ -115,6 +115,11 @@ var portrait_sway: bool = true
 var portrait_values: Dictionary = {}  # uniform -> value, once changed
 
 
+# A dev tool: kept at full resolution and in colour (see PixelArt).
+func _init() -> void:
+	set_meta("crisp_ui", true)
+
+
 func initialize(context: TestRangeContext) -> void:
 	range_context = context
 	layer = 20
@@ -145,7 +150,7 @@ func _process(delta: float) -> void:
 func label(text: String, size: int = 14, color: Color = TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", UiStyle.px(size))
+	l.add_theme_font_size_override("font_size", UiStyle.crisp_px(size))
 	l.add_theme_color_override("font_color", color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
@@ -155,7 +160,7 @@ func button(text: String, action: Callable, size: int = 14) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", UiStyle.px(size))
+	b.add_theme_font_size_override("font_size", UiStyle.crisp_px(size))
 	b.pressed.connect(func() -> void:
 		Sfx.play_2d("ui_click")
 		action.call())
@@ -167,7 +172,7 @@ func check(text: String, on: bool, action: Callable) -> CheckBox:
 	c.text = text
 	c.button_pressed = on
 	c.focus_mode = Control.FOCUS_NONE
-	c.add_theme_font_size_override("font_size", UiStyle.px(14))
+	c.add_theme_font_size_override("font_size", UiStyle.crisp_px(14))
 	c.toggled.connect(action)
 	return c
 
@@ -284,7 +289,7 @@ func build_ui() -> void:
 	stats_label.fit_content = true
 	stats_label.scroll_active = false
 	stats_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_label.add_theme_font_size_override("normal_font_size", UiStyle.px(13))
+	stats_label.add_theme_font_size_override("normal_font_size", UiStyle.crisp_px(13))
 	stats_label.add_theme_color_override("default_color", TEXT)
 	column.add_child(stats_label)
 	column.add_child(button("RESET STATS", range_context.reset_stats))
@@ -447,6 +452,7 @@ func copy_movement() -> void:
 
 func build_portrait() -> void:
 	portrait_layer = CanvasLayer.new()
+	portrait_layer.set_meta("crisp_ui", true)
 	portrait_layer.layer = layer - 1
 	add_child(portrait_layer)
 

@@ -11,6 +11,9 @@ extends Node3D
 #               turn up again in the stretch's city
 #   depot     - fuel tanks that set each other off, with a few guards
 #   tank_line - dug-in tanks behind berms, riflemen in a trench behind
+#   patrol    - a few riflemen and a car wandering about, coming at you
+#               with their usual moves (the early stretches)
+#   armored_patrol - the same with a tank along
 # Units go into the mission world like any other enemy; buildings and
 # scenery are children of this node.
 
@@ -22,10 +25,11 @@ const TankScene := preload("res://features/mission/enemies/tank.tscn")
 const CarScene := preload("res://features/mission/enemies/car.tscn")
 const InfantryScene := preload("res://features/mission/enemies/infantry.tscn")
 
-const KINDS := ["compound", "convoy", "depot", "tank_line"]
-const NAMES := {"compound": "COMPOUND", "convoy": "CONVOY", "depot": "FUEL DEPOT", "tank_line": "TANK LINE"}
+const KINDS := ["compound", "convoy", "depot", "tank_line", "patrol", "armored_patrol"]
+const NAMES := {"compound": "COMPOUND", "convoy": "CONVOY", "depot": "FUEL DEPOT", "tank_line": "TANK LINE",
+		"patrol": "PATROL", "armored_patrol": "PATROL"}
 
-@export_enum("compound", "convoy", "depot", "tank_line") var kind: String = "compound"
+@export_enum("compound", "convoy", "depot", "tank_line", "patrol", "armored_patrol") var kind: String = "compound"
 @export var convoy_speed: float = 6.0
 # The convoy sets off once the view centre is this close to it, and a
 # vehicle this far out to the side has got away.
@@ -51,6 +55,8 @@ func _ready() -> void:
 		"convoy": build_convoy()
 		"depot": build_depot()
 		"tank_line": build_tank_line()
+		"patrol": build_patrol(false)
+		"armored_patrol": build_patrol(true)
 		_: build_compound()
 
 
@@ -58,9 +64,14 @@ func display_name() -> String:
 	return NAMES.get(kind, "TARGET")
 
 
-## Furthest-back z the view must keep on screen while this stands.
+## Furthest-back z the view must keep on screen while this stands: its
+## own back edge, or a part that has wandered further back.
 func rear_z() -> float:
-	return global_position.z + depth * 0.5
+	var rear := global_position.z + depth * 0.5
+	for part in parts:
+		if alive(part):
+			rear = maxf(rear, part.global_position.z + 4.0)
+	return rear
 
 
 func _physics_process(delta: float) -> void:
@@ -168,6 +179,18 @@ func build_tank_line() -> void:
 	P.box(self, Vector3(count * 12.0, 0.05, 2.4), Vector3(0, ground_y + 0.02, -6.0), Building.material(Color(0.2, 0.18, 0.17))).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for i in count + 2:
 		unit(InfantryScene, Vector3(randf_range(-0.5, 0.5) * count * 12.0, 0, -6.0))
+
+
+func build_patrol(armored: bool) -> void:
+	depth = 20.0
+	var squad: Array = [InfantryScene, InfantryScene, InfantryScene, CarScene]
+	if armored:
+		squad = [InfantryScene, InfantryScene, CarScene, TankScene]
+	for scene: PackedScene in squad:
+		var node := unit(scene, Vector3(randf_range(-16.0, 16.0), 0, randf_range(-8.0, 8.0)))
+		# On the move, not dug in.
+		node.set("dug_in", false)
+		parts.append(node)
 
 
 func add_building(building: Building, at: Vector3) -> Building:
