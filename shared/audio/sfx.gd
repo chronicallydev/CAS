@@ -69,6 +69,8 @@ const MIX := {
 	# Chain dodge: time stopping on a perfect dodge, and starting again.
 	"time_stop": -2.0,
 	"time_resume": -9.0,
+	# Minigun rounds glancing off the ground or armour.
+	"ricochet": -16.0,
 }
 
 # Per sound: [max voices at once, min milliseconds between starts].
@@ -85,6 +87,7 @@ const LIMITS := {
 	"body_thud": [4, 40],
 	"gear_clank": [3, 50],
 	"scream": [1, 1200],
+	"ricochet": [3, 55],
 }
 
 var streams: Dictionary = {}
@@ -132,6 +135,7 @@ func _ready() -> void:
 	streams["missile_flyby"] = streams["dash_whoosh"]
 	streams["time_stop"] = make_stream(synth_time_stop())
 	streams["time_resume"] = make_stream(synth_time_resume())
+	streams["ricochet"] = make_stream(synth_ricochet())
 
 
 func get_stream(sound: String) -> AudioStream:
@@ -537,6 +541,23 @@ func synth_time_stop() -> PackedFloat32Array:
 			# Slight detune beats against the next partial: a shimmer.
 			ring += sin(TAU * partials[k] * t + sin(TAU * 5.0 * t) * 0.4) / (1.0 + k)
 		s += ring * minf(t / 0.01, 1.0) * exp(-t * 2.6) * 0.35
+		out[i] = s
+	return out
+
+
+# A round glancing off: a click, then a thin whine dropping in pitch as it
+# flies off.
+func synth_ricochet() -> PackedFloat32Array:
+	var duration := 0.22
+	var n := int(duration * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		phase += lerpf(3400.0, 1500.0, t / duration) / RATE
+		var s := sin(TAU * phase) * minf(t / 0.004, 1.0) * exp(-t * 16.0)
+		s += noise() * exp(-t * 220.0) * 0.9
 		out[i] = s
 	return out
 

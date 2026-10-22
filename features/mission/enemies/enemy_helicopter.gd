@@ -74,6 +74,13 @@ const HeavyRocket := preload("res://features/mission/enemies/projectiles/heavy_r
 # dashes, if it has a charge, so the player has to find it again.
 @export var jink_damage: float = 5.0
 
+@export_group("Hits")
+# Each hit knocks the airframe this far (metres) away from the shot and
+# twitches its roll; it springs back at hit_recover per second.
+@export var hit_jolt: float = 0.35
+@export var hit_twitch_degrees: float = 5.0
+@export var hit_recover: float = 12.0
+
 @export_group("Crash")
 @export var crash_explosion_scale: float = 2.4
 @export var crash_spin: float = 9.0
@@ -92,6 +99,8 @@ var dash_direction: Vector3 = Vector3.ZERO
 var judged_threats: Dictionary = {}
 # Recent damage, for jinking under fire (see jink_damage).
 var under_fire: float = 0.0
+# The body's knock-back from hits (see hit_jolt).
+var jolt: Vector3 = Vector3.ZERO
 var crashing: bool = false
 var crash_velocity: Vector3 = Vector3.ZERO
 var smoke: CPUParticles3D
@@ -107,6 +116,14 @@ func _ready() -> void:
 	build_model()
 	super()
 	add_to_group("air_enemies")
+	# Sparks, chips and holes for every hit, smoke below half health and
+	# fire below a quarter (see vehicle_damage.gd), placed on the fuselage
+	# only: the model's full box is mostly rotor disc.
+	damage_fx = VehicleDamage.new()
+	add_child(damage_fx)
+	var hull := fuselage * model_scale
+	damage_fx.bounds = AABB(-hull, hull * 2.0)
+	damage_fx.bounds_ready = true
 	position.y = altitude
 	orbit_direction = 1.0 if randf() < 0.5 else -1.0
 	orbit_timer = randf_range(orbit_swap_min, orbit_swap_max)
@@ -212,6 +229,8 @@ func lean(delta: float) -> void:
 	var follow := 1.0 - exp(-8.0 * delta)
 	body.rotation.x = lerpf(body.rotation.x, local.z * tilt, follow)
 	body.rotation.z = lerpf(body.rotation.z, -local.x * tilt, follow)
+	jolt = jolt.lerp(Vector3.ZERO, 1.0 - exp(-hit_recover * delta))
+	body.position = global_transform.basis.inverse() * jolt
 
 
 # --- Dash ----------------------------------------------------------------------
@@ -340,6 +359,16 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 			under_fire = 0.0
 			jink()
 	return killed
+
+
+# Every hit that doesn't kill: the damage effects, plus a knock away from
+# the shot and a twitch of the roll, so rounds visibly land.
+func register_hit(from: Vector3, light_weapon: bool) -> void:
+	super(from, light_weapon)
+	var away := global_position - from
+	away.y = 0.0
+	jolt = (jolt + away.normalized() * hit_jolt).limit_length(hit_jolt * 3.5)
+	body.rotation.z += deg_to_rad(randf_range(-hit_twitch_degrees, hit_twitch_degrees))
 
 
 # Breaks off under fire: circles the other way and, with a charge, dashes

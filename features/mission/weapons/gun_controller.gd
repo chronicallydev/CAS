@@ -54,6 +54,9 @@ const Rocket := preload("res://features/mission/weapons/rocket.gd")
 @export_range(0.1, 100.0, 0.1) var minigun_damage: float = 1.0
 @export_range(0.05, 2.0, 0.05) var minigun_explosion_scale: float = 0.35
 @export var minigun_shake_strength: float = 1.5
+# Share of ground rounds that glance off as a ricochet streak. On an enemy
+# helicopter the chance is its armour (light_armor).
+@export_range(0.0, 1.0, 0.05) var ricochet_chance: float = 0.3
 # Barrels spin up for this long before the first round.
 @export_range(0.0, 3.0, 0.05) var minigun_spin_up: float = 0.4
 # Seconds of continuous fire until it overheats.
@@ -446,7 +449,12 @@ func fire_air_round(from: Vector3, target: Node3D, spread: float) -> void:
 	var jinking: bool = is_instance_valid(target) and target.get("dash_time_left") > 0.0
 	if is_instance_valid(target) and target.is_in_group("air_enemies") and not jinking and target.global_position.distance_to(aim) <= air_hit_radius:
 		# On the hull: a burst there and the damage on this target alone.
+		# Armour turns some rounds aside with a ping.
 		spawn_impact(target.global_position, minigun_explosion_scale)
+		var armor: float = target.get("light_armor") if target.get("light_armor") != null else 0.0
+		if randf() < armor:
+			var outward := (from - target.global_position).normalized()
+			spawn_ricochet(target.global_position, target.global_position - from, (outward + Vector3.UP * 0.5).normalized())
 		if damage_enemy(target, minigun_damage, true):
 			report_kills(1, target.get("max_health") >= HEAVY_KILL_HEALTH)
 	else:
@@ -577,6 +585,26 @@ func schedule_explosion(from: Vector3, position: Vector3, delay: float, radius: 
 		return
 
 	explode_at(position, radius, hit_damage, vfx_scale, light_weapon)
+	if light_weapon and randf() < ricochet_chance:
+		spawn_ricochet(position, position - from, Vector3.UP)
+
+
+# A round glancing off at `at`: a short bright streak bouncing away
+# (`incoming` mirrored off the surface `normal`, kept shallow and
+# scattered) and a ping.
+func spawn_ricochet(at: Vector3, incoming: Vector3, normal: Vector3) -> void:
+	var bounce := incoming.normalized().bounce(normal)
+	bounce += normal * randf_range(0.1, 0.5) + random_spread(0.6)
+	var to := at + bounce.normalized() * randf_range(6.0, 12.0)
+	var streak := Tracer.new()
+	streak.radius = 0.16
+	streak.length = 2.2
+	streak.outline = 0.28
+	streak.color = Color.WHITE
+	streak.outline_color = Color.BLACK
+	MissionContext.spawn_parent(self).add_child(streak)
+	streak.setup(at, to, randf_range(0.1, 0.18), 0.0, Callable())
+	Sfx.play_3d("ricochet", at, 0.0, randf_range(0.85, 1.25), 0.0)
 
 
 # Visible round flying from the muzzle to where it will land.
