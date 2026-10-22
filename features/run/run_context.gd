@@ -67,6 +67,7 @@ func start_run() -> void:
 	add_child(director)
 	director.stretch_started.connect(_on_stretch_started)
 	director.arena_started.connect(func(_index: int) -> void:
+		Music.play("final_arena" if director.is_last_stretch() else "arena")
 		screens.show_banner("INTERCEPT"))
 	director.arena_cleared.connect(_on_arena_cleared)
 	director.run_complete.connect(_on_run_complete)
@@ -75,6 +76,7 @@ func start_run() -> void:
 
 func _on_stretch_started(index: int) -> void:
 	mission.hud.title_label.text = "STRETCH %d / %d" % [index + 1, stretch_count]
+	Music.play("final_travel" if index == stretch_count - 1 else "travel")
 	screens.show_banner("FINAL STRETCH" if index == stretch_count - 1 else "GO  ^")
 
 
@@ -84,8 +86,10 @@ func _on_arena_cleared(_index: int) -> void:
 	if over or mission.helicopter.dead:
 		return
 	get_tree().paused = true
+	Music.duck(true)
 	screens.show_picks("CLEARED - PICK ONE", RunUpgrades.offer(mission), func(id: String) -> void:
 		RunUpgrades.apply(id, mission)
+		Music.duck(false)
 		get_tree().paused = false
 		director.next_stretch())
 
@@ -106,6 +110,7 @@ func end_run(title: String) -> void:
 		return
 	over = true
 	get_tree().paused = true
+	Music.play("run_complete" if director.state == RunDirector.State.DONE else "shot_down")
 	var lines := [
 		"Stretch %d / %d" % [director.stretch + 1, stretch_count],
 		"Kills %d     Score %d" % [mission.guns.kills, mission.score],

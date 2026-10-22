@@ -63,6 +63,7 @@ var _time: float = 0.0
 func _ready() -> void:
 	panel.initialize(self)
 	rebuild()
+	Music.play("test_range")
 
 
 func _process(delta: float) -> void:

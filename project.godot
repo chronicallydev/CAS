@@ -18,6 +18,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 Sfx="*res://shared/audio/sfx.gd"
+Music="*res://shared/audio/music.gd"
 PixelArt="*res://shared/pixelart/pixel_art.gd"
 
 [display]
