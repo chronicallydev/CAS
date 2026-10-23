@@ -51,6 +51,9 @@ const MIX := {
 	"ui_click": -10.0,
 	# Hit and kill confirmation (heard constantly, so kept small).
 	"hit_tick": -18.0,
+	# A gun round landing on something: a short metal thwack, pitched up
+	# through a burst (gun_controller.gd).
+	"gun_hit": -9.0,
 	"kill_tick": -11.0,
 	"combo": -6.0,
 	# Minigun spin-up whine.
@@ -83,6 +86,7 @@ const LIMITS := {
 	"heli_hit": [2, 100],
 	"tank_fire": [3, 60],
 	"hit_tick": [2, 70],
+	"gun_hit": [3, 40],
 	"kill_tick": [3, 40],
 	"rocket_fire": [6, 40],
 	"body_thud": [4, 40],
@@ -119,6 +123,7 @@ func _ready() -> void:
 	streams["rotor_loop"] = make_stream(synth_rotor_loop(), true)
 	streams["ui_click"] = make_stream(synth_click())
 	streams["hit_tick"] = make_stream(synth_blips([2600.0], 0.03))
+	streams["gun_hit"] = make_stream(synth_clang(0.14, [480.0, 1350.0, 2600.0], 28.0))
 	streams["kill_tick"] = make_stream(synth_blips([1700.0, 2550.0], 0.05))
 	streams["combo"] = make_stream(synth_blips([880.0, 1175.0, 1760.0], 0.08))
 	streams["spin_up"] = make_stream(synth_spin_up())

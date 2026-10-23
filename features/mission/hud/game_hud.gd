@@ -37,6 +37,7 @@ var combo_tween: Tween
 var indicators: Control
 var dodge_fx: DodgeFx
 var missile_warning: MissileWarning
+var damage_numbers: DamageNumbers
 
 
 func _ready() -> void:
@@ -54,6 +55,10 @@ func initialize(mission_context: MissionContext) -> void:
 	indicators = Indicators.new()
 	indicators.helicopter = mission.helicopter
 	add_child(indicators)
+
+	# Damage numbers flying out of what the guns hit.
+	damage_numbers = DamageNumbers.new()
+	add_child(damage_numbers)
 
 	# Chevrons round the helicopter for missiles homing on it.
 	missile_warning = MissileWarning.new()

@@ -13,6 +13,8 @@ extends Node
 const MAX_HOLES := 12
 # Fastest rate holes are added (sparks still show for every hit).
 const HOLE_INTERVAL_MS := 90
+# Fastest rate gun hits knock a shard of bodywork off.
+const SHARD_INTERVAL_MS := 120
 const Debris := preload("res://features/mission/effects/debris.gd")
 
 static var hole_texture: Texture2D
@@ -22,11 +24,12 @@ static var spark_mesh: Mesh
 var vehicle: Node3D
 var holes: Array = []
 var last_hole_ms: int = -100000
+var last_shard_ms: int = -100000
 var bounds: AABB
 var bounds_ready: bool = false
 var smoke: CPUParticles3D
 var fire: CPUParticles3D
-# The vehicle's own paint, for chips knocked off by heavy hits.
+# The vehicle's own paint, for chips knocked off by hits.
 var paints: Array = []
 
 
@@ -49,9 +52,13 @@ func register_hit(from: Vector3, light_weapon: bool, armored: bool) -> void:
 	var world_normal := (vehicle.global_transform.basis * normal).normalized()
 	spawn_sparks(vehicle.global_transform * point, world_normal, armored)
 
-	# Heavy hits knock chips of bodywork off.
+	# Heavy hits knock chips of bodywork off; gun hits a shard now and then,
+	# so held fire visibly chews the thing up.
 	if not light_weapon:
 		spawn_chips(vehicle.global_transform * point, world_normal)
+	elif not armored and Time.get_ticks_msec() - last_shard_ms >= SHARD_INTERVAL_MS:
+		last_shard_ms = Time.get_ticks_msec()
+		spawn_chips(vehicle.global_transform * point, world_normal, 1)
 
 	# Armour shrugs the round off: ricochet sparks, no hole.
 	if armored:
@@ -239,10 +246,16 @@ func make_emitter(role: String, amount: int, life: float, size: float, rise: flo
 
 # --- Chips --------------------------------------------------------------
 
-func spawn_chips(at: Vector3, normal: Vector3) -> void:
+# `count` chips of the vehicle's paint flying off `at` (0: a few).
+func spawn_chips(at: Vector3, normal: Vector3, count: int = 0) -> void:
 	if paints.is_empty():
+		# Gun hits land mid hit flash: read each mesh's own material, not the
+		# flash's, and leave out rims and drop shadows.
+		var flash := vehicle.get_node_or_null("HitFlash") as HitFlash
 		for mesh in vehicle.find_children("*", "MeshInstance3D", true, false):
-			var material: Material = mesh.material_override
+			if mesh.has_meta("one_bit_rim") or mesh.has_meta("no_hit_flash"):
+				continue
+			var material: Material = flash.flashed[mesh] if flash != null and flash.flashed.has(mesh) else mesh.material_override
 			if material == null and mesh.mesh != null and mesh.mesh.get_surface_count() > 0:
 				material = mesh.mesh.surface_get_material(0)
 			if material != null and not paints.has(material):
@@ -251,7 +264,7 @@ func spawn_chips(at: Vector3, normal: Vector3) -> void:
 		return
 
 	var scene := MissionContext.spawn_parent(vehicle)
-	for i in randi_range(2, 4):
+	for i in count if count > 0 else randi_range(2, 4):
 		Debris.spawn_chip(scene, at, normal, paints.pick_random())
 
 

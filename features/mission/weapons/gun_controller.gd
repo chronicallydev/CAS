@@ -26,6 +26,8 @@ const SLOT_BUTTONS := [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]
 const SLOT_NAMES := ["LMB", "RMB"]
 # Killing an enemy with at least this much health (tanks) freezes the game
 # for a moment.
+# Gun hits further apart than this (msec) start a new streak (see hit_streak).
+const STREAK_GAP_MS := 300
 const HEAVY_KILL_HEALTH := 10.0
 
 # Upgrades (see RunUpgrades and the end of this file).
@@ -119,6 +121,10 @@ var kills : int = 0
 # Reticle flash when rounds land on an enemy.
 var hit_flash: float = 0.0
 var hit_was_kill: bool = false
+# Gun hits landing close together, and when the last one did: the hit
+# sound climbs in pitch through a burst.
+var hit_streak: int = 0
+var last_hit_ms: int = -100000
 # Minigun barrel spin.
 var minigun_spin: float = 0.0
 # Rockets: shots left in the current salvo, time to the next, reload.
@@ -674,11 +680,16 @@ func damage_enemy(enemy: Node3D, hit_damage: float, light_weapon: bool, force: f
 	if light_weapon and not killed_now and upgraded("incendiary") and burnable(enemy) and randf() < IGNITE_CHANCE:
 		Burn.ignite(enemy, mission)
 	if enemy.get("health") != null:
-		damage_dealt.emit(health_before - maxf(enemy.health, 0.0))
+		var dealt := health_before - maxf(enemy.health, 0.0)
+		damage_dealt.emit(dealt)
+		if mission != null and mission.hud != null:
+			mission.hud.damage_numbers.add(enemy, dealt, killed_now)
 	if killed_now:
 		register_kill(enemy, enemy.score_value if "score_value" in enemy else 10)
 	else:
 		register_hit()
+		if light_weapon:
+			play_gun_hit()
 		if enemy.has_method("register_hit"):
 			enemy.register_hit(get_shot_origin(), light_weapon)
 	return killed_now
@@ -698,6 +709,14 @@ func get_shot_origin() -> Vector3:
 	if shooter != null and shooter.has_method("get_muzzle_position"):
 		return shooter.get_muzzle_position()
 	return camera.global_position if camera != null else global_position
+
+
+# A gun round landed on something: a thwack, higher the longer the burst.
+func play_gun_hit() -> void:
+	var now := Time.get_ticks_msec()
+	hit_streak = hit_streak + 1 if now - last_hit_ms < STREAK_GAP_MS else 0
+	last_hit_ms = now
+	Sfx.play_2d("gun_hit", 0.0, 0.85 + minf(hit_streak, 25) * 0.015 + randf_range(-0.03, 0.03))
 
 
 func register_hit() -> void:
