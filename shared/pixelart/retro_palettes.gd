@@ -7,8 +7,14 @@ extends RefCounted
 # brightness only, for monochrome palettes (colours listed dark to light),
 # and "curve" darkens the image first so the bright sand isn't all white.
 #
-# The game is designed as 1-bit: Black & White comes first. PICO-8 is the
-# default for now (PixelArt.palette = 4); the rest are for comparison.
+# The game is designed as 1-bit: Black & White comes first. Dusk is the
+# default for now (PixelArt.palette = 8); the rest are for comparison.
+#
+# A colour palette can also name its colours ("named", looked up by
+# OneBit.colour; PICO-8's names otherwise), restyle units its own way
+# ("ink" and "paper": [tint, brightness range, how far toward the tint];
+# see OneBit.ink) and ask for a dark ground ("night"; see
+# DesertEnvironment.night).
 
 const LIST := [
 	{"name": "Black & White", "mode": 1, "lightness": true, "curve": 1.4, "colors": [
@@ -28,6 +34,24 @@ const LIST := [
 	{"name": "Master System 64", "mode": 2, "levels": 4},
 	{"name": "Grey 4", "mode": 1, "lightness": true, "curve": 1.5, "colors": [
 		"000000", "555555", "aaaaaa", "ffffff"]},
+	# After 20 Minutes Till Dawn: a near-black plum ground, bone white for
+	# the player and what they fire, muted teal for enemies, coral for danger.
+	{"name": "Dusk", "mode": 1, "night": true, "colors": [
+		"140f17", "211a26", "2e2433", "433548", "5e4d5e",
+		"1f3a36", "2f5248", "4a7563", "7aa08a",
+		"a8968e", "d9c2b0", "f2dfcc", "fff4e6",
+		"9e2f45", "e64a5f", "f58a7a"],
+		"named": {
+			"black": "140f17", "dark_blue": "140f17", "dark_purple": "9e2f45",
+			"dark_green": "2f5248", "brown": "433548", "dark_grey": "5e4d5e",
+			"light_grey": "a8968e", "white": "f2dfcc", "red": "e64a5f",
+			"orange": "f58a7a", "yellow": "fff4e6", "green": "7aa08a",
+			"blue": "7aa08a", "lavender": "2e2433", "pink": "f58a7a",
+			"peach": "d9c2b0"},
+		# Enemies go teal, light enough to read on the dark ground; the
+		# player goes bone.
+		"ink": ["4a7563", Vector2(0.35, 0.72), 0.85],
+		"paper": ["f2dfcc", Vector2(0.82, 1.0), 0.85]},
 ]
 
 

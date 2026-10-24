@@ -586,7 +586,7 @@ func update_hud(delta: float) -> void:
 		warning_label.visible = false
 	elif incoming:
 		warning_label.text = "MISSILE INBOUND"
-		warning_label.add_theme_color_override("font_color", Color.WHITE if OneBit.mono() else OneBit.PICO.red)
+		warning_label.add_theme_color_override("font_color", Color.WHITE if OneBit.mono() else OneBit.colour("red"))
 		warning_label.visible = fmod(time, 0.25) < 0.15
 	elif lock_warning_timer > 0.0:
 		warning_label.text = "MISSILE LOCK"
@@ -624,7 +624,7 @@ func make_loop_player(sound: String) -> AudioStreamPlayer:
 func update_low_hull() -> void:
 	var low := not dead and health < max_health * LOW_HULL
 	low_smoke.emitting = low
-	var normal := Color.WHITE if OneBit.mono() else OneBit.PICO.green
+	var normal := Color.WHITE if OneBit.mono() else OneBit.colour("green")
 	if not low:
 		hull_fill.bg_color = normal
 		return
@@ -632,7 +632,7 @@ func update_low_hull() -> void:
 	if OneBit.mono():
 		hull_fill.bg_color = Color.WHITE if lit else Color.BLACK
 	else:
-		hull_fill.bg_color = OneBit.PICO.red if lit else OneBit.PICO.dark_purple
+		hull_fill.bg_color = OneBit.colour("red") if lit else OneBit.colour("dark_purple")
 
 
 func build_low_smoke() -> void:
@@ -707,7 +707,7 @@ func build_hud() -> void:
 	bg.set_border_width_all(8)
 	var fill := StyleBoxFlat.new()
 	hull_fill = fill
-	fill.bg_color = Color.WHITE if OneBit.mono() else OneBit.PICO.green
+	fill.bg_color = Color.WHITE if OneBit.mono() else OneBit.colour("green")
 	fill.border_color = Color.BLACK
 	fill.set_border_width_all(8)
 	health_bar.add_theme_stylebox_override("background", bg)

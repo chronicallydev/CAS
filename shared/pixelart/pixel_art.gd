@@ -43,9 +43,9 @@ const UI_SHADER := preload("res://shared/pixelart/ui_palette.gdshader")
 @export var pixel_ui: bool = true
 # Convert every StandardMaterial3D to toon shading as it appears.
 @export var toon_shading: bool = true
-# Index into RetroPalettes.LIST (0 = black & white; 4 = PICO-8, the look for
+# Index into RetroPalettes.LIST (0 = black & white; 8 = Dusk, the look for
 # now).
-@export var palette: int = 4:
+@export var palette: int = 8:
 	set(value):
 		palette = posmod(value, RetroPalettes.LIST.size())
 		if palette_material != null:

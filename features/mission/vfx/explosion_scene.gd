@@ -192,14 +192,14 @@ func leave_scorch() -> void:
 	for i in 3:
 		var part := MeshInstance3D.new()
 		part.mesh = disc
-		part.material_override = OneBit.solid(OneBit.PICO.brown)
+		part.material_override = OneBit.solid(OneBit.colour("brown"))
 		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		part.position = Vector3(randf_range(-0.8, 0.8), 0.0, randf_range(-0.8, 0.8)) * size
 		part.scale = Vector3(randf_range(1.4, 2.0), 1.0, randf_range(1.0, 1.6)) * size
 		mark.add_child(part)
 	var middle := MeshInstance3D.new()
 	middle.mesh = disc
-	middle.material_override = OneBit.solid(OneBit.PICO.dark_grey)
+	middle.material_override = OneBit.solid(OneBit.colour("dark_grey"))
 	middle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	middle.position.y = 0.01
 	middle.scale = Vector3(0.9, 1.0, 0.7) * size

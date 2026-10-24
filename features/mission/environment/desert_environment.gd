@@ -30,6 +30,13 @@ const GROUND := {
 	"terminal": Color(0.84, 0.76, 0.66),
 	"oilfield": Color(0.72, 0.6, 0.46),
 }
+# With a "night" palette (Dusk; see RetroPalettes) the ground is dark plum
+# instead, whatever the biome: ground colours are scaled from it by their
+# brightness, so salt and dunes still come out a step apart. The scatter
+# turns into teal grass and plum stones on it.
+const GROUND_NIGHT := Color(0.22, 0.165, 0.26)
+const GRASS_NIGHT := [Color(0.18, 0.3, 0.27), Color(0.27, 0.43, 0.36)]
+const STONE_NIGHT := Color(0.22, 0.17, 0.24)
 
 @export_enum("desert", "wadi", "saltflat", "ridge", "refinery", "terminal", "oilfield") var biome: String = "desert":
 	set(value):
@@ -134,7 +141,9 @@ func build() -> void:
 	rng.seed = seed_value
 
 	sand = P.material(Color(0.72, 0.6, 0.46), 1.0)
-	dirt = P.material(Color(0.8, 0.7, 0.6), 1.0)
+	dirt = P.material(ground_tone(Color(0.8, 0.7, 0.6)), 1.0)
+	if night():
+		dirt.metallic_specular = 0.0
 	concrete = P.material(Color(0.66, 0.64, 0.6), 0.95)
 	steel = P.material(Color(0.36, 0.38, 0.4), 0.5, 0.6)
 	pipe_mat = P.material(Color(0.55, 0.55, 0.52), 0.4, 0.7)
@@ -158,8 +167,25 @@ func tint_ground(color: Color) -> void:
 	if ground == null or ground.material == null:
 		return
 	var mat: StandardMaterial3D = ground.material.duplicate()
-	mat.albedo_color = color
+	mat.albedo_color = ground_tone(color)
+	if night():
+		# On dark ground the sky's reflection would win and turn it teal.
+		mat.metallic_specular = 0.0
 	ground.material = mat
+
+
+# True while the palette wants a dark ground (see GROUND_NIGHT). Looked up
+# by path, as this also runs in the editor, where PixelArt isn't loaded.
+func night() -> bool:
+	var pixel_art := get_node_or_null("/root/PixelArt")
+	return pixel_art != null and RetroPalettes.LIST[pixel_art.palette].get("night", false)
+
+
+# `color` as ground: itself by day, scaled from GROUND_NIGHT by night.
+func ground_tone(color: Color) -> Color:
+	if not night():
+		return color
+	return GROUND_NIGHT * (color.get_luminance() / 0.78)
 
 
 # --- Biomes ----------------------------------------------------------------
@@ -481,13 +507,17 @@ func build_roads() -> void:
 # and what they fire. Roughness 0 opts out of the outline pass; no specular
 # keeps it from mirroring the sky at that roughness.
 func ground_material(color: Color) -> StandardMaterial3D:
-	var mat := P.material(color, 0.0)
+	var mat := P.material(ground_tone(color), 0.0)
 	mat.metallic_specular = 0.0
 	return mat
 
 
 func build_dunes() -> void:
 	var dune_mat := ground_material(GROUND.get(biome, GROUND["desert"]))
+	if night():
+		# Dunes face the light more than the flat ground: darker, to stay a
+		# quiet step above it.
+		dune_mat.albedo_color *= 0.8
 
 	for i in dune_count:
 		var pos := random_ground_point(80.0, outer_radius)
@@ -503,6 +533,8 @@ func build_rocks() -> void:
 	mesh.radial_segments = 6
 	mesh.rings = 3
 	var mat := ground_material(Color(1, 1, 1))
+	# Coloured per instance, by night too.
+	mat.albedo_color = Color.WHITE
 	mat.vertex_color_use_as_albedo = true
 	mesh.material = mat
 
@@ -521,7 +553,7 @@ func build_rocks() -> void:
 		pos.y += scale.y * 0.2
 		multimesh.set_instance_transform(i, Transform3D(basis, pos))
 		var shade := rng.randf_range(0.5, 0.6)
-		multimesh.set_instance_color(i, Color(shade * 1.1, shade * 0.95, shade * 0.8))
+		multimesh.set_instance_color(i, STONE_NIGHT * shade * 1.8 if night() else Color(shade * 1.1, shade * 0.95, shade * 0.8))
 
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
@@ -535,10 +567,13 @@ func build_shrubs() -> void:
 	mesh.radial_segments = 7
 	mesh.rings = 4
 	var mat := ground_material(Color(1, 1, 1))
+	# Coloured per instance, by night too.
+	mat.albedo_color = Color.WHITE
 	mat.vertex_color_use_as_albedo = true
 	mesh.material = mat
 
-	var count := int(shrub_count * scatter_density)
+	# Denser by night: teal grass speckling the dark ground.
+	var count := int(shrub_count * scatter_density * (8.0 if night() else 1.0))
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.use_colors = true
@@ -552,7 +587,8 @@ func build_shrubs() -> void:
 		pos.y += s * 0.15
 		multimesh.set_instance_transform(i, Transform3D(basis, pos))
 		var green := rng.randf_range(0.0, 1.0)
-		multimesh.set_instance_color(i, Color(0.45, 0.42, 0.25).lerp(Color(0.38, 0.45, 0.22), green))
+		var grass: Color = GRASS_NIGHT[0].lerp(GRASS_NIGHT[1], green)
+		multimesh.set_instance_color(i, grass if night() else Color(0.45, 0.42, 0.25).lerp(Color(0.38, 0.45, 0.22), green))
 
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh

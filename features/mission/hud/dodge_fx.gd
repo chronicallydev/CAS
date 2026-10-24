@@ -179,7 +179,7 @@ func deflect_kill(at: Vector3, kills: int) -> void:
 func make_bar() -> ColorRect:
 	var bar := ColorRect.new()
 	# Dark blue with a colour palette: time has gone cold.
-	bar.color = INK if OneBit.mono() else OneBit.PICO.dark_blue
+	bar.color = INK if OneBit.mono() else OneBit.colour("dark_blue")
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bar)
 	return bar
@@ -303,8 +303,8 @@ func _draw() -> void:
 	if chain_dodge == null or not chain_dodge.is_slowed():
 		return
 	if not OneBit.mono() and top_bar.offset_bottom > 1.0:
-		draw_rect(Rect2(0, top_bar.offset_bottom, size.x, EDGE_WIDTH), OneBit.PICO.blue)
-		draw_rect(Rect2(0, size.y + bottom_bar.offset_top - EDGE_WIDTH, size.x, EDGE_WIDTH), OneBit.PICO.blue)
+		draw_rect(Rect2(0, top_bar.offset_bottom, size.x, EDGE_WIDTH), OneBit.colour("blue"))
+		draw_rect(Rect2(0, size.y + bottom_bar.offset_top - EDGE_WIDTH, size.x, EDGE_WIDTH), OneBit.colour("blue"))
 	var missile := chain_dodge.next_missile()
 	var camera := get_viewport().get_camera_3d()
 	if missile == null or camera == null:

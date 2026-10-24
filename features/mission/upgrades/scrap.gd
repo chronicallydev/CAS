@@ -33,8 +33,8 @@ func _ready() -> void:
 	add_child(piece)
 	# A crate with a black rim and a cross on it, so it reads as a pickup:
 	# white with a black cross in 1-bit, green with a white one in colour.
-	var crate := Color.WHITE if OneBit.mono() else OneBit.PICO.green
-	var cross := Color.BLACK if OneBit.mono() else OneBit.PICO.white
+	var crate := Color.WHITE if OneBit.mono() else OneBit.colour("green")
+	var cross := Color.BLACK if OneBit.mono() else OneBit.colour("white")
 	P.box(piece, Vector3(1.6, 1.0, 1.6), Vector3.ZERO, OneBit.solid(crate))
 	P.box(piece, Vector3(1.7, 0.2, 0.4), Vector3(0, 0.52, 0), OneBit.solid(cross))
 	P.box(piece, Vector3(0.4, 0.2, 1.7), Vector3(0, 0.52, 0), OneBit.solid(cross))

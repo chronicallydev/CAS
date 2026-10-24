@@ -32,7 +32,7 @@ func add(target: Node3D, amount: float, killed: bool) -> void:
 	var label := Label.new()
 	label.text = str(maxi(roundi(amount), 1))
 	label.add_theme_font_size_override("font_size", UiStyle.px(FONT_SIZE * (2 if killed else 1)))
-	label.add_theme_color_override("font_color", Color.WHITE if not killed or OneBit.mono() else OneBit.PICO.red)
+	label.add_theme_color_override("font_color", Color.WHITE if not killed or OneBit.mono() else OneBit.colour("red"))
 	label.add_theme_color_override("font_shadow_color", Color.BLACK)
 	var shadow := roundi(PixelArt.ui_pixel_units())
 	label.add_theme_constant_override("shadow_offset_x", shadow)

@@ -48,7 +48,7 @@ func _ready() -> void:
 	# the border, so the chunk shows through where its fill has gone.
 	lag_bar = health_bar.duplicate()
 	var lag_fill := StyleBoxFlat.new()
-	lag_fill.bg_color = Color(0.5, 0.5, 0.5) if OneBit.mono() else OneBit.PICO.red
+	lag_fill.bg_color = Color(0.5, 0.5, 0.5) if OneBit.mono() else OneBit.colour("red")
 	lag_bar.add_theme_stylebox_override("fill", lag_fill)
 	viewport.add_child(lag_bar)
 	viewport.move_child(lag_bar, 0)

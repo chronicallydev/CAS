@@ -62,9 +62,27 @@ func setup() -> void:
 	helicopter.initialize(self, airframe, mounted_weapons())
 	guns.equip(mounted_types(), helicopter.weapon_muzzles)
 	camera_rig.snap()
+	if environment.night():
+		dusk_lighting()
 
 	hud.initialize(self)
 	guns.kill_registered.connect(hud.register_kill)
+
+
+## With a "night" palette (Dusk), a cool, fogless light: the desert's warm
+## fog and sun would wash the dark ground out to olive.
+func dusk_lighting() -> void:
+	var sun := world.get_node("Atmosphere/DirectionalLight3D") as DirectionalLight3D
+	sun.light_color = Color(0.86, 0.84, 1.0)
+	# Long shadows only dither into noise on the dark ground.
+	sun.shadow_enabled = false
+	var sky := (world.get_node("Atmosphere/WorldEnvironment") as WorldEnvironment).environment.duplicate() as Environment
+	sky.fog_enabled = false
+	# Filmic tonemapping and the contrast boost crush dark colours to black.
+	sky.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	sky.adjustment_enabled = false
+	sky.ambient_light_color = Color(0.4, 0.34, 0.48)
+	(world.get_node("Atmosphere/WorldEnvironment") as WorldEnvironment).environment = sky
 
 
 ## WeaponData per hardpoint (null where empty), for building the model.

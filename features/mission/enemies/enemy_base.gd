@@ -87,7 +87,7 @@ func take_damage(amount: float, light_weapon: bool = false) -> bool:
 		return true
 
 	# White, then red with a colour palette: hits on dark enemies register.
-	HitFlash.trigger(self, Color.WHITE, Color.TRANSPARENT if OneBit.mono() else OneBit.PICO.red)
+	HitFlash.trigger(self, Color.WHITE, Color.TRANSPARENT if OneBit.mono() else OneBit.colour("red"))
 	return false
 
 

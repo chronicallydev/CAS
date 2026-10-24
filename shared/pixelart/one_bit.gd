@@ -11,7 +11,7 @@ extends RefCounted
 # Mid-tones and see-through effects turn into dither noise, so effects use
 # solid puffs: a fill colour with a rim of the opposite colour.
 #
-# With a colour palette (PICO-8; see PixelArt.is_monochrome) the same rules
+# With a colour palette (Dusk, PICO-8; see PixelArt.is_monochrome) the same rules
 # hold in colour: units keep their hue (enemies darker, the player lighter),
 # and effects take their fill and rim from ROLES instead of black and white.
 # Styles are picked when a thing is built, so switching palettes mid-fight
@@ -38,23 +38,23 @@ const PICO := {
 }
 
 # What each kind of effect is drawn in: [1-bit fill, 1-bit rim, colour fill,
-# colour rim]. Enemy fire is red in colour, the colour the eye finds first
-# on the sand; the player's stays white.
+# colour rim], the colour ones by name (see colour). Enemy fire is red in
+# colour, the colour the eye finds first; the player's stays white.
 const ROLES := {
-	"fire": [Color.WHITE, Color.BLACK, PICO.yellow, PICO.red],
-	"smoke": [Color.BLACK, Color.WHITE, PICO.dark_grey, PICO.black],
-	"dust": [Color.WHITE, Color.BLACK, PICO.peach, PICO.brown],
-	"spark": [Color.WHITE, Color.BLACK, PICO.yellow, PICO.black],
-	"trail": [Color.WHITE, Color.BLACK, PICO.light_grey, PICO.dark_grey],
+	"fire": [Color.WHITE, Color.BLACK, "yellow", "red"],
+	"smoke": [Color.BLACK, Color.WHITE, "dark_grey", "black"],
+	"dust": [Color.WHITE, Color.BLACK, "peach", "brown"],
+	"spark": [Color.WHITE, Color.BLACK, "yellow", "black"],
+	"trail": [Color.WHITE, Color.BLACK, "light_grey", "dark_grey"],
 	# A missile the player sent back.
-	"deflect_trail": [Color.WHITE, Color.BLACK, PICO.yellow, PICO.orange],
-	"enemy_fire": [Color.BLACK, Color.WHITE, PICO.red, PICO.black],
-	"player_fire": [Color.WHITE, Color.BLACK, PICO.white, PICO.black],
-	"warning": [Color.BLACK, Color.WHITE, PICO.red, PICO.white],
+	"deflect_trail": [Color.WHITE, Color.BLACK, "yellow", "orange"],
+	"enemy_fire": [Color.BLACK, Color.WHITE, "red", "black"],
+	"player_fire": [Color.WHITE, Color.BLACK, "white", "black"],
+	"warning": [Color.BLACK, Color.WHITE, "red", "white"],
 	# The heavy rocket, which can't be sent back: set apart from the rest.
-	"heavy_fire": [Color.BLACK, Color.WHITE, PICO.dark_purple, PICO.black],
+	"heavy_fire": [Color.BLACK, Color.WHITE, "dark_purple", "black"],
 	# The solid drop shadow under enemy helicopters (no rim).
-	"shadow": [Color.BLACK, Color.BLACK, PICO.dark_blue, PICO.dark_blue],
+	"shadow": [Color.BLACK, Color.BLACK, "dark_blue", "dark_blue"],
 }
 
 static var _puffs: Dictionary = {}
@@ -66,14 +66,21 @@ static func mono() -> bool:
 	return PixelArt.is_monochrome()
 
 
+## The colour palette's colour called `name` (PICO-8's names; a palette
+## can name its own, see RetroPalettes).
+static func colour(name: String) -> Color:
+	var named: Dictionary = RetroPalettes.LIST[PixelArt.palette].get("named", {})
+	return Color(named[name]) if named.has(name) else PICO[name]
+
+
 ## `role`'s fill colour (see ROLES).
 static func fill(role: String) -> Color:
-	return ROLES[role][0 if mono() else 2]
+	return ROLES[role][0] if mono() else colour(ROLES[role][2])
 
 
 ## `role`'s rim colour (see ROLES).
 static func rim_color(role: String) -> Color:
-	return ROLES[role][1 if mono() else 3]
+	return ROLES[role][1] if mono() else colour(ROLES[role][3])
 
 
 ## A puff (see puff) in `role`'s colours.
@@ -83,38 +90,47 @@ static func role_puff(role: String, radius: float = 0.5, rim_width: float = 0.3)
 
 ## Darkens every mesh under `root`: to near-black in 1-bit, a darker shade
 ## of its own colour otherwise.
+## A palette with its own "ink" (see RetroPalettes) tints toward that
+## instead (Dusk: muted teal, so enemies read on its dark ground).
 static func ink(root: Node) -> void:
+	var own: Array = RetroPalettes.LIST[PixelArt.palette].get("ink", [])
 	if mono():
 		_restyle(root, INK_RANGE, "one_bit_ink")
+	elif not own.is_empty():
+		_restyle(root, own[1], "palette_ink", Color(own[0]), own[2])
 	else:
 		_restyle(root, COLOUR_INK_RANGE, "colour_ink")
 
 
 ## Lightens every mesh under `root`: to near-white in 1-bit, a lighter
-## shade of its own colour otherwise.
+## shade of its own colour otherwise, or toward the palette's own "paper".
 static func paper(root: Node) -> void:
+	var own: Array = RetroPalettes.LIST[PixelArt.palette].get("paper", [])
 	if mono():
 		_restyle(root, PAPER_RANGE, "one_bit_paper")
+	elif not own.is_empty():
+		_restyle(root, own[1], "palette_paper", Color(own[0]), own[2])
 	else:
 		_restyle(root, COLOUR_PAPER_RANGE, "colour_paper")
 
 
-static func _restyle(root: Node, span: Vector2, tag: String) -> void:
+static func _restyle(root: Node, span: Vector2, tag: String, tint: Color = Color.WHITE, toward: float = 0.0) -> void:
 	var meshes: Array = root.find_children("*", "MeshInstance3D", true, false)
 	if root is MeshInstance3D:
 		meshes.append(root)
 	for mesh: MeshInstance3D in meshes:
-		_squeeze(mesh.material_override, span, tag)
+		_squeeze(mesh.material_override, span, tag, tint, toward)
 		for i in mesh.get_surface_override_material_count():
-			_squeeze(mesh.get_surface_override_material(i), span, tag)
+			_squeeze(mesh.get_surface_override_material(i), span, tag, tint, toward)
 		if mesh.mesh != null:
 			for i in mesh.mesh.get_surface_count():
-				_squeeze(mesh.mesh.surface_get_material(i), span, tag)
+				_squeeze(mesh.mesh.surface_get_material(i), span, tag, tint, toward)
 
 
 # Materials can be shared between copies of a model, so each is squeezed
-# once and tagged.
-static func _squeeze(material: Material, span: Vector2, tag: String) -> void:
+# once and tagged. `toward` blends the hue toward `tint` at the same
+# brightness.
+static func _squeeze(material: Material, span: Vector2, tag: String, tint: Color = Color.WHITE, toward: float = 0.0) -> void:
 	var standard := material as BaseMaterial3D
 	# Unlit parts (glows, the hit flash's white) are already what they mean
 	# to be; see-through ones would only dither.
@@ -125,10 +141,11 @@ static func _squeeze(material: Material, span: Vector2, tag: String) -> void:
 	var color := standard.albedo_color
 	var brightness := maxf(color.get_luminance(), 0.01)
 	var target := lerpf(span.x, span.y, brightness)
+	var hue := color.lerp(tint * (brightness / maxf(tint.get_luminance(), 0.01)), toward)
 	standard.albedo_color = Color(
-		clampf(color.r * target / brightness, 0.0, 1.0),
-		clampf(color.g * target / brightness, 0.0, 1.0),
-		clampf(color.b * target / brightness, 0.0, 1.0), color.a)
+		clampf(hue.r * target / brightness, 0.0, 1.0),
+		clampf(hue.g * target / brightness, 0.0, 1.0),
+		clampf(hue.b * target / brightness, 0.0, 1.0), color.a)
 
 
 ## Gives every solid mesh under `root` a `width`-thick rim of `color`: a
